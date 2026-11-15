@@ -11,16 +11,13 @@ from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
 import numpy as np
-import cv2
 from app.core.errors import RealSenseError
 from app.services import advanced_mode, options
 from app.models.device import Device, DeviceInfo
-from app.models.sensor import Sensor, SensorInfo, SupportedStreamProfile
+from app.models.sensor import SensorInfo, StreamProfile
 from app.models.option import Option, OptionInfo
-from app.models.stream import PointCloudStatus, StreamConfig, StreamStatus, Resolution
-from app.models.sensor_streaming import SensorStreamConfig, SensorStreamStatus
+from app.models.stream import PointCloudStatus, StreamConfig, StreamStatus
 import socketio
-from datetime import datetime
 
 from app.services.metadata_socket_server import MetadataSocketServer
 from app.services import firmware as fw
@@ -33,6 +30,25 @@ _IS_WINDOWS = platform.system() == "Windows"
 # (~one capture interval); the picker selects the entry whose timestamp is
 # closest to the depth frame being processed.
 COLOR_FRAME_HISTORY = 5
+
+
+def _stream_name(profile) -> str:
+    if profile.stream_type() == rs.stream.infrared:
+        return f"infrared-{profile.stream_index()}"
+    return profile.stream_type().name.lower()
+
+
+def _profile_row(profile) -> StreamProfile:
+    video = profile.as_video_stream_profile()
+    return StreamProfile(
+        stream_type=profile.stream_type().name,
+        stream_index=profile.stream_index(),
+        format=profile.format().name,
+        width=video.width(),
+        height=video.height(),
+        fps=profile.fps(),
+        default=profile.is_default(),
+    )
 
 
 class RealSenseManager:
@@ -49,7 +65,6 @@ class RealSenseManager:
         self.devices: Dict[str, rs.device] = {}
         self.device_infos: Dict[str, DeviceInfo] = {}
         self.pipelines: Dict[str, rs.pipeline] = {}
-        self.configs: Dict[str, rs.config] = {}
         self.active_streams: Dict[str, Set[str]] = (
             {}
         )  # device_id -> set of stream types
@@ -73,14 +88,6 @@ class RealSenseManager:
         # state, and depth/color threads from different devices would race on
         # a shared instance (texturing device A's cloud with device B's color).
         self.point_clouds: Dict[str, "rs.pointcloud"] = {}
-
-        # Caches for pipeline/config reuse to reduce startup cost
-        self.config_cache: Dict[str, Dict[str, rs.config]] = {}  # device -> signature -> config
-        self.pipeline_cache: Dict[str, rs.pipeline] = {}  # device -> last pipeline object
-        self.pipeline_signatures: Dict[str, str] = {}  # device -> active signature
-
-        # Stop coordination
-        self.stopping: Set[str] = set()
 
         # Store latest raw depth frames for pixel depth queries
         self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
@@ -108,17 +115,9 @@ class RealSenseManager:
         self.sio = sio
         self.metadata_socket_server = MetadataSocketServer(sio, self)
 
-        # Device discovery cache metadata
-        self._last_refresh_time: float = 0.0
-
         # --- Per-Sensor Streaming State (Sensor API) ---
         # Tracks which mode each device is using: "pipeline", "sensor", or "idle"
         self.streaming_mode: Dict[str, str] = {}  # device_id -> mode
-        # Per-sensor streaming info: device_id -> sensor_id -> SensorStreamInfo dict
-        self.sensor_streams: Dict[str, Dict[str, dict]] = {}
-        # Per-sensor frame queues: device_id -> sensor_id -> list of frames
-        self.sensor_frame_queues: Dict[str, Dict[str, List]] = {}
-        # Per-sensor metadata queues: device_id -> sensor_id -> list of metadata dicts
 
         # --- Post-Processing Filters ---
         # Stores filter instances per device/sensor: device_id -> sensor_id -> list of filter dicts
@@ -127,11 +126,8 @@ class RealSenseManager:
         # One colorizer per device so depth-visualization options (color scheme,
         # min/max distance, histogram eq) set on it affect the streamed depth image.
         self.colorizers: Dict[str, "rs.colorizer"] = defaultdict(rs.colorizer)
-        self.sensor_metadata_queues: Dict[str, Dict[str, List[Dict]]] = {}
         # Per-sensor rs.frame_queue objects: device_id -> sensor_id -> rs.frame_queue
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
-        # Track sensor stopping state
-        self.sensor_stopping: Dict[str, Set[str]] = {}  # device_id -> set of sensor_ids
 
         # Initialize devices
         self.refresh_devices()
@@ -165,7 +161,6 @@ class RealSenseManager:
     def _remove_device(self, serial: str) -> None:
         assert self.lock.locked(), "_remove_device called without self.lock held"
         self.pipelines.pop(serial, None)
-        self.configs.pop(serial, None)
         self.active_streams.pop(serial, None)
         self.frame_queues.pop(serial, None)
         self.metadata_queues.pop(serial, None)
@@ -263,9 +258,9 @@ class RealSenseManager:
     def _refresh_devices_locked(self) -> List[DeviceInfo]:
         """Actual device enumeration (no FW-in-progress guard)."""
         with self.lock:
-            # Clear existing devices (that aren't streaming)
+            # Clear existing devices (that aren't streaming, in either mode)
             for device_id in list(self.devices.keys()):
-                if device_id not in self.pipelines:
+                if device_id not in self.pipelines and not self.sensor_rs_queues.get(device_id):
                     del self.devices[device_id]
                     self.device_infos.pop(device_id, None)
                     self._supported_md_by_profile.pop(device_id, None)
@@ -273,20 +268,7 @@ class RealSenseManager:
             for dev in self.ctx.devices:
                 self._register_new_device(dev)
 
-            # Update cache timestamp after a successful refresh
-            import time
-            self._last_refresh_time = time.perf_counter()
             return list(self.device_infos.values())
-
-    def _make_signature(self, configs: List[StreamConfig], align_to: Optional[str]) -> str:
-        """Deterministic signature for a stream start request."""
-        parts = []
-        for cfg in sorted(configs, key=lambda c: (c.stream_type.lower(), c.sensor_id, c.resolution.width, c.resolution.height, c.framerate, c.format.lower())):
-            parts.append(
-                f"{cfg.stream_type.lower()}|{cfg.format.lower()}|{cfg.resolution.width}x{cfg.resolution.height}@{cfg.framerate}|sensor:{cfg.sensor_id}"
-            )
-        align_part = align_to.lower() if align_to else "none"
-        return ";".join(parts) + f"|align:{align_part}"
 
     def get_devices(self, force_refresh: bool = False) -> List[DeviceInfo]:
         """Get all connected devices, with optional forced refresh."""
@@ -822,67 +804,7 @@ class RealSenseManager:
             # Determine sensor type
             sensor_type = sensor.name
 
-            # Get supported stream profiles
-            profiles = sensor.get_stream_profiles()
-            supported_stream_profiles = (
-                {}
-            )  # Dictionary to temporarily store profiles by stream_type
-
-            for profile in profiles:
-                if profile.is_video_stream_profile():
-                    video_profile = profile.as_video_stream_profile()
-                    fmt = str(profile.format()).split(".")[1]
-                    width, height = video_profile.width(), video_profile.height()
-                    fps = video_profile.fps()
-                else:
-                    # Motion stream profiles - get actual fps, use placeholder for format/resolution
-                    fmt = "combined_motion"
-                    width, height = 320, 120  # Visualization frame size
-                    fps = profile.fps()  # Use actual motion sensor fps
-                stream_type = profile.stream_type().name
-                if profile.stream_type() == rs.stream.infrared:
-                    stream_index = profile.stream_index()
-                    if stream_index == 0:
-                        continue
-                    else:
-                        stream_type = f"{profile.stream_type().name}-{stream_index}"
-
-                if stream_type not in supported_stream_profiles:
-                    supported_stream_profiles[stream_type] = {
-                        "stream_type": stream_type,
-                        "resolutions": [],
-                        "fps": [],
-                        "formats": [],
-                    }
-
-                # Add resolution if not already in the list
-                resolution = (width, height)
-                if (
-                    resolution
-                    not in supported_stream_profiles[stream_type]["resolutions"]
-                ):
-                    supported_stream_profiles[stream_type]["resolutions"].append(
-                        resolution
-                    )
-
-                # Add fps if not already in the list
-                if fps not in supported_stream_profiles[stream_type]["fps"]:
-                    supported_stream_profiles[stream_type]["fps"].append(fps)
-
-                # Add format if not already in the list
-                if fmt not in supported_stream_profiles[stream_type]["formats"]:
-                    supported_stream_profiles[stream_type]["formats"].append(fmt)
-
-            # Convert dictionary to list of SupportedStreamProfile objects
-            stream_profiles_list = []
-            for stream_data in supported_stream_profiles.values():
-                stream_profile = SupportedStreamProfile(
-                    stream_type=stream_data["stream_type"],
-                    resolutions=stream_data["resolutions"],
-                    fps=stream_data["fps"],
-                    formats=stream_data["formats"],
-                )
-                stream_profiles_list.append(stream_profile)
+            stream_profiles_list = [_profile_row(profile) for profile in sensor.get_stream_profiles()]
 
             # Get options
             sensor_options = self.get_sensor_options(device_id, sensor_id)
@@ -1113,163 +1035,112 @@ class RealSenseManager:
         device_id: str,
         configs: List[StreamConfig],
         align_to: Optional[str] = None,
-        reuse_cache: bool = True,
-        timing: bool = True,
-    ) -> dict:
-        """Start streaming from a device, with timing info for diagnostics"""
-        import time
-        
+    ) -> StreamStatus:
+        """Start streaming from a device"""
         # Check mode compatibility - pipeline API cannot be used if sensor API is active
         self._check_streaming_mode(device_id, "pipeline")
-        
-        timings = {}
-        t0 = time.perf_counter()
-        refreshed = False
-        # Only refresh when the cache is empty or the requested device is unknown
-        if not self.devices or device_id not in self.devices:
-            self.refresh_devices()
-            refreshed = True
-        timings['refresh_devices'] = time.perf_counter() - t0 if refreshed else 0.0
 
-        t1 = time.perf_counter()
+        # Only refresh when the cache is empty or the requested device is unknown
+        if device_id not in self.devices:
+            self.refresh_devices()
+
         if device_id not in self.devices:
             raise RealSenseError(
                 status_code=404, detail=f"Device {device_id} not found"
             )
-        if device_id in self.stopping:
-            raise RealSenseError(status_code=409, detail="Stop in progress; try again shortly")
-        timings['device_lookup'] = time.perf_counter() - t1
-        signature = self._make_signature(configs, align_to)
 
-        t2 = time.perf_counter()
-        # If already streaming with identical signature, short-circuit
-        if device_id in self.pipelines and self.pipeline_signatures.get(device_id) == signature:
-            return {
-                'device_id': device_id,
-                'is_streaming': True,
-                'active_streams': list(self.active_streams[device_id]),
-                'timings': timings,
-                'config_reused': True,
-                'config_signature': signature,
-            }
+        pipeline = rs.pipeline(self.ctx)
+        pipeline.set_device(self.devices[device_id])  # skips re-creating the device on start
+        config = rs.config()
 
-        # Initialize or reuse pipeline and config
-        config_cache_for_device = self.config_cache.setdefault(device_id, {})
-
-        if not reuse_cache:
-            config_cache_for_device.pop(signature, None)
-            self.pipeline_cache.pop(device_id, None)
-        pipeline = self.pipeline_cache.get(device_id) if reuse_cache else None
-        pipeline = pipeline or rs.pipeline(self.ctx)
-
-        config_reused = False
-        if reuse_cache and signature in config_cache_for_device:
-            config = config_cache_for_device[signature]
-            config_reused = True
-        else:
-            config = rs.config()
-            config.enable_device(device_id)
-        timings['pipeline_config_init'] = 0.0 if config_reused else time.perf_counter() - t2
-
-        t3 = time.perf_counter()
         # Track active stream types
         active_streams = set()
-        # Enable streams based on configuration only if not reused
-        if not config_reused:
-            for stream_config in configs:
-                # Parse sensor index from sensor_id
-                try:
-                    sensor_index = int(stream_config.sensor_id.split("-")[-1])
-                    if sensor_index < 0 or sensor_index >= len(
-                        self.devices[device_id].sensors
-                    ):
-                        raise RealSenseError(
-                            status_code=404,
-                            detail=f"Sensor {stream_config.sensor_id} not found",
-                        )
-                except (ValueError, IndexError):
+        for stream_config in configs:
+            # Parse sensor index from sensor_id
+            try:
+                sensor_index = int(stream_config.sensor_id.split("-")[-1])
+                if sensor_index < 0 or sensor_index >= len(
+                    self.devices[device_id].sensors
+                ):
                     raise RealSenseError(
                         status_code=404,
-                        detail=f"Invalid sensor ID format: {stream_config.sensor_id}",
+                        detail=f"Sensor {stream_config.sensor_id} not found",
                     )
-                # Get stream type from string
-                stream_name_list = stream_config.stream_type.split("-")
-                stream_type = None
-                for name, val in rs.stream.__members__.items():
-                    if name.lower() == stream_name_list[0].lower():
-                        stream_type = val
-                        break
-                if stream_type is None:
-                    raise RealSenseError(
-                        status_code=400,
-                        detail=f"Invalid stream type: {stream_config.stream_type}",
-                    )
-                format_type = None
-                for name, val in rs.format.__members__.items():
-                    if name.lower() == stream_config.format.lower():
-                        format_type = val
-                        break
-                if format_type is None:
-                    raise RealSenseError(
-                        status_code=400, detail=f"Invalid format: {stream_config.format}"
-                    )
-                if active_streams and stream_config.stream_type in active_streams:
-                    continue
-                    
-                # Try to enable stream - first with exact format, then with any format
-                stream_enabled = False
-                last_error = None
-                
-                for try_format in [format_type, rs.format.any]:
-                    if stream_enabled:
-                        break
-                    try:
-                        if len(stream_name_list) > 1:
-                            stream_index = int(stream_name_list[1])
-                            config.enable_stream(
-                                stream_type,
-                                stream_index,
-                                stream_config.resolution.width,
-                                stream_config.resolution.height,
-                                try_format,
-                                stream_config.framerate,
-                            )
-                        elif format_type == rs.format.combined_motion:
-                            config.enable_stream(stream_type)
-                        else:
-                            config.enable_stream(
-                                stream_type,
-                                stream_config.resolution.width,
-                                stream_config.resolution.height,
-                                try_format,
-                                stream_config.framerate,
-                            )
-                        stream_enabled = True
-                        if try_format == rs.format.any:
-                            logging.info(f"[PIPELINE] Using fallback format for {stream_config.stream_type} "
-                                        f"(requested {stream_config.format} not available at "
-                                        f"{stream_config.resolution.width}x{stream_config.resolution.height}@{stream_config.framerate}fps)")
-                    except RuntimeError as e:
-                        last_error = e
-                        continue
-                        
-                if not stream_enabled:
-                    raise RealSenseError(
-                        status_code=400, detail=f"Failed to enable stream {stream_config.stream_type}: {str(last_error)}"
-                    )
-                active_streams.add(stream_config.stream_type)
-        else:
-            # Even when reusing config, rebuild the active_streams set for reporting
-            for stream_config in configs:
-                active_streams.add(stream_config.stream_type)
+            except (ValueError, IndexError):
+                raise RealSenseError(
+                    status_code=404,
+                    detail=f"Invalid sensor ID format: {stream_config.sensor_id}",
+                )
+            # Get stream type from string
+            stream_name_list = stream_config.stream_type.split("-")
+            stream_type = None
+            for name, val in rs.stream.__members__.items():
+                if name.lower() == stream_name_list[0].lower():
+                    stream_type = val
+                    break
+            if stream_type is None:
+                raise RealSenseError(
+                    status_code=400,
+                    detail=f"Invalid stream type: {stream_config.stream_type}",
+                )
+            format_type = None
+            for name, val in rs.format.__members__.items():
+                if name.lower() == stream_config.format.lower():
+                    format_type = val
+                    break
+            if format_type is None:
+                raise RealSenseError(
+                    status_code=400, detail=f"Invalid format: {stream_config.format}"
+                )
+            if active_streams and stream_config.stream_type in active_streams:
+                continue
 
-        timings['stream_enable'] = 0.0 if config_reused else time.perf_counter() - t3
-        t4 = time.perf_counter()
+            # Try to enable stream - first with exact format, then with any format
+            stream_enabled = False
+            last_error = None
+
+            for try_format in [format_type, rs.format.any]:
+                if stream_enabled:
+                    break
+                try:
+                    if len(stream_name_list) > 1:
+                        stream_index = int(stream_name_list[1])
+                        config.enable_stream(
+                            stream_type,
+                            stream_index,
+                            stream_config.resolution.width,
+                            stream_config.resolution.height,
+                            try_format,
+                            stream_config.framerate,
+                        )
+                    elif format_type == rs.format.combined_motion:
+                        config.enable_stream(stream_type)
+                    else:
+                        config.enable_stream(
+                            stream_type,
+                            stream_config.resolution.width,
+                            stream_config.resolution.height,
+                            try_format,
+                            stream_config.framerate,
+                        )
+                    stream_enabled = True
+                    if try_format == rs.format.any:
+                        logging.info(f"[PIPELINE] Using fallback format for {stream_config.stream_type} "
+                                    f"(requested {stream_config.format} not available at "
+                                    f"{stream_config.resolution.width}x{stream_config.resolution.height}@{stream_config.framerate}fps)")
+                except RuntimeError as e:
+                    last_error = e
+                    continue
+
+            if not stream_enabled:
+                raise RealSenseError(
+                    status_code=400, detail=f"Failed to enable stream {stream_config.stream_type}: {str(last_error)}"
+                )
+            active_streams.add(stream_config.stream_type)
+
         # Start streaming
         try:
             pipeline_profile = pipeline.start(config)
-            timings['pipeline_start'] = time.perf_counter() - t4
-            t5 = time.perf_counter()
             # Set up align if requested
             align_processor = None
             if align_to:
@@ -1283,10 +1154,6 @@ class RealSenseManager:
             # Store pipeline and config
             with self.lock:
                 self.pipelines[device_id] = pipeline
-                self.configs[device_id] = config
-                self.pipeline_cache[device_id] = pipeline
-                self.pipeline_signatures[device_id] = signature
-                config_cache_for_device[signature] = config
                 self.active_streams[device_id] = active_streams
                 self.frame_queues[device_id] = {
                     stream_type: [] for stream_type in active_streams
@@ -1296,9 +1163,7 @@ class RealSenseManager:
                 }
                 # Track that this device is using pipeline API
                 self.streaming_mode[device_id] = "pipeline"
-            timings['post_start_setup'] = time.perf_counter() - t5
-            t6 = time.perf_counter()
-            
+
             # Initialize post-processing filters for enabled sensors if not already done
             dev = self.devices[device_id]
             for stream_config in configs:
@@ -1322,75 +1187,51 @@ class RealSenseManager:
             if device_id in self.device_infos:
                 self.device_infos[device_id].is_streaming = True
             self.metadata_socket_server.start_broadcast(device_id)
-            timings['thread_start'] = time.perf_counter() - t6
-            timings['total'] = time.perf_counter() - t0
-            logging.debug("[TIMING] start_stream timings for %s: %s", device_id, timings)
-            return {
-                'device_id': device_id,
-                'is_streaming': True,
-                'active_streams': list(active_streams),
-                'timings': timings,
-                'config_reused': config_reused,
-                'config_signature': signature,
-            }
+            return StreamStatus(
+                device_id=device_id,
+                is_streaming=True,
+                active_streams=list(active_streams),
+            )
         except RuntimeError as e:
             raise RealSenseError(
                 status_code=500, detail=f"Failed to start streaming: {str(e)}"
             )
 
     def stop_stream(self, device_id: str) -> StreamStatus:
-        """Stop streaming from a device. Returns immediately and completes stop in background."""
+        """Stop streaming from a device"""
         with self.lock:
             if device_id not in self.devices:
-                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=[], stopping=False)
-
-            # If already stopping, report status
-            if device_id in self.stopping:
-                return StreamStatus(
-                    device_id=device_id,
-                    is_streaming=device_id in self.pipelines,
-                    active_streams=list(self.active_streams.get(device_id, set())),
-                    stopping=True,
-                )
+                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=[])
 
             is_streaming = device_id in self.pipelines
             active_streams = list(self.active_streams.get(device_id, set()))
             if not is_streaming:
-                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=active_streams, stopping=False)
+                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=active_streams)
 
-            self.stopping.add(device_id)
-
-        def _do_stop():
-            try:
-                self.metadata_socket_server.stop_broadcast(device_id)
-                self.pipelines[device_id].stop()
-            except Exception as e:
-                logging.error("Failed to stop streaming for %s: %s", device_id, e)
-            finally:
-                with self.lock:
-                    # Clean up resources
-                    self.pipelines.pop(device_id, None)
-                    self.configs.pop(device_id, None)
-                    active = list(self.active_streams.pop(device_id, set()))
-                    self.pipeline_signatures.pop(device_id, None)
-                    self.frame_queues.pop(device_id, None)
-                    self.metadata_queues.pop(device_id, None)
-                    self.color_frames.pop(device_id, None)
-                    self.point_clouds.pop(device_id, None)
-                    self._supported_md_by_profile.pop(device_id, None)
-                    self.stopping.discard(device_id)
-                    # Reset streaming mode to idle
-                    self.streaming_mode[device_id] = "idle"
-                    if device_id in self.device_infos:
-                        self.device_infos[device_id].is_streaming = False
-
-        threading.Thread(target=_do_stop, daemon=True).start()
+        try:
+            self.metadata_socket_server.stop_broadcast(device_id)
+            self.pipelines[device_id].stop()
+        except Exception as e:
+            logging.error("Failed to stop streaming for %s: %s", device_id, e)
+        finally:
+            with self.lock:
+                # Clean up resources
+                self.pipelines.pop(device_id, None)
+                self.active_streams.pop(device_id, None)
+                self.frame_queues.pop(device_id, None)
+                self.metadata_queues.pop(device_id, None)
+                self.color_frames.pop(device_id, None)
+                self.point_clouds.pop(device_id, None)
+                self._supported_md_by_profile.pop(device_id, None)
+                # Reset streaming mode to idle
+                self.streaming_mode[device_id] = "idle"
+                if device_id in self.device_infos:
+                    self.device_infos[device_id].is_streaming = False
 
         return StreamStatus(
             device_id=device_id,
             is_streaming=False,
             active_streams=active_streams,
-            stopping=True,
         )
 
     def activate_point_cloud(self, device_id: str, enable: bool) -> bool:
@@ -1437,25 +1278,17 @@ class RealSenseManager:
         is_pipeline_streaming = device_id in self.pipelines
         pipeline_streams = list(self.active_streams.get(device_id, set()))
         
-        # Check sensor mode - collect active stream types from sensor_streams
-        sensor_streams = []
-        if device_id in self.sensor_streams:
-            for sensor_id, sensor_info in self.sensor_streams[device_id].items():
-                if sensor_info.get("is_streaming", False):
-                    # Use stream_types (plural) - it's a list of active stream types
-                    stream_types_list = sensor_info.get("stream_types", [])
-                    sensor_streams.extend(stream_types_list)
+        # Check sensor mode - its active streams are the device's frame queues
+        sensor_streams = list(self.frame_queues.get(device_id, {})) if mode == "sensor" else []
         
         # Combine based on mode
         is_streaming = is_pipeline_streaming or len(sensor_streams) > 0
         active_streams = pipeline_streams if mode == "pipeline" else sensor_streams
-        stopping = device_id in self.stopping
 
         return StreamStatus(
             device_id=device_id,
             is_streaming=is_streaming,
             active_streams=active_streams,
-            stopping=stopping,
         )
 
     def _publish_frames(self, device_id: str, stream_types) -> None:
@@ -1503,83 +1336,35 @@ class RealSenseManager:
     ) -> np.ndarray:
         """Get the latest frame from a specific stream (supports both pipeline and sensor modes)"""
         with self.lock:
-            mode = self.streaming_mode.get(device_id, "idle")
-            
-            # Try pipeline mode first
-            if mode == "pipeline" or device_id in self.frame_queues:
-                if device_id in self.frame_queues:
-                    if stream_type in self.frame_queues[device_id]:
-                        queue = self.frame_queues[device_id][stream_type]
-                        if len(queue) > 0:
-                            return queue[-1]
-            
-            # Try sensor mode - find sensor by stream_type
-            if mode == "sensor" or device_id in self.sensor_streams:
-                if device_id in self.sensor_streams:
-                    for sensor_id, sensor_info in self.sensor_streams[device_id].items():
-                        sensor_stream_types = sensor_info.get("stream_types", [])
-                        # Check if this stream type is active on this sensor
-                        matching_type = None
-                        for st in sensor_stream_types:
-                            if st.lower() == stream_type.lower():
-                                matching_type = st
-                                break
-                        
-                        if sensor_info.get("is_streaming", False) and matching_type:
-                            # Found matching sensor, get frame from per-stream-type queue
-                            if (device_id in self.sensor_frame_queues and
-                                sensor_id in self.sensor_frame_queues[device_id] and
-                                matching_type in self.sensor_frame_queues[device_id][sensor_id]):
-                                queue = self.sensor_frame_queues[device_id][sensor_id][matching_type]
-                                if len(queue) > 0:
-                                    return queue[-1]
-                                else:
-                                    # 503 Service Unavailable: stream is active but no frames yet
-                                    # (transient — caller should retry rather than treat as fatal)
-                                    raise RealSenseError(
-                                        status_code=503,
-                                        detail=f"No frames available for stream {stream_type}",
-                                    )
-                    # Stream type not found in active sensors
-                    active_sensor_streams = []
-                    for sensor_info in self.sensor_streams[device_id].values():
-                        if sensor_info.get("is_streaming", False):
-                            active_sensor_streams.extend(sensor_info.get("stream_types", []))
-                    raise RealSenseError(
-                        status_code=400, 
-                        detail=f"Stream type '{stream_type}' is not active. Available: {active_sensor_streams}"
-                    )
-            
-            # Device not streaming
-            raise RealSenseError(
-                status_code=400, detail=f"Device {device_id} is not streaming"
-            )
+            queues = self.frame_queues.get(device_id)
+            if queues is None:
+                raise RealSenseError(
+                    status_code=400, detail=f"Device {device_id} is not streaming"
+                )
+            if stream_type not in queues:
+                raise RealSenseError(
+                    status_code=400,
+                    detail=f"Stream type '{stream_type}' is not active. Available: {list(queues)}"
+                )
+            if not queues[stream_type]:
+                # 503 Service Unavailable: stream is active but no frames yet
+                # (transient — caller should retry rather than treat as fatal)
+                raise RealSenseError(
+                    status_code=503,
+                    detail=f"No frames available for stream {stream_type}",
+                )
+            return queues[stream_type][-1]
 
     def get_latest_metadata(self, device_id: str, stream_type: str) -> Dict:
         """Get the latest METADATA dictionary from a specific stream (supports both pipeline and sensor modes)"""
         stream_key = stream_type.lower()  # Use consistent key format
         with self.lock:
-            mode = self.streaming_mode.get(device_id, "idle")
-            
-            # Try pipeline mode first
-            if mode == "pipeline" and device_id in self.pipelines and device_id in self.metadata_queues:
-                if stream_key in self.metadata_queues.get(device_id, {}):
-                    queue = self.metadata_queues[device_id][stream_key]
-                    if len(queue) > 0:
-                        return queue[-1]
-                    return {}
-            
-            # Try sensor mode - find the sensor that has this stream type
-            if mode == "sensor" and device_id in self.sensor_metadata_queues:
-                for sensor_id, sensor_queues in self.sensor_metadata_queues[device_id].items():
-                    if stream_key in sensor_queues:
-                        queue = sensor_queues[stream_key]
-                        if len(queue) > 0:
-                            return queue[-1]
-                        return {}
-            
+            queue = self.metadata_queues.get(device_id, {}).get(stream_key)
+            if queue is not None:
+                return queue[-1] if queue else {}
+
             # If we get here, the stream is not active or device is not streaming
-            if mode == "idle":
+            if self.streaming_mode.get(device_id, "idle") == "idle":
                 raise RealSenseError(
                     status_code=400, detail=f"Device {device_id} is not streaming."
                 )
@@ -1590,10 +1375,7 @@ class RealSenseManager:
                     detail=f"Stream type '{stream_key}' is not active for device {device_id}.",
                 )
 
-    # TODO: replace with `list(rs.frame_metadata_value)` once pyrealsense2 ships
-    # with pybind11 >= 2.12 (added __iter__ on py::enum_). Current PyPI wheels
-    # use older pybind11 where the enum is not iterable.
-    _FRAME_METADATA_VALUES = list(rs.frame_metadata_value.__members__.values())
+    _FRAME_METADATA_ITEMS = list(rs.frame_metadata_value.__members__.items())
 
     @staticmethod
     def _build_viewer_info(frame_data) -> Dict[str, Any]:
@@ -1638,7 +1420,7 @@ class RealSenseManager:
         # Build the supported set from the 2nd frame on: delta-computed metadata
         # (e.g. actual_fps) is not yet available on the first frame.
         if supported is None and frame_data.get_frame_number() >= 2:
-            supported = [md for md in self._FRAME_METADATA_VALUES
+            supported = [(name, md) for name, md in self._FRAME_METADATA_ITEMS
                          if frame_data.supports_frame_metadata(md)]
             if profile_uid is not None:
                 if device_cache is None:
@@ -1646,12 +1428,12 @@ class RealSenseManager:
                 device_cache[profile_uid] = supported
 
         attrs: Dict[str, int] = {}
-        for md in (supported or []):
+        for name, md in (supported or []):
             try:
-                attrs[md.name] = frame_data.get_frame_metadata(md)
+                attrs[name] = frame_data.get_frame_metadata(md)
             except Exception as e:
                 # supports_frame_metadata said yes; getting the value should not throw.
-                logging.debug("[METADATA] failed to read %s: %s", md.name, e)
+                logging.debug("[METADATA] failed to read %s: %s", name, e)
                 continue
         return attrs
 
@@ -1759,16 +1541,7 @@ class RealSenseManager:
         cloud. Pipeline mode reads color straight from the frameset and doesn't
         need this — the frameset already drops disabled streams.
         """
-        mode = self.streaming_mode.get(device_id)
-        if mode == "pipeline":
-            return any(s.lower() == "color" for s in self.active_streams.get(device_id, set()))
-        if device_id in self.sensor_streams:
-            for sensor_info in self.sensor_streams[device_id].values():
-                if not sensor_info.get("is_streaming", False):
-                    continue
-                if any(st.lower() == "color" for st in sensor_info.get("stream_types", [])):
-                    return True
-        return False
+        return any(st.lower() == "color" for st in self.frame_queues.get(device_id, {}))
 
     @staticmethod
     def _sample_color_at_tex(tex: np.ndarray, color_frame) -> Optional[np.ndarray]:
@@ -1882,11 +1655,8 @@ class RealSenseManager:
                                         "y": float(motion_data.y),
                                         "z": float(motion_data.z),
                                     }
-                                    # Create simple visualization frame for motion data
+                                    # Placeholder frame; viewers draw motion from metadata["motion_data"]
                                     frame = np.zeros((120, 320, 3), dtype=np.uint8)
-                                    cv2.putText(frame, f"X: {motion_data.x:.3f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 1)
-                                    cv2.putText(frame, f"Y: {motion_data.y:.3f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 1)
-                                    cv2.putText(frame, f"Z: {motion_data.z:.3f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
                             else:
                                 continue  # Unknown stream type
 
@@ -1960,8 +1730,6 @@ class RealSenseManager:
                     if device_id in self.pipelines:
                         self.pipelines[device_id].stop()
                         del self.pipelines[device_id]
-                        if device_id in self.configs:
-                            del self.configs[device_id]
                         if device_id in self.active_streams:
                             del self.active_streams[device_id]
                         if device_id in self.frame_queues:
@@ -2058,154 +1826,9 @@ class RealSenseManager:
                        f"Stop all streams before switching to '{requested_mode}' mode."
             )
 
-    def _get_sensor_by_id(self, device_id: str, sensor_id: str) -> Tuple[rs.sensor, int]:
-        """
-        Get sensor object and index from sensor_id.
-        
-        Returns:
-            Tuple of (sensor, sensor_index)
-        """
-        if device_id not in self.devices:
-            self.refresh_devices()
-            if device_id not in self.devices:
-                raise RealSenseError(
-                    status_code=404, detail=f"Device {device_id} not found"
-                )
-        
-        dev = self.devices[device_id]
-        
-        # Parse sensor index from sensor_id (format: "{device_id}-sensor-{index}")
-        try:
-            sensor_index = int(sensor_id.split("-")[-1])
-            if sensor_index < 0 or sensor_index >= len(dev.sensors):
-                raise RealSenseError(
-                    status_code=404, detail=f"Sensor {sensor_id} not found"
-                )
-        except (ValueError, IndexError):
-            raise RealSenseError(
-                status_code=404, detail=f"Invalid sensor ID format: {sensor_id}"
-            )
-        
-        return dev.sensors[sensor_index], sensor_index
-
-    def _find_matching_profile(
-        self,
-        sensor: rs.sensor,
-        config: SensorStreamConfig
-    ) -> rs.stream_profile:
-        """
-        Find a stream profile matching the configuration.
-        
-        If exact format match isn't found at the requested resolution/fps,
-        falls back to finding any available format for that stream/resolution/fps.
-        
-        Returns:
-            Matching rs.stream_profile
-            
-        Raises:
-            RealSenseError: If no matching profile found
-        """
-        profiles = sensor.get_stream_profiles()
-        
-        exact_match = None
-        fallback_match = None  # Any format match for same stream/res/fps
-        
-        for profile in profiles:
-            # Get stream type name
-            stream_name = profile.stream_type().name.lower()
-            
-            # Handle infrared index
-            if profile.stream_type() == rs.stream.infrared:
-                stream_name = f"infrared-{profile.stream_index()}"
-            
-            # Check stream type match
-            if stream_name != config.stream_type.lower():
-                continue
-            
-            # Check format match (skip for motion streams if format is "combined_motion")
-            format_name = str(profile.format()).split('.')[-1].lower()
-            is_motion_stream = stream_name in ('accel', 'gyro')
-            
-            format_matches = False
-            if is_motion_stream:
-                # Motion streams: accept if config says "combined_motion" or actual format matches
-                format_matches = (config.format.lower() == "combined_motion" or 
-                                  format_name == config.format.lower())
-            else:
-                # Video streams: check exact format match
-                format_matches = (format_name == config.format.lower())
-            
-            # For video streams, check resolution and fps
-            res_fps_matches = False
-            if profile.is_video_stream_profile():
-                video_profile = profile.as_video_stream_profile()
-                res_fps_matches = (video_profile.width() == config.resolution.width and
-                                   video_profile.height() == config.resolution.height and
-                                   video_profile.fps() == config.framerate)
-            else:
-                # Motion streams - just check fps if applicable
-                res_fps_matches = (profile.fps() == config.framerate)
-            
-            if not res_fps_matches:
-                continue
-                
-            # Found a profile with matching stream/res/fps
-            if format_matches:
-                exact_match = profile
-                break  # Perfect match, use it
-            elif fallback_match is None:
-                fallback_match = profile  # Keep as fallback
-        
-        if exact_match:
-            return exact_match
-        
-        if fallback_match:
-            # Use fallback with different format
-            fallback_format = str(fallback_match.format()).split('.')[-1]
-            logging.info(f"[SENSOR] Using fallback format '{fallback_format}' for {config.stream_type} "
-                        f"(requested '{config.format}' not available at {config.resolution.width}x{config.resolution.height}@{config.framerate}fps)")
-            return fallback_match
-        
-        raise RealSenseError(
-            status_code=400,
-            detail=f"No matching profile found for stream_type={config.stream_type}, "
-                   f"format={config.format}, resolution={config.resolution.width}x{config.resolution.height}, "
-                   f"fps={config.framerate}"
-        )
-
-    def _validate_profile_compatibility(self, profiles: List[rs.stream_profile]) -> None:
-        """
-        Validate that all profiles can be opened together on one sensor.
-        
-        Args:
-            profiles: List of stream profiles to validate
-            
-        Raises:
-            RealSenseError: If profiles are incompatible (different FPS)
-        """
-        if len(profiles) <= 1:
-            return
-        
-        # Motion streams (gyro/accel) can have different FPS - skip validation
-        motion_streams = {rs.stream.gyro, rs.stream.accel}
-        all_motion = all(p.stream_type() in motion_streams for p in profiles)
-        if all_motion:
-            return  # Motion streams don't require FPS sync
-        
-        # Video streams must have same FPS for hardware sync
-        fps_values = set(p.fps() for p in profiles)
-        if len(fps_values) > 1:
-            profile_details = [f"{p.stream_type().name}@{p.fps()}fps" for p in profiles]
-            raise RealSenseError(
-                status_code=400,
-                detail=f"Incompatible FPS values. All streams on same sensor must use same FPS. "
-                       f"Requested: {', '.join(profile_details)}"
-            )
-
     def _process_sensor_frame(
         self,
         frame: Any,
-        frame_stream_name: str,
         device_id: str,
         colorizer: Any,
     ) -> Tuple[Optional[Any], dict]:
@@ -2215,8 +1838,9 @@ class RealSenseManager:
         metadata: dict = {
             "frame_metadata": self._get_frame_metadata(frame, device_id),
         }
+        stream = frame.get_profile().stream_type()
 
-        if "depth" in frame_stream_name:
+        if stream == rs.stream.depth:
             depth_frame = frame.as_depth_frame()
             depth_frame = self._apply_depth_filters(device_id, depth_frame)
             self.depth_frames[device_id] = depth_frame
@@ -2241,7 +1865,7 @@ class RealSenseManager:
                 if pc_meta:
                     metadata["point_cloud"] = pc_meta
 
-        elif "color" in frame_stream_name:
+        elif stream == rs.stream.color:
             color_frame = frame.as_video_frame()
             color_frame = self._apply_color_filters(device_id, color_frame)
             # Append to bounded history so the depth thread can pick the color
@@ -2254,11 +1878,11 @@ class RealSenseManager:
             processed_frame = np.asanyarray(color_frame.get_data())
             info_source = color_frame
 
-        elif "infrared" in frame_stream_name:
+        elif stream == rs.stream.infrared:
             processed_frame = np.asanyarray(frame.get_data())
             info_source = frame.as_video_frame()
 
-        elif "gyro" in frame_stream_name or "accel" in frame_stream_name:
+        elif stream in (rs.stream.gyro, rs.stream.accel):
             motion_frame = frame.as_motion_frame()
             motion_data = motion_frame.get_motion_data()
             metadata["motion_data"] = {
@@ -2267,12 +1891,6 @@ class RealSenseManager:
                 "z": float(motion_data.z),
             }
             processed_frame = np.zeros((120, 320, 3), dtype=np.uint8)
-            cv2.putText(processed_frame, f"X: {motion_data.x:.3f}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 1)
-            cv2.putText(processed_frame, f"Y: {motion_data.y:.3f}", (10, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 1)
-            cv2.putText(processed_frame, f"Z: {motion_data.z:.3f}", (10, 90),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
 
         metadata.update(self._build_viewer_info(info_source))
         return processed_frame, metadata
@@ -2282,32 +1900,27 @@ class RealSenseManager:
         device_id: str,
         sensor_id: str,
         rs_queue: Any,
-        stream_types: List[str]
+        queue_keys: Dict[Tuple[Any, int], str]
     ) -> None:
         """
         Thread function to collect frames from a single sensor's queue.
         Routes frames to appropriate per-stream-type queues.
-        
+
         Args:
             device_id: Device ID
             sensor_id: Sensor ID
             rs_queue: The rs.frame_queue to poll
-            stream_types: List of stream types this sensor is producing
+            queue_keys: (stream type, stream index) of each opened stream -> its queue key
         """
-        logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id} streams: {stream_types}")
+        logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id} streams: {list(queue_keys.values())}")
 
         colorizer = self.colorizers[device_id]
 
         try:
             while True:
-                # Check if we should stop
+                # Stop once this start's queue is gone (stopped, or replaced by a restart)
                 with self.lock:
-                    if device_id not in self.sensor_streams:
-                        break
-                    if sensor_id not in self.sensor_streams[device_id]:
-                        break
-                    sensor_info = self.sensor_streams[device_id][sensor_id]
-                    if not sensor_info.get("is_streaming", False):
+                    if self.sensor_rs_queues.get(device_id, {}).get(sensor_id) is not rs_queue:
                         break
                 
                 try:
@@ -2316,46 +1929,26 @@ class RealSenseManager:
                     if not frame:
                         continue
                     
-                    # Determine frame's stream type from the frame itself
-                    frame_profile = frame.get_profile()
-                    frame_stream = frame_profile.stream_type()
-                    frame_stream_name = frame_stream.name.lower()
-                    
-                    # Handle infrared index
-                    if frame_stream == rs.stream.infrared:
-                        frame_stream_name = f"infrared-{frame_profile.stream_index()}"
-                    
-                    processed_frame, metadata = self._process_sensor_frame(
-                        frame, frame_stream_name, device_id, colorizer
-                    )
+                    profile = frame.get_profile()
+                    target_stream_type = queue_keys.get((profile.stream_type(), profile.stream_index()))
+                    if target_stream_type is None:
+                        continue
+
+                    processed_frame, metadata = self._process_sensor_frame(frame, device_id, colorizer)
 
                     if processed_frame is None:
                         continue
-                    
-                    # Find matching stream type (case-insensitive)
-                    target_stream_type = None
-                    for st in stream_types:
-                        if st.lower() == frame_stream_name.lower():
-                            target_stream_type = st
-                            break
-                    
-                    if target_stream_type is None:
-                        continue
-                    
+
                     # Add to per-stream-type queues
                     with self.lock:
-                        if (device_id in self.sensor_frame_queues and 
-                            sensor_id in self.sensor_frame_queues[device_id] and
-                            target_stream_type in self.sensor_frame_queues[device_id][sensor_id]):
-                            queue = self.sensor_frame_queues[device_id][sensor_id][target_stream_type]
+                        queue = self.frame_queues.get(device_id, {}).get(target_stream_type)
+                        if queue is not None:
                             queue.append(processed_frame)
                             while len(queue) > self.max_queue_size:
                                 queue.pop(0)
-                        
-                        if (device_id in self.sensor_metadata_queues and 
-                            sensor_id in self.sensor_metadata_queues[device_id] and
-                            target_stream_type in self.sensor_metadata_queues[device_id][sensor_id]):
-                            mqueue = self.sensor_metadata_queues[device_id][sensor_id][target_stream_type]
+
+                        mqueue = self.metadata_queues.get(device_id, {}).get(target_stream_type)
+                        if mqueue is not None:
                             mqueue.append(metadata)
                             while len(mqueue) > self.max_queue_size:
                                 mqueue.pop(0)
@@ -2376,8 +1969,8 @@ class RealSenseManager:
         self,
         device_id: str,
         sensor_id: str,
-        configs: List[SensorStreamConfig]
-    ) -> SensorStreamStatus:
+        rows: List[StreamProfile]
+    ) -> None:
         """
         Start streaming from a single sensor using the sensor API.
         Supports multiple stream profiles (e.g., depth + IR from same sensor).
@@ -2385,63 +1978,15 @@ class RealSenseManager:
         Args:
             device_id: The device ID
             sensor_id: The sensor ID (format: "{device_id}-sensor-{index}")
-            configs: List of stream configurations
-            
-        Returns:
-            SensorStreamStatus with current state
+            rows: profiles from the sensor's supported_stream_profiles
         """
-        if not configs:
-            raise RealSenseError(status_code=400, detail="At least one stream config required")
-        
         # Check mode compatibility
         self._check_streaming_mode(device_id, "sensor")
-        
-        # Get sensor
-        sensor, sensor_index = self._get_sensor_by_id(device_id, sensor_id)
-        
-        # Check if already streaming - with recovery mechanism
-        with self.lock:
-            if (device_id in self.sensor_streams and 
-                sensor_id in self.sensor_streams[device_id] and
-                self.sensor_streams[device_id][sensor_id].get("is_streaming", False)):
-                # State says streaming - try to recover by stopping first
-                logging.warning(f"[SENSOR] {sensor_id} has stale streaming state - attempting recovery")
-                try:
-                    sensor.stop()
-                except:
-                    pass
-                try:
-                    sensor.close()
-                except:
-                    pass
-                # Clean up stale state
-                self.sensor_streams[device_id].pop(sensor_id, None)
-                if not self.sensor_streams[device_id]:
-                    del self.sensor_streams[device_id]
-                    self.streaming_mode[device_id] = "idle"
-                if device_id in self.sensor_frame_queues:
-                    self.sensor_frame_queues[device_id].pop(sensor_id, None)
-                if device_id in self.sensor_metadata_queues:
-                    self.sensor_metadata_queues[device_id].pop(sensor_id, None)
-                if device_id in self.sensor_rs_queues:
-                    self.sensor_rs_queues[device_id].pop(sensor_id, None)
-                logging.info(f"[SENSOR] {sensor_id} stale state cleaned up - proceeding with start")
-        
+
+        sensor = self._find_sensor(device_id, sensor_id)
+
         try:
-            # Get sensor name
-            try:
-                sensor_name = sensor.get_info(rs.camera_info.name)
-            except RuntimeError:
-                sensor_name = f"Sensor {sensor_index}"
-            
-            # Find matching profile for EACH config
-            profiles = []
-            for config in configs:
-                profile = self._find_matching_profile(sensor, config)
-                profiles.append(profile)
-            
-            # Validate profile compatibility (same FPS required)
-            self._validate_profile_compatibility(profiles)
+            profiles = [next(p for p in sensor.get_stream_profiles() if _profile_row(p) == r) for r in rows]
 
             # Translate sensor timestamps to a unified system-time domain so
             # depth/color frames from independent sensors on the same device
@@ -2477,35 +2022,18 @@ class RealSenseManager:
             # Start sensor
             sensor.start(rs_queue)
             
-            # Collect stream types (normalized to lowercase for consistent lookup)
-            stream_types = [c.stream_type.lower() for c in configs]
-            
+            queue_keys = {(p.stream_type(), p.stream_index()): _stream_name(p) for p in profiles}
+            stream_types = list(queue_keys.values())
+
             # Update state
             with self.lock:
                 self.streaming_mode[device_id] = "sensor"
                 
-                if device_id not in self.sensor_streams:
-                    self.sensor_streams[device_id] = {}
-                if device_id not in self.sensor_frame_queues:
-                    self.sensor_frame_queues[device_id] = {}
-                if device_id not in self.sensor_metadata_queues:
-                    self.sensor_metadata_queues[device_id] = {}
-                if device_id not in self.sensor_rs_queues:
-                    self.sensor_rs_queues[device_id] = {}
-                
-                self.sensor_streams[device_id][sensor_id] = {
-                    "is_streaming": True,
-                    "stream_types": stream_types,  # List of stream types
-                    "configs": configs,  # All configs
-                    "started_at": datetime.now(),
-                    "error": None,
-                    "sensor": sensor,
-                    "name": sensor_name,
-                }
                 # Create per-stream-type frame queues
-                self.sensor_frame_queues[device_id][sensor_id] = {st: [] for st in stream_types}
-                self.sensor_metadata_queues[device_id][sensor_id] = {st: [] for st in stream_types}
-                self.sensor_rs_queues[device_id][sensor_id] = rs_queue
+                for st in stream_types:
+                    self.frame_queues.setdefault(device_id, {})[st] = []
+                    self.metadata_queues.setdefault(device_id, {})[st] = []
+                self.sensor_rs_queues.setdefault(device_id, {})[sensor_id] = rs_queue
             
             # Initialize post-processing filters for this sensor if not already done
             self._get_or_create_processing_blocks(device_id, sensor_id, sensor)
@@ -2513,7 +2041,7 @@ class RealSenseManager:
             # Start frame collection thread
             threading.Thread(
                 target=self._collect_sensor_frames,
-                args=(device_id, sensor_id, rs_queue, stream_types),
+                args=(device_id, sensor_id, rs_queue, queue_keys),
                 daemon=True
             ).start()
             
@@ -2521,21 +2049,6 @@ class RealSenseManager:
             self.metadata_socket_server.start_broadcast(device_id)
             
             logging.info(f"[SENSOR] Started {sensor_id} with streams: {stream_types}")
-            
-            # Return status with backward compat fields
-            first_config = configs[0]
-            return SensorStreamStatus(
-                sensor_id=sensor_id,
-                name=sensor_name,
-                is_streaming=True,
-                stream_type=first_config.stream_type.lower(),  # Backward compat (lowercase for consistency)
-                stream_types=stream_types,
-                streams=configs,
-                resolution=first_config.resolution,
-                framerate=first_config.framerate,
-                format=first_config.format,
-                started_at=datetime.now(),
-            )
             
         except RealSenseError:
             raise
@@ -2559,85 +2072,45 @@ class RealSenseManager:
         self,
         device_id: str,
         sensor_id: str
-    ) -> SensorStreamStatus:
+    ) -> None:
         """
         Stop streaming from a single sensor.
         
         Args:
             device_id: The device ID
             sensor_id: The sensor ID
-            
-        Returns:
-            SensorStreamStatus with current state
         """
-        sensor, sensor_index = self._get_sensor_by_id(device_id, sensor_id)
+        sensor = self._find_sensor(device_id, sensor_id)
         
-        # Get sensor name
-        try:
-            sensor_name = sensor.get_info(rs.camera_info.name)
-        except RuntimeError:
-            sensor_name = f"Sensor {sensor_index}"
-        
+        # Dropping the rs queue claims the stop and ends the collection thread
         with self.lock:
-            if (device_id not in self.sensor_streams or
-                sensor_id not in self.sensor_streams[device_id]):
-                return SensorStreamStatus(
-                    sensor_id=sensor_id,
-                    name=sensor_name,
-                    is_streaming=False,
-                )
-            
-            sensor_info = self.sensor_streams[device_id][sensor_id]
-            if not sensor_info.get("is_streaming", False):
-                return SensorStreamStatus(
-                    sensor_id=sensor_id,
-                    name=sensor_name,
-                    is_streaming=False,
-                )
-            
-            # Mark as stopping
-            sensor_info["is_streaming"] = False
+            if self.sensor_rs_queues.get(device_id, {}).pop(sensor_id, None) is None:
+                return
         
+        # The sensor reports its open streams until close()
+        stopped_stream_types = [_stream_name(p) for p in sensor.get_active_streams()]
+
         # Stop and close sensor
         try:
             sensor.stop()
             sensor.close()
         except Exception as e:
             logging.warning(f"[SENSOR] Error stopping {sensor_id}: {e}")
-        
+
         # Clean up state
         last_sensor_stopped = False
         with self.lock:
-            # Capture the stopped sensor's stream types BEFORE removing its
-            # entry — needed below to know whether to evict cached color frames.
-            stopped_stream_types: List[str] = []
-            if (device_id in self.sensor_streams
-                    and sensor_id in self.sensor_streams[device_id]):
-                stopped_stream_types = list(
-                    self.sensor_streams[device_id][sensor_id].get("stream_types", [])
-                )
+            for st in stopped_stream_types:
+                self.frame_queues.get(device_id, {}).pop(st, None)
+                self.metadata_queues.get(device_id, {}).pop(st, None)
+            if not self.frame_queues.get(device_id):
+                self.frame_queues.pop(device_id, None)
+                self.metadata_queues.pop(device_id, None)
+                self.streaming_mode[device_id] = "idle"
+                last_sensor_stopped = True
 
-            if device_id in self.sensor_streams:
-                self.sensor_streams[device_id].pop(sensor_id, None)
-                if not self.sensor_streams[device_id]:
-                    del self.sensor_streams[device_id]
-                    self.streaming_mode[device_id] = "idle"
-                    last_sensor_stopped = True
-
-            if device_id in self.sensor_frame_queues:
-                self.sensor_frame_queues[device_id].pop(sensor_id, None)
-                if not self.sensor_frame_queues[device_id]:
-                    del self.sensor_frame_queues[device_id]
-
-            if device_id in self.sensor_metadata_queues:
-                self.sensor_metadata_queues[device_id].pop(sensor_id, None)
-                if not self.sensor_metadata_queues[device_id]:
-                    del self.sensor_metadata_queues[device_id]
-
-            if device_id in self.sensor_rs_queues:
-                self.sensor_rs_queues[device_id].pop(sensor_id, None)
-                if not self.sensor_rs_queues[device_id]:
-                    del self.sensor_rs_queues[device_id]
+            if not self.sensor_rs_queues.get(device_id, True):
+                del self.sensor_rs_queues[device_id]
 
             # Free the cached color frames if the stopped sensor was producing
             # color — otherwise the 5 cached rs.video_frame refs stay pinned
@@ -2655,93 +2128,6 @@ class RealSenseManager:
             self.metadata_socket_server.stop_broadcast(device_id)
 
         logging.info(f"[SENSOR] Stopped {sensor_id}")
-        
-        return SensorStreamStatus(
-            sensor_id=sensor_id,
-            name=sensor_name,
-            is_streaming=False,
-        )
-
-    def get_sensor_status(
-        self,
-        device_id: str,
-        sensor_id: str
-    ) -> SensorStreamStatus:
-        """
-        Get streaming status for a specific sensor.
-        
-        Args:
-            device_id: The device ID
-            sensor_id: The sensor ID
-            
-        Returns:
-            SensorStreamStatus with current state
-        """
-        sensor, sensor_index = self._get_sensor_by_id(device_id, sensor_id)
-        
-        # Get sensor name
-        try:
-            sensor_name = sensor.get_info(rs.camera_info.name)
-        except RuntimeError:
-            sensor_name = f"Sensor {sensor_index}"
-        
-        with self.lock:
-            if (device_id not in self.sensor_streams or
-                sensor_id not in self.sensor_streams[device_id]):
-                return SensorStreamStatus(
-                    sensor_id=sensor_id,
-                    name=sensor_name,
-                    is_streaming=False,
-                )
-            
-            info = self.sensor_streams[device_id][sensor_id]
-            resolution = info.get("resolution")
-            
-            return SensorStreamStatus(
-                sensor_id=sensor_id,
-                name=info.get("name", sensor_name),
-                is_streaming=info.get("is_streaming", False),
-                stream_type=info.get("stream_type"),
-                resolution=Resolution(width=resolution[0], height=resolution[1]) if resolution else None,
-                framerate=info.get("framerate"),
-                format=info.get("format"),
-                error=info.get("error"),
-                started_at=info.get("started_at"),
-            )
-
-    def get_sensor_frame(
-        self,
-        device_id: str,
-        sensor_id: str
-    ) -> Tuple[np.ndarray, dict]:
-        """
-        Get the latest frame from a specific sensor.
-        
-        Args:
-            device_id: The device ID
-            sensor_id: The sensor ID
-            
-        Returns:
-            Tuple of (frame_data, metadata)
-        """
-        with self.lock:
-            if (device_id not in self.sensor_frame_queues or
-                sensor_id not in self.sensor_frame_queues[device_id]):
-                raise RealSenseError(
-                    status_code=400,
-                    detail=f"Sensor {sensor_id} is not streaming"
-                )
-            
-            queue = self.sensor_frame_queues[device_id][sensor_id]
-            if len(queue) == 0:
-                # 503 Service Unavailable: sensor is streaming but no frames yet
-                # (transient — caller should retry rather than treat as fatal)
-                raise RealSenseError(
-                    status_code=503,
-                    detail=f"No frames available for sensor {sensor_id}"
-                )
-            
-            return queue[-1]
 
     def send_hwm_command(
         self,
@@ -2818,32 +2204,3 @@ class RealSenseManager:
             raise RealSenseError(
                 status_code=500, detail=f"HWM command failed: {e}"
             )
-
-    def get_sensor_metadata(
-        self,
-        device_id: str,
-        sensor_id: str
-    ) -> Dict:
-        """
-        Get the latest metadata from a specific sensor.
-        
-        Args:
-            device_id: The device ID
-            sensor_id: The sensor ID
-            
-        Returns:
-            Metadata dictionary
-        """
-        with self.lock:
-            if (device_id not in self.sensor_metadata_queues or
-                sensor_id not in self.sensor_metadata_queues[device_id]):
-                raise RealSenseError(
-                    status_code=400,
-                    detail=f"Sensor {sensor_id} is not streaming"
-                )
-            
-            queue = self.sensor_metadata_queues[device_id][sensor_id]
-            if len(queue) == 0:
-                return {}
-            
-            return queue[-1]

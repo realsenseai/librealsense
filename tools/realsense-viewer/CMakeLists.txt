@@ -36,6 +36,7 @@ if(BUILD_GRAPHICAL_EXAMPLES)
     ../../common/post-processing-worker-filter.h
     ../../common/post-processing-filters-list.h
     ../../common/objects-in-frame.h
+    ../../common/detection-distance.h
     ../../third-party/glad/glad.c
     ../../third-party/tinyfiledialogs/tinyfiledialogs.c
     ../../third-party/tinyfiledialogs/tinyfiledialogs.h
@@ -264,11 +265,6 @@ include_directories(
 install(
     TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-#https://cmake.org/cmake/help/latest/command/install.html
-install(DIRECTORY presets/
-    DESTINATION $ENV{HOME}/Documents/librealsense2/presets
-    FILES_MATCHING PATTERN "*.preset"
 )
 
 if(BUILD_VIEWER_TESTS)

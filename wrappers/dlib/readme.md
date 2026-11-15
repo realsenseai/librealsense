@@ -20,7 +20,7 @@ First, download and install `CMake` from [cmake.org/download](https://cmake.org/
 
 #### Building the Dlib samples as part of librealsense's VisualStudio project
 1. Download the latest Dlib release from [dlib.net](http://dlib.net/) and extract into a local directory (`C:/work/dlib-19.17`)
-2. Enable the ENABLED_DLIB_EXAMPLES entry in the CMake configuration for your copy of librealsense
+2. Enable the BUILD_DLIB_EXAMPLES entry in the CMake configuration for your copy of librealsense
 3. Point the DLIB_DIR entry to the location of your Dlib installation (`C:/work/dlib-19.17`)
 4. Click `Configure`, then `Generate`
 5. Click `Open Project` to open Visual Studio (2015 or later, as required by librealsense)

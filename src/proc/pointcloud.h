@@ -41,6 +41,7 @@ namespace librealsense
 
         optional_value<rs2_intrinsics>         _depth_intrinsics;
         optional_value<rs2_intrinsics>         _other_intrinsics;
+        bool                                   _other_intrinsics_missing = false;
         optional_value<float>                  _depth_units;
         optional_value<rs2_extrinsics>         _extrinsics;
         std::shared_ptr<occlusion_filter>      _occlusion_filter;

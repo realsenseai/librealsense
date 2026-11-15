@@ -2,16 +2,17 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.concurrency import run_in_threadpool
 from typing import List, Optional
 
 
-from app.models.stream import StreamStatus, StreamStart, StreamStartTiming
-from app.services.rs_manager import RealSenseManager
+from app.models.stream import StreamStatus, StreamStart
+from app.services.rs_manager import RealSenseManager, RealSenseError
 from app.api.dependencies import get_realsense_manager
 
 router = APIRouter()
 
-@router.post("/start", response_model=StreamStartTiming)
+@router.post("/start", response_model=StreamStatus)
 async def start_stream(
     device_id: str,
     stream_config: StreamStart,
@@ -19,21 +20,17 @@ async def start_stream(
 ):
     """
     Start streaming from a RealSense device with the specified configuration.
-    Returns timing info for diagnostics.
     """
-    import time
     import logging
     import traceback
-    t0 = time.perf_counter()
     try:
-        result = rs_manager.start_stream(
+        return rs_manager.start_stream(
             device_id,
             stream_config.configs,
             stream_config.align_to,
-            reuse_cache=stream_config.reuse_cache,
         )
-        result['timings']['endpoint_total'] = time.perf_counter() - t0
-        return result
+    except RealSenseError:
+        raise
     except Exception as e:
         error_msg = str(e) if str(e) else repr(e)
         logging.error(f"[PIPELINE] Start stream failed: {error_msg}")
@@ -51,7 +48,7 @@ async def stop_stream(
     Stop streaming from a RealSense device.
     """
     try:
-        return rs_manager.stop_stream(device_id)
+        return await run_in_threadpool(rs_manager.stop_stream, device_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -136,6 +136,12 @@ def pytest_addoption(parser):
              "Can be used multiple times or with a comma-separated value (--exclude-device 'D585 Proto,D585S')."
     )
     group.addoption(
+        "--device-map",
+        action="store",
+        default=None,
+        help="Device inventory YAML for pytest-map-check.py (default: device-map.yaml in the LibCI home)."
+    )
+    group.addoption(
         "--context",
         action="store",
         default="",
@@ -301,6 +307,8 @@ def pytest_configure(config):
     if config.getoption("--tb") == "auto":
         config.option.tbstyle = "no"
     config.option.reportchars = "fE"
+    # Show the file:line context for every failed soft check, not just the first one
+    config.option.check_max_tb = sys.maxsize
 
     # Suppress paramiko and cryptography deprecation warnings
     config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:cryptography")
@@ -313,7 +321,7 @@ def pytest_configure(config):
         "markers", "device(pattern): mark test to run on devices matching pattern (e.g., D400*, D455)"
     )
     config.addinivalue_line(
-        "markers", "device_each(pattern): mark test to run on each device matching pattern separately"
+        "markers", "device_each(pattern, ...): mark test to run on each device matching any pattern separately"
     )
     config.addinivalue_line(
         "markers", "device_exclude(pattern): exclude devices matching pattern from test execution"
@@ -335,6 +343,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "dds: test requires a DDS-enabled build (selected by --tag dds / -m dds)"
+    )
+    config.addinivalue_line(
+        "markers", "infra: harness-level or LibCI-only test (e.g. needs recordings served from Artifactory) with "
+                   "no device requirement that still runs under --live (and is skipped under --not-live)"
     )
 
     # Configure standard logging with format matching legacy rspy.log output
@@ -376,6 +388,23 @@ def pytest_configure(config):
             devices.map_unknown_ports()
         except Exception as e:
             log.warning(f"Failed to query devices during configuration: {e}")
+        try:
+            _name_recovery_devices(config)
+        except Exception as e:
+            log.warning(f"Failed to name recovery devices from the device map: {e}")
+
+
+def _name_recovery_devices(config):
+    """Give D500 recovery devices their mapped SKU name so device specs and FW choices can match them."""
+    from rspy import device_map
+    # LibCI checks the inventory out into the workspace for its health check; use it when no
+    # --device-map is given and the LibCI home has no map of its own
+    candidates = [config.getoption("--device-map", default=None),
+                  device_map.default_map_path(),
+                  os.path.join("device-inventory-checkout", "jenkins", "device-inventory.yaml")]
+    map_file = next((p for p in candidates if p and os.path.isfile(p)), None)
+    if map_file:
+        device_map.name_recovery_devices(map_file)
 
 
 def pytest_generate_tests(metafunc):
@@ -501,7 +530,7 @@ def _reset_pytest_timeout_for_retry(item):
     hooks.pytest_timeout_set_timer(item=item, settings=settings)
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(wrapper=True)
 def pytest_runtest_call(item):
     """Reset pytest-timeout between rerun attempts + surface pytest-check
     soft-check failures in the call phase.
@@ -514,35 +543,37 @@ def pytest_runtest_call(item):
     """
     _reset_pytest_timeout_for_retry(item)
 
-    outcome = yield
-
     # Log every call-phase failure here — one place that fires on every rerun attempt —
     # so each attempt's failure is captured in the per-test .log file.
-    if outcome.excinfo is not None and not issubclass(outcome.excinfo[0], pytest.skip.Exception):
-        ensure_newline()
-        log.error(f"call failed: {outcome.excinfo[0].__name__}: {outcome.excinfo[1]}")
-
     try:
-        from pytest_check import check_log
-    except ImportError:
-        return
+        result = yield
+    except BaseException as e:
+        if not isinstance(e, pytest.skip.Exception):
+            ensure_newline()
+            log.error(f"call failed: {type(e).__name__}: {e}")
+        raise  # a real exception is never masked by soft-check failures
+
+    from pytest_check import check_log
     failures = check_log.get_failures()
-    if not failures:
-        return
-    # Don't mask a real exception, and leave pytest-check's xfail handling to it.
-    if outcome.excinfo is not None or item.get_closest_marker("xfail"):
-        return
+    # Leave pytest-check's xfail handling to it.
+    if not failures or item.get_closest_marker("xfail"):
+        return result
     num_failures = check_log._num_failures
     check_log.clear_failures()
-    message = "\n".join(failures + ["-" * 60, f"Failed Checks: {num_failures}"])
+    footer = f"Failed Checks: {num_failures}"
     ensure_newline()
-    log.error(f"call failed: {num_failures} soft-check failure(s):\n{message}")
-    raise AssertionError(message)
+    log.error(f"call failed: {num_failures} soft-check failure(s):\n" + "\n".join(failures + ["-" * 60, footer]))
+    # Keep the console to one line: first failed check + count; the per-test log has it all
+    raise AssertionError(f"{failures[0].splitlines()[0]} ({footer})")
 
 
 def pytest_sessionstart(session):
     """Configure the junitxml plugin once it exists (after pytest_configure)."""
     configure_junit_logging(session.config)
+    # pytest-check copies tbstyle ("no", set above) at configure time and would drop the
+    # file:line context of each failed check; restore it so the per-test logs show it.
+    from pytest_check import pseudo_traceback
+    pseudo_traceback._traceback_style = "auto"
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):

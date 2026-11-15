@@ -28,6 +28,11 @@ namespace RsImGui
         ~ScopePushStyleVar() { ImGui::PopStyleVar(); }
     };
     bool          SliderIntWithSteps(const char* label, int* v, int v_min, int v_max, int v_step = 1);
+    // Call right after a slider: while it has keyboard focus and is not being dragged, Left/Right
+    // arrows move *v by one step (clamped), repeating while held. Returns true when *v changed this frame.
+    bool          SliderArrowNudge(float* v, float v_min, float v_max, float v_step);
+    // Drops keyboard focus from the focused item (e.g. a slider after an arrow-key edit); the window keeps focus.
+    void          ClearItemFocus();
     float         RoundScalar(float value, int decimal_precision);
     bool          CustomComboBox(const char* label, int* current_item, const char* const items[], int items_count);
     bool          SliderBehavior(const ImRect& frame_bb, ImGuiID id, float* v, float v_min, float v_max, float power, int decimal_precision, ImGuiSliderFlags flags, bool render_bg);
@@ -40,6 +45,8 @@ namespace RsImGui
     void          CustomTooltip( const char * fmt, const char * label );
     void          CustomTooltip( const char * label );
     void          CustomTooltip(const char* fmt, float value);
+    void          BetaBadge(const char* tooltip = nullptr);   // small gradient "BETA" pill drawn as an inline item
+    float         BetaBadgeWidth();   // width BetaBadge() takes in the current font
     }
 
 // Macros to create unique function names using the current line number (__LINE__)

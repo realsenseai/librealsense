@@ -100,6 +100,76 @@ namespace rs2
             && std::string(dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE)) == "D500";
     }
 
+    bool is_beta_stream(rs2_stream type)
+    {
+        return type == RS2_STREAM_OCCUPANCY
+            || type == RS2_STREAM_LABELED_POINT_CLOUD
+            || type == RS2_STREAM_OBJECT_DETECTION;
+    }
+
+    static void draw_beta_badge()
+    {
+        ImGui::SameLine();
+        RsImGui::BetaBadge("Beta feature - still maturing, behavior and output may change");
+    }
+
+    // The camera's Detection Distance control only turns the FW calculation on or off; the combo adds the
+    // viewer's own estimate as a third choice and drives the overlay from the chosen mode
+    static bool draw_detection_distance_combo( option_model & opt_model, std::string & error_message,
+                                               notifications_model & model )
+    {
+        auto & objects = opt_model.dev->detected_objects;
+        if( ! objects )
+            return false;
+
+        static const char * const labels[] = { "Off", "Application", "Camera" };
+        static const detection_distance_source sources[] = { detection_distance_source::none,
+                                                             detection_distance_source::application,
+                                                             detection_distance_source::camera };
+
+        std::string const txt = rsutils::string::from() << opt_model.endpoint->get_option_name( opt_model.opt ) << ":";
+        float const combo_position_x = ImGui::GetCursorPosX() + ImGui::CalcTextSize( txt.c_str() ).x + 5;
+        ImGui::Text( "%s", txt.c_str() );
+        if( ImGui::IsItemHovered() )
+            RsImGui::CustomTooltip( "Distance shown on the object detection boxes\n"
+                                    "Off: no distance\n"
+                                    "Application: estimated by the application from the depth stream\n"
+                                    "Camera: calculated by the camera" );
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX( combo_position_x );
+        ImGui::PushItemWidth( ImGui::GetContentRegionAvail().x - 25 );
+        ImGui::PushStyleColor( ImGuiCol_TextSelectedBg, { 1, 1, 1, 1 } );
+
+        int selected = 0;
+        for( int i = 0; i < 3; ++i )
+            if( sources[i] == objects->distance_source )
+                selected = i;
+
+        bool changed = false;
+        try
+        {
+            if( RsImGui::CustomComboBox( opt_model.id.c_str(), &selected, labels, 3 ) )
+            {
+                objects->distance_source = sources[selected];
+                model.add_log( rsutils::string::from() << "Setting Detection Distance to " << labels[selected] );
+                // A recording replays the FW distances it captured; only a live camera takes the control
+                float const control_value = detection_distance_control_value( sources[selected] );
+                if( ! opt_model.dev->dev.is< playback >() && opt_model.value_as_float() != control_value )
+                    opt_model.set_option_async( opt_model.opt, control_value );
+                changed = true;
+            }
+        }
+        catch( const error & e )
+        {
+            error_message = error_to_string( e );
+        }
+
+        ImGui::PopStyleColor();
+        ImGui::PopItemWidth();
+        return changed;
+    }
+
     void subdevice_model::populate_options( const std::string & opt_base_label,
                                             bool * options_invalidated,
                                             std::string & error_message )
@@ -126,6 +196,16 @@ namespace rs2
                 }
             }
 
+            auto distance_opt = options_metadata.find( RS2_OPTION_DETECTION_DISTANCE );
+            if( distance_opt != options_metadata.end() && detected_objects )
+            {
+                distance_opt->second.custom_draw_method = draw_detection_distance_combo;
+                // Start from the camera's control; a repopulate keeps Application, the one choice the control can't show
+                detected_objects->distance_source
+                    = follow_detection_distance_control( detected_objects->distance_source,
+                                                         distance_opt->second.value_as_float() );
+            }
+
             s->on_options_changed( [this]( const options_list & list )
             {
                 for( auto changed_option : list )
@@ -145,6 +225,18 @@ namespace rs2
         }
     }
 
+    bool sensor_has_color_stream( const std::vector< stream_profile > & profiles )
+    {
+        return std::any_of( profiles.begin(), profiles.end(),
+                            []( const stream_profile & p ) { return p.stream_type() == RS2_STREAM_COLOR; } );
+    }
+
+    bool sensor_has_depth_stream( const std::vector< stream_profile > & profiles )
+    {
+        return std::any_of( profiles.begin(), profiles.end(),
+                            []( const stream_profile & p ) { return p.stream_type() == RS2_STREAM_DEPTH; } );
+    }
+
     subdevice_model::subdevice_model(
         device& dev,
         std::shared_ptr<sensor> s,
@@ -160,6 +252,7 @@ namespace rs2
         yuy2rgb(std::make_shared<rs2::gl::yuy_decoder>()),
         m420_to_rgb(std::make_shared<rs2::gl::m420_decoder>()),
         nv12_to_rgb(std::make_shared<rs2::gl::nv12_decoder>()),
+        mjpeg_to_rgb(std::make_shared<rs2::mjpeg_decoder>()),
         y411(std::make_shared<rs2::gl::y411_decoder>()),
         viewer(viewer),
         detected_objects(device_detected_objects),
@@ -433,6 +526,7 @@ namespace rs2
             auto default_resolution = std::make_pair(1280, 720);
             auto default_fps = 30;
             std::map<int, int> def_fps_per_stream;   // per-stream default-profile FPS (by unique_id)
+            std::map<rs2_stream, std::pair<int, int>> def_res_per_stream;   // seeds the split resolution UI
             for (auto&& profile : sensor_profiles)
             {
                 std::stringstream res;
@@ -441,6 +535,7 @@ namespace rs2
                     if (profile.is_default())
                     {
                         default_resolution = std::pair<int, int>(vid_prof.width(), vid_prof.height());
+                        def_res_per_stream[profile.stream_type()] = default_resolution;
                         default_fps = profile.fps();
 
                         if (is_rgb_camera)
@@ -473,7 +568,7 @@ namespace rs2
                 push_back_if_not_exists(shared_fps_values, profile.fps());
                 push_back_if_not_exists(fpses_per_stream[profile.unique_id()], fps.str());
                 push_back_if_not_exists(shared_fpses, fps.str());
-                stream_display_names[profile.unique_id()] = profile.stream_name();
+                stream_display_names[profile.unique_id()] = viewer_stream_name( profile.stream_name() );
 
                 std::string format = rs2_format_to_string(profile.format());
 
@@ -553,7 +648,8 @@ namespace rs2
                 ui.is_multiple_resolutions = true;
                 for (auto res_array : resolutions_per_stream)
                 {
-                    ui.selected_stream_to_res[res_array.first] = default_resolution;
+                    auto def = def_res_per_stream.find(res_array.first);
+                    ui.selected_stream_to_res[res_array.first] = def != def_res_per_stream.end() ? def->second : default_resolution;
                 }
             }
             else
@@ -802,6 +898,7 @@ namespace rs2
                 continue;
 
             auto formats_chars = get_string_pointers(f.second);
+            const bool beta = is_beta_stream(stream_type_of(f.first));
             if (!streaming || (streaming && stream_enabled[f.first]))
             {
                 if (streaming)
@@ -866,6 +963,8 @@ namespace rs2
                     }
                     if (mode_locked) ImGui::EndDisabled();
                 }
+                if (beta)
+                    draw_beta_badge();
             }
 
             if (stream_enabled[f.first])
@@ -873,7 +972,9 @@ namespace rs2
                 if (show_single_fps_list)
                 {
                     ImGui::SameLine();
-                    ImGui::SetCursorPosX(col1);
+                    // A long stream name (plus the BETA badge) can run past the column; the combo then starts after it
+                    if (ImGui::GetCursorPosX() < col1)
+                        ImGui::SetCursorPosX(col1);
                 }
 
                 label = rsutils::string::from()
@@ -973,12 +1074,53 @@ namespace rs2
         return res;
     }
 
+    // Embedded decimation mandates a fixed depth+IR (and color, when dual-color) pairing:
+    // depth 640x360 with IR/color 1280x720. Returns {0,0} for streams with no such mandate.
+    static std::pair<int, int> decimation_mandated_res(rs2_stream stream)
+    {
+        switch (stream)
+        {
+        case RS2_STREAM_DEPTH:    return { 640, 360 };
+        case RS2_STREAM_INFRARED: return { 1280, 720 };
+        case RS2_STREAM_COLOR:    return { 1280, 720 };
+        default:                  return { 0, 0 };
+        }
+    }
+
+    bool subdevice_model::decimation_restricts_stream(rs2_stream stream) const
+    {
+        // D585S (PID 0B6B): FW-side decimation kicks in only when depth is 640x360,
+        // so depth is free and IR/color are pinned only in that specific case.
+        if (is_d585s())
+        {
+            if (stream == RS2_STREAM_DEPTH) return false;
+            auto it = ui.selected_stream_to_res.find(RS2_STREAM_DEPTH);
+            return it != ui.selected_stream_to_res.end()
+                && it->second == decimation_mandated_res(RS2_STREAM_DEPTH);
+        }
+        // Other D500 with the user-toggle decimation on: FW mandates depth 640x360 + IR/color 1280x720.
+        return is_decimation_enabled();
+    }
+
     bool subdevice_model::draw_resolutions_combo_box_multiple_resolutions(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1,
         rs2_stream stream_type)
     {
         bool res = false;
 
         auto res_pairs = resolutions_per_stream[stream_type];
+        // Constrain the combo to the single decimation-mandated resolution when the
+        // FW will not accept anything else (see decimation_restricts_stream for the
+        // per-SKU rule). Also snap the current selection to that value so a construction-
+        // time or refresh path that seeded a different one can't leave
+        // get_res_id_in_resolutions_array looking up a value the combo no longer offers.
+        auto mandated = decimation_mandated_res(stream_type);
+        if (mandated.first != 0 && mandated.second != 0
+            && decimation_restricts_stream(stream_type)
+            && std::find(res_pairs.begin(), res_pairs.end(), mandated) != res_pairs.end())
+        {
+            res_pairs = { mandated };
+            ui.selected_stream_to_res[stream_type] = mandated;
+        }
         std::vector<std::string> resolutions_str;
         for (int i = 0; i < res_pairs.size(); ++i)
         {
@@ -1050,11 +1192,15 @@ namespace rs2
             if (f.second.size() == 0)
                 continue;
 
-            if (stream_type == RS2_STREAM_DEPTH && f.second[0] != std::string("Z16") ||
-                stream_type == RS2_STREAM_INFRARED && f.second[0] == std::string("Z16"))
+            // Color has a section of its own; any other non-Z16 stream is listed with IR, or with depth when IR shares its resolution
+            rs2_stream section = stream_type_of(f.first) == RS2_STREAM_COLOR ? RS2_STREAM_COLOR
+                               : f.second[0] == std::string("Z16") || ir_shares_depth_resolution() ? RS2_STREAM_DEPTH
+                                                                                                   : RS2_STREAM_INFRARED;
+            if (section != stream_type)
                 continue;
 
             auto formats_chars = get_string_pointers(f.second);
+            const bool beta = is_beta_stream(stream_type_of(f.first));
             if (!streaming || (streaming && stream_enabled[f.first]))
             {
                 if (streaming)
@@ -1086,6 +1232,8 @@ namespace rs2
                     }
                     if (mode_locked) ImGui::EndDisabled();
                 }
+                if (beta)
+                    draw_beta_badge();
             }
 
             if (stream_enabled[f.first])
@@ -1093,7 +1241,9 @@ namespace rs2
                 if (show_single_fps_list)
                 {
                     ImGui::SameLine();
-                    ImGui::SetCursorPosX(col1);
+                    // A long stream name (plus the BETA badge) can run past the column; the combo then starts after it
+                    if (ImGui::GetCursorPosX() < col1)
+                        ImGui::SetCursorPosX(col1);
                 }
 
                 label = rsutils::string::from()
@@ -1137,12 +1287,18 @@ namespace rs2
     {
         bool res = false;
 
-        std::vector<rs2_stream> relevant_streams = { RS2_STREAM_DEPTH, RS2_STREAM_INFRARED };
+        std::vector<rs2_stream> relevant_streams = { RS2_STREAM_DEPTH };
+        if (!ir_shares_depth_resolution())
+            relevant_streams.push_back(RS2_STREAM_INFRARED);
+        if (has_color_streams())
+            relevant_streams.push_back(RS2_STREAM_COLOR);
         for (auto&& stream_type : relevant_streams)
         {
             // resolution
             // Draw combo-box with all resolution options for this stream type
             res |= draw_resolutions_combo_box_multiple_resolutions(error_message, label, streaming_tooltip, col0, col1, stream_type);
+            if (stream_type == RS2_STREAM_DEPTH)
+                sync_ir_to_depth_resolution();
 
             if (draw_streams_selector) 
             {
@@ -1160,8 +1316,8 @@ namespace rs2
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
         bool res = false;
 
-        // The split depth/IR resolution UI only makes sense when the embedded decimation
-        // filter is ON; re-evaluate here so toggling the filter switches modes live.
+        // Outside dual-color, the split resolution UI follows the embedded decimation filter;
+        // re-evaluate here so toggling the filter switches modes live.
         refresh_multiple_resolutions_state();
 
         std::string label = rsutils::string::from()
@@ -1280,8 +1436,7 @@ namespace rs2
                 }
             }
         }
-        last_valid_ui = ui;
-        prev_stream_enabled = stream_enabled; // prev differs from curr only after user changes
+        store_ui_selection(); // prev_stream_enabled differs from stream_enabled only after user changes
     }
 
     template<typename T, typename V>
@@ -1349,7 +1504,7 @@ namespace rs2
                 score_b++;
 
             auto a_vp = a.as<video_stream_profile>();
-            auto b_vp = a.as<video_stream_profile>();
+            auto b_vp = b.as<video_stream_profile>();
             if (!a_vp || !b_vp)
                 return score_a < score_b;
 
@@ -1377,7 +1532,11 @@ namespace rs2
                     score_b++;
             }
 
-            return score_a < score_b;
+            // On a tie prefer the frame rate closest to the selected one, then the higher one
+            if (score_a != score_b)
+                return score_a < score_b;
+            auto dist_a = std::abs(a.fps() - fps), dist_b = std::abs(b.fps() - fps);
+            return dist_a != dist_b ? dist_a < dist_b : a.fps() > b.fps();
             });
     }
 
@@ -1395,18 +1554,10 @@ namespace rs2
         auto fps = shared_fps_values[ui.selected_shared_fps_id];
         int width = 0;
         int height = 0;
-        std::vector<std::pair<int, int>> selected_resolutions;
         if (!ui.is_multiple_resolutions)
         {
             width = res_values[ui.selected_res_id].first;
             height = res_values[ui.selected_res_id].second;
-        }
-        else
-        {
-            for (auto it = resolutions_per_stream.begin(); it != resolutions_per_stream.end(); ++it)
-            {
-                selected_resolutions.push_back(ui.selected_stream_to_res[it->first]);
-            }
         }
 
         std::vector<stream_profile> sorted_profiles = profiles;
@@ -1429,16 +1580,7 @@ namespace rs2
             std::map<int, std::map<int, stream_profile>> profiles_by_fps;
             for (auto&& p : sorted_profiles)
             {
-                if (check_profile(p, [&](video_stream_profile vsp)
-                    {
-                        bool res = false;
-                        std::pair<int, int> cur_res;
-                        if (p.stream_type() == RS2_STREAM_DEPTH)
-                            cur_res = selected_resolutions[0];
-                        else
-                            cur_res = selected_resolutions[1];
-                        return (vsp.width() == cur_res.first && vsp.height() == cur_res.second);
-                    },
+                if (check_profile(p, [&](video_stream_profile vsp) { return is_selected_resolution(vsp); },
                     profiles_by_fps, results, p.fps(), num_streams, def_p))
                     break;
             }
@@ -1468,8 +1610,8 @@ namespace rs2
             get_sorted_profiles(sorted_profiles);
             std::vector<stream_profile> matching_profiles;
             std::map<std::tuple<int, int, int>, std::map<int, stream_profile>> profiles_by_fps_res; //fps, width, height
-            rs2_format format;
-            int stream_id;
+            rs2_format format = RS2_FORMAT_ANY;
+            int stream_id = -1;
             // find the stream to which the user made changes
             for (auto& it : ui.selected_format_id)
             {
@@ -1482,6 +1624,12 @@ namespace rs2
                         stream_id = it.first;
                     }
                 }
+            }
+            // Format change was on a disabled stream only, nothing to match
+            if (stream_id == -1)
+            {
+                last_valid_ui = ui;
+                return results;
             }
             for (auto&& p : sorted_profiles)
             {
@@ -1527,20 +1675,7 @@ namespace rs2
                 }
                 else
                 {
-                    if (check_profile(p, [&](video_stream_profile vid_prof)
-                        {
-                            bool res = false;
-                            for (int i = 0; i < selected_resolutions.size(); ++i)
-                            {
-                                auto cur_res = selected_resolutions[i];
-                                if (p.fps() == fps && vid_prof.width() == cur_res.first && vid_prof.height() == cur_res.second)
-                                {
-                                    res = true;
-                                    break;
-                                }
-                            }
-                            return res;
-                        },
+                    if (check_profile(p, [&](video_stream_profile vid_prof) { return p.fps() == fps && is_selected_resolution(vid_prof); },
                         profiles_by_format, results, p.format(), num_streams, def_p))
                         break;
                 }
@@ -1609,8 +1744,12 @@ namespace rs2
         // this stays a no-op on EVERY other camera -- standard D4xx (color on a separate sensor /
         // single color) never reach the color>=2 check anyway, but the D500 dual-RGB (separate color
         // sensors, 2 colors + stereo on one sensor) would, and it has no such imager conflict.
-        if (!dev.supports(RS2_CAMERA_INFO_PRODUCT_ID)
-            || std::string(dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID)) != "ABCC")   // RS401_GMSL_PID
+        // Over USB the D401 enumerates as a D405 (0B5B) and follows the same single-mode rules; a plain
+        // D405 has no Color 1, so the check below keeps it out.
+        if (!dev.supports(RS2_CAMERA_INFO_PRODUCT_ID))
+            return false;
+        const std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
+        if (pid != "ABCC" && pid != "0B5B")   // RS401_GMSL_PID, RS405_PID
             return false;
 
         // Treat this as a dual-RGB subdevice only when it actually exposes a second color stream
@@ -1763,6 +1902,11 @@ namespace rs2
         return it->second.value_as_float() <= 0.f;
     }
 
+    float subdevice_model::panel_extra_width() const
+    {
+        return viewer.panel_extra_width();
+    }
+
     bool subdevice_model::is_depth_calibration_profile() const
     {
         // Check if D555 at depth resolution of 1280x800
@@ -1810,11 +1954,46 @@ namespace rs2
         if( std::string( s->get_info( RS2_CAMERA_INFO_NAME ) ) != "Stereo Module" ) return false;
 
         // D585S: FW-side decimation always on, option not exposed.
-        if( dev.supports( RS2_CAMERA_INFO_PRODUCT_ID )
-            && std::string( dev.get_info( RS2_CAMERA_INFO_PRODUCT_ID ) ) == "0B6B" )
+        if( is_d585s() )
             return true;
 
-        // Other D500: show split UI only when the user-toggleable decimation is enabled.
+        // Dual-color carries color on this sensor, at a resolution of its own. Other D500 split only
+        // when the user-toggleable decimation is enabled.
+        return has_color_streams() || is_decimation_enabled();
+    }
+
+    bool subdevice_model::is_d585s() const
+    {
+        return dev.supports( RS2_CAMERA_INFO_PRODUCT_ID )
+            && std::string( dev.get_info( RS2_CAMERA_INFO_PRODUCT_ID ) ) == "0B6B";
+    }
+
+    bool subdevice_model::has_color_streams() const
+    {
+        return resolutions_per_stream.count( RS2_STREAM_COLOR ) > 0;
+    }
+
+    bool subdevice_model::ir_shares_depth_resolution() const
+    {
+        // Without decimation, dual-color IR delivers no frames at any resolution but depth's
+        return has_color_streams() && ! is_decimation_enabled();
+    }
+
+    bool subdevice_model::is_selected_resolution( const video_stream_profile & profile ) const
+    {
+        auto it = ui.selected_stream_to_res.find( profile.stream_type() );
+        return it != ui.selected_stream_to_res.end() && it->second == std::make_pair( profile.width(), profile.height() );
+    }
+
+    void subdevice_model::sync_ir_to_depth_resolution()
+    {
+        auto depth = ui.selected_stream_to_res.find( RS2_STREAM_DEPTH );
+        if( depth != ui.selected_stream_to_res.end() && ir_shares_depth_resolution() )
+            ui.selected_stream_to_res[RS2_STREAM_INFRARED] = depth->second;
+    }
+
+    bool subdevice_model::is_decimation_enabled() const
+    {
         // Read the cached is_enabled() (kept fresh via on_options_changed) so this stays
         // cheap on the per-frame draw path.
         for( auto & ef : embedded_filters )
@@ -1883,25 +2062,23 @@ namespace rs2
 
     void subdevice_model::apply_decimation_resolution_defaults()
     {
-        // Viewer-only convenience for the split-resolution UI: the embedded decimation
-        // filter (FW-side) only accepts depth at 640x360 and pairs it with IR at 1280x720.
-        // Landing the combo boxes on these values here avoids the streaming-time error
-        // in avoid_streaming_on_embedded_filters_not_matching_configuration().
-        // Dual-color carries color on this same sensor, so pin it alongside IR
-        static const std::pair< int, int > DEPTH_RES{ 640, 360 };
-        static const std::pair< int, int > IR_RES{ 1280, 720 };
-        static const std::pair< int, int > COLOR_RES{ 1280, 720 };
-
-        auto force = [&]( rs2_stream stream, const std::pair< int, int > & res ) {
+        // Viewer-only convenience for the split-resolution UI: land the combo boxes on
+        // the FW-mandated decimation pairing (see decimation_mandated_res) so streaming
+        // starts cleanly. Dual-color carries color on this same sensor, so pin it too.
+        if( ! is_d585s() && ! is_decimation_enabled() )
+            return;
+        auto force = [&]( rs2_stream stream ) {
+            auto res = decimation_mandated_res( stream );
+            if( res.first == 0 || res.second == 0 ) return;
             auto it = resolutions_per_stream.find( stream );
             if( it == resolutions_per_stream.end() ) return;
             auto & options = it->second;
             if( std::find( options.begin(), options.end(), res ) == options.end() ) return;
             ui.selected_stream_to_res[stream] = res;
         };
-        force( RS2_STREAM_DEPTH, DEPTH_RES );
-        force( RS2_STREAM_INFRARED, IR_RES );
-        force( RS2_STREAM_COLOR, COLOR_RES );
+        force( RS2_STREAM_DEPTH );
+        force( RS2_STREAM_INFRARED );
+        force( RS2_STREAM_COLOR );
     }
 
     std::pair<int, int> subdevice_model::get_max_resolution(rs2_stream stream) const
@@ -1939,6 +2116,8 @@ namespace rs2
     std::vector<stream_profile> subdevice_model::get_selected_profiles(bool enforce_inter_stream_policies)
     {
         std::vector<stream_profile> results;
+        if (ui.is_multiple_resolutions)
+            sync_ir_to_depth_resolution();
 
         std::stringstream error_message;
         error_message << "The profile ";
@@ -2054,6 +2233,12 @@ namespace rs2
             local.get();
     }
 
+    bool subdevice_model::is_stopping()
+    {
+        std::lock_guard< std::mutex > lock( _stop_mutex );
+        return _stop_future.valid() && _stop_future.wait_for( std::chrono::seconds( 0 ) ) != std::future_status::ready;
+    }
+
     void subdevice_model::stop(std::shared_ptr<notifications_model> not_model)
     {
         if (not_model)
@@ -2065,17 +2250,17 @@ namespace rs2
 
         if (ui.is_multiple_resolutions)
         {
-            streaming_map[RS2_STREAM_DEPTH] = false;
-            streaming_map[RS2_STREAM_INFRARED] = false;
+            streaming_map.clear();
         }
 
-        if (profiles[0].stream_type() == RS2_STREAM_COLOR)
+        if (sensor_has_color_stream(profiles))
         {
             std::lock_guard< std::mutex > lock(detected_objects->mutex);
             detected_objects->clear();
             detected_objects->sensor_is_on = false;
         }
-        else if (profiles[0].stream_type() == RS2_STREAM_DEPTH)
+        // Separate check: on dual-RGB the one sensor carries both, so depth must still be handled
+        if (sensor_has_depth_stream(profiles))
         {
             viewer.disable_measurements();
         }
@@ -2172,23 +2357,39 @@ namespace rs2
             }
             if (decimation_enabled)
             {
-                // check if resolution is different from 640 X 360
-                int width = 0;
-                int height = 0;
-                if (!ui.is_multiple_resolutions)
+                // Guard uses the same per-SKU rule as the combo (decimation_restricts_stream):
+                // 3C/2C - depth+IR+color all mandated; D585S - depth free, IR/color pinned only
+                // when depth is 640x360. This prevents an API/profile-restore path bypassing the
+                // combo constraints in draw_resolutions_combo_box_multiple_resolutions.
+                if (decimation_restricts_stream(RS2_STREAM_DEPTH))
                 {
-                    width = res_values[ui.selected_res_id].first;
-                    height = res_values[ui.selected_res_id].second;
+                    std::pair<int, int> depth_res{ 0, 0 };
+                    if (!ui.is_multiple_resolutions)
+                        depth_res = res_values[ui.selected_res_id];
+                    else
+                        depth_res = ui.selected_stream_to_res.at(RS2_STREAM_DEPTH);
+                    auto depth_mandated = decimation_mandated_res(RS2_STREAM_DEPTH);
+                    if (depth_res != depth_mandated)
+                        throw std::runtime_error(rsutils::string::from()
+                            << "Cannot start streaming: Embedded Decimation filter to be used only with resolution "
+                            << depth_mandated.first << "x" << depth_mandated.second << ".");
                 }
-                else
+
+                if (ui.is_multiple_resolutions)
                 {
-                    auto res_pair = ui.selected_stream_to_res.at(RS2_STREAM_DEPTH);
-                    width = res_pair.first;
-                    height = res_pair.second;
-                }
-                if (width != 640 || height != 360)
-                {
-                    throw std::runtime_error("Cannot start streaming: Embedded Decimation filter to be used only with resolution 640x360.");
+                    for (auto stream : { RS2_STREAM_INFRARED, RS2_STREAM_COLOR })
+                    {
+                        auto mandated = decimation_mandated_res(stream);
+                        if (mandated.first == 0) continue;
+                        if (!decimation_restricts_stream(stream)) continue;
+                        auto it = ui.selected_stream_to_res.find(stream);
+                        if (it == ui.selected_stream_to_res.end()) continue;
+                        if (it->second != mandated)
+                            throw std::runtime_error(rsutils::string::from()
+                                << "Cannot start streaming: Embedded Decimation filter requires "
+                                << rs2_stream_to_string(stream) << " at "
+                                << mandated.first << "x" << mandated.second << ".");
+                    }
                 }
             }
         }
@@ -2223,7 +2424,7 @@ namespace rs2
                     {
                         auto id = f.get_profile().unique_id();
                         {
-                            std::lock_guard< std::mutex > lock( viewer.streams_mutex );
+                            std::lock_guard< std::mutex > lock( viewer.ppf.frames_queue_mutex );
                             auto queue = viewer.ppf.frames_queue.find( id );
                             if( queue == viewer.ppf.frames_queue.end() )
                                 return;
@@ -2249,11 +2450,13 @@ namespace rs2
         {
             for (size_t i = 0; i < profiles.size(); i++)
             {
-                streaming_map[profiles[i].stream_type()] = true;
+                // IR that shares depth's resolution is listed in depth's section
+                auto type = profiles[i].stream_type();
+                streaming_map[type == RS2_STREAM_INFRARED && ir_shares_depth_resolution() ? RS2_STREAM_DEPTH : type] = true;
             }
         }
 
-        if (s->is< color_sensor >())
+        if (sensor_has_color_stream(this->profiles))
         {
             std::lock_guard< std::mutex > lock(detected_objects->mutex);
             detected_objects->sensor_is_on = true;
@@ -2273,6 +2476,18 @@ namespace rs2
         // update() in the future (or below this point) is not silently throttled.
         // `value` stays fresh during the gate via options_watcher -> on_options_changed.
         const bool user_writing = last_user_set_stopwatch.get_elapsed_ms() < 500;
+
+        // Detection Distance can change outside the combo (another app, ROS, a FW reset). Follow it here, every frame,
+        // so the overlay matches the camera even with the panel collapsed. While a combo write is pending,
+        // value_as_float() returns the requested value, so this doesn't undo the user's choice. A recording's control
+        // is fixed, so there only the combo sets the source.
+        if( detected_objects && ! dev.is< playback >() )
+        {
+            auto it = options_metadata.find( RS2_OPTION_DETECTION_DISTANCE );
+            if( it != options_metadata.end() && it->second.supported )
+                detected_objects->distance_source
+                    = follow_detection_distance_control( detected_objects->distance_source, it->second.value_as_float() );
+        }
 
         if (!user_writing && _options_invalidated)
         {

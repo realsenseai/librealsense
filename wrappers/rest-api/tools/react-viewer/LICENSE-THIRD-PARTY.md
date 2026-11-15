@@ -32,7 +32,6 @@ This application is built using only open source dependencies with permissive li
 | python-socketio    | 5.x       | MIT            | Socket.IO server                               |
 | aiortc             | 1.15.x    | BSD-3-Clause   | WebRTC stack (PeerConnection, video tracks)    |
 | PyAV (`av`)        | 17.x      | BSD-3-Clause   | Pulled transitively by aiortc (FFmpeg wheel binding) |
-| OpenCV (`opencv-python`) | 4.11.x | Apache-2.0  | Image processing wheel                         |
 | numpy              | 2.x       | BSD-3-Clause   | Numeric arrays                                 |
 | pyrealsense2       | 2.x       | Apache-2.0     | RealSense SDK Python bindings (in-house)       |
 
@@ -83,7 +82,7 @@ This application is built using only open source dependencies with permissive li
 - All shipped runtime dependencies are MIT, Apache-2.0, BSD or ISC — all OSI-approved permissive licenses.
 - Rust ecosystem packages are commonly dual-licensed (`Apache-2.0 OR MIT`); recipients may choose either.
 - **PyInstaller** is GPL-2.0+ but its [bootloader exception](https://pyinstaller.org/en/stable/license.html) means generated executables are **not subject to GPL**.
-- The **PyAV** and **opencv-python** wheels bundle prebuilt **FFmpeg** shared libraries, licensed **LGPL-2.1+** (built without GPL components). They are redistributed unmodified as dynamically-linked libraries, which satisfies the LGPL for the packaged application; the FFmpeg license text ships inside the respective wheels.
+- The **PyAV** wheel bundles prebuilt **FFmpeg** shared libraries, licensed **LGPL-2.1+** (built without GPL components). They are redistributed unmodified as dynamically-linked libraries, which satisfies the LGPL for the packaged application; the FFmpeg license text ships inside the wheel.
 - Apart from the LGPL FFmpeg binaries noted above, no copyleft or non-commercial dependencies are bundled into the produced artifacts.
 - The list above covers **direct** dependencies declared in `requirements.txt`, `package.json`, and `Cargo.toml`. Transitive dependencies inherit the same permissive license classes; the full transitive set is enumerated in the respective lockfiles (`package-lock.json`, `Cargo.lock`).
 

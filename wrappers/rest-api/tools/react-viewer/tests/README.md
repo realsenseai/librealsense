@@ -25,9 +25,6 @@ npm test
 # Run tests in watch mode
 npm test -- --watch
 
-# Run tests with UI
-npm run test:ui
-
 # Run tests with coverage
 npm run test:coverage
 
@@ -38,14 +35,11 @@ npm test Header.test.tsx
 ### E2E Tests (Playwright)
 
 ```bash
-# Run E2E tests (headless)
-npm run test:e2e
+# No camera needed
+npm run test:e2e -- --grep-invert @real-device
 
-# Run E2E tests with UI
-npm run test:e2e:ui
-
-# Run specific browser
-npm run test:e2e -- --project=chromium
+# Needs a camera
+npm run test:e2e -- --grep @real-device
 
 # Debug mode
 npm run test:e2e -- --debug
@@ -134,8 +128,8 @@ Tests run automatically on:
 - Check that mocks are properly initialized
 
 ### E2E tests timeout
-- Ensure dev server is running: `npm run dev`
-- Check that backend is available on `localhost:8000`
+- Ensure the viewer is built and bundled: `npm run build && npm run bundle`
+- Playwright starts the server itself; check `PYTHON_BIN` can import the SDK bindings
 - Increase timeout in `playwright.config.ts`
 
 ### Coverage seems low

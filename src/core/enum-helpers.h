@@ -67,6 +67,7 @@ RS2_ENUM_HELPERS( rs2_sensor_mode, SENSOR_MODE )
 RS2_ENUM_HELPERS( rs2_l500_visual_preset, L500_VISUAL_PRESET )
 RS2_ENUM_HELPERS( rs2_calibration_type, CALIBRATION_TYPE )
 RS2_ENUM_HELPERS( rs2_eth_link_priority, LINK_PRIORITY )
+RS2_ENUM_HELPERS( rs2_nn_target, NN_TARGET )
 RS2_ENUM_HELPERS_CUSTOMIZED( rs2_calibration_status,
                              RS2_CALIBRATION_STATUS_FIRST,
                              RS2_CALIBRATION_STATUS_LAST,
@@ -81,12 +82,14 @@ RS2_ENUM_HELPERS( rs2_emitter_frequency_mode, EMITTER_FREQUENCY )
 RS2_ENUM_HELPERS( rs2_depth_auto_exposure_mode, DEPTH_AUTO_EXPOSURE )
 RS2_ENUM_HELPERS( rs2_colored_ir_auto_exposure_mode, COLORED_IR_AUTO_EXPOSURE )
 RS2_ENUM_HELPERS( rs2_emitter_mode, EMITTER_MODE )
+RS2_ENUM_HELPERS( rs2_passive_depth_mode, PASSIVE_DEPTH_MODE )
 RS2_ENUM_HELPERS( rs2_safety_mode, SAFETY_MODE )
 RS2_ENUM_HELPERS( rs2_d500_intercam_sync_mode, D500_INTERCAM_SYNC )
 RS2_ENUM_HELPERS( rs2_point_cloud_label, POINT_CLOUD_LABEL )
 RS2_ENUM_HELPERS( rs2_calib_location, CALIB_LOCATION )
 RS2_ENUM_HELPERS( rs2_embedded_filter_type, EMBEDDED_FILTER_TYPE )
 RS2_ENUM_HELPERS( rs2_gyro_sensitivity, GYRO_SENSITIVITY )
+RS2_ENUM_HELPERS( rs2_accel_sensitivity, ACCEL_SENSITIVITY )
 // rs2_composite_option_id: a separate id space from rs2_option - deliberately uses the plain
 // enum-helpers machinery (no registry), unlike rs2_option's is_valid()/get_string() below.
 // std::string const& return type mirrors rs2_option_type, since get_composite_option_name() needs it.

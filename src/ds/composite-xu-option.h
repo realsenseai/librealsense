@@ -9,9 +9,11 @@
 // shared base). No set(float)/query(), so it's never mistaken for a scalar option by code
 // walking options_container::get_supported_options().
 //
-// get_raw()/set_raw()/get_raw_range() do the wire transaction directly via the locked
-// uvc_sensor's invoke_powered() - uvc_xu_option<T>'s set/query are hardwired to sizeof(T), not
-// this control's caller-supplied wire_size, so wrapping it would have bought nothing here.
+// Get/set are a plain uvc XU passthrough on every transport: FW authors the dpp_header on get,
+// the app carries it back on set (on GMSL the driver pipes the whole struct as well). The range
+// differs: USB asks FW via get_xu_range, but GMSL cannot - V4L2 reports one scalar bound for an
+// array control and the FW registers hold only the current value - so on MIPI it is built from
+// the static `dpp_control_desc` tables instead.
 
 #pragma once
 
@@ -27,35 +29,65 @@
 
 namespace librealsense {
 
+// Describes a DPP composite XU control (ctl_id / param_count / param_type + per-slot ranges).
+// USB doesn't consume it (FW authors it into the payload); MIPI uses it only to synthesize the
+// range. The description belongs to the control itself, not to the transport - hence callers
+// pass it unconditionally to `create()`.
+struct dpp_control_desc
+{
+    uint16_t ctl_id;         // dpp_header.ctl_id of the synthesized range (MIPI-only)
+    uint8_t  param_count;    // active int32 slots
+    uint8_t  param_type;     // dpp_header.param_type of the synthesized range (MIPI-only)
+    const int32_t * min;     // param_count entries each
+    const int32_t * max;
+    const int32_t * step;
+    const int32_t * def;
+};
+
 class composite_xu_option : public composite_option_interface
 {
 public:
-    composite_xu_option( std::weak_ptr< uvc_sensor > ep,
+    // `desc` is used only when `is_mipi` (to synthesize the range); validated against wire_size.
+    composite_xu_option( bool is_mipi,
+                         std::weak_ptr< uvc_sensor > ep,
                          platform::extension_unit xu,
                          uint8_t ctrl_id,
                          uint32_t wire_size,
-                         std::string description );
+                         std::string description,
+                         const dpp_control_desc & desc );
+
+    static std::shared_ptr< composite_xu_option > create( bool is_mipi,
+                                                          std::weak_ptr< uvc_sensor > ep,
+                                                          platform::extension_unit xu,
+                                                          uint8_t ctrl_id,
+                                                          uint32_t wire_size,
+                                                          std::string description,
+                                                          const dpp_control_desc & desc );
 
     // composite_option_interface: EXACTLY one get_xu()/set_xu() call - the whole payload
     // travels atomically. This is the non-negotiable HW/FW invariant this class exists for.
-    std::vector< uint8_t > get_raw() const override;
-    void set_raw( const void * data, size_t size ) override;
+    std::vector< uint8_t > get_raw() const final;
+    void set_raw( const void * data, size_t size ) final;
 
-    // One get_xu_range() call (a read-only metadata query, not subject to the get_raw/set_raw
-    // atomicity contract above) - packs {version=1, min, max, step, def} per the generic
-    // convention documented on composite_option_interface::get_raw_range().
-    std::vector< uint8_t > get_raw_range() const override;
+    // USB: one get_xu_range() call (a read-only metadata query, not subject to the get_raw/set_raw
+    // atomicity contract above). MIPI: built from the static desc. Either way packs
+    // {min, max, step, def} per the convention on composite_option_interface::get_raw_range().
+    std::vector< uint8_t > get_raw_range() const final;
 
-    bool is_enabled() const override { return true; }
-    bool is_read_only() const override { return false; }
-    const char * get_description() const override { return _description.c_str(); }
+    bool is_enabled() const final { return true; }
+    bool is_read_only() const final { return false; }
+    const char * get_description() const final { return _description.c_str(); }
 
 private:
+    platform::control_range synthesize_range() const;
+
     std::weak_ptr< uvc_sensor > _ep;
     platform::extension_unit _xu;
     uint8_t _ctrl_id;
     uint32_t _wire_size;
     std::string _description;
+    bool _is_mipi;
+    dpp_control_desc _desc;  // by value; its min/max/step/def arrays must have static lifetime
 };
 
 }  // namespace librealsense

@@ -6,7 +6,9 @@
 #include <librealsense2-gl/rs_processing_gl.hpp>
 #include <string>
 #include <map>
+#include <mutex>
 #include <thread>
+#include <utility>
 #include "opengl3.h"
 #include <GLFW/glfw3.h>
 
@@ -27,8 +29,6 @@ namespace rs2
                 }),
             viewer(viewer),
                     depth_stream_active(false),
-                    resulting_queue_max_size(20),
-                    resulting_queue(static_cast<unsigned int>(resulting_queue_max_size)),
                     render_thread(),
                     render_thread_active(false),
                     pc(new gl::pointcloud()),
@@ -37,7 +37,7 @@ namespace rs2
         {
             std::string s;
             pc_gen = std::make_shared<processing_block_model>(nullptr, "Pointcloud Engine", pc, [=](rs2::frame f) { return pc->calculate(f); }, s);
-            processing_block.start(resulting_queue);
+            processing_block.start([this](rs2::frame f) { store_latest(f); });
         }
 
                 ~post_processing_filters() { stop(); }
@@ -55,29 +55,31 @@ namespace rs2
                     return render_thread_active.load();
                 }
 
-                rs2::frameset get_points()
-                {
-                    frame f;
-                    if (resulting_queue.poll_for_frame(&f))
-                    {
-                        rs2::frameset frameset(f);
-                        model = frameset;
-                    }
-                    return model;
-                }
-
                 void reset(void)
                 {
-                    rs2::frame f{};
-                    model = f;
-                    while (resulting_queue.poll_for_frame(&f));
+                    rs2::frame f;
+                    take_latest_frames(f);
+                }
+
+                std::map<int, rs2::frame> take_latest_frames(rs2::frame& last)
+                {
+                    std::lock_guard<std::mutex> lock(latest_mutex);
+                    last = std::exchange(latest_set, {});
+                    return std::exchange(latest_frames, {});
+                }
+
+                rs2::frame_queue get_frame_queue(int id)
+                {
+                    // Return a shared queue handle so callers wait without holding the map lock.
+                    std::lock_guard<std::mutex> lock(frames_queue_mutex);
+                    return frames_queue.at(id);
                 }
 
                 std::atomic<bool> depth_stream_active;
 
-                const size_t resulting_queue_max_size;
+                // Capture callbacks must not wait for texture uploads under streams_mutex.
+                std::mutex frames_queue_mutex;
                 std::map<int, rs2::frame_queue> frames_queue;
-                rs2::frame_queue resulting_queue;
 
                 std::shared_ptr<pointcloud> get_pc() const { return pc; }
                 std::shared_ptr<processing_block_model> get_pc_model() const { return pc_gen; }
@@ -85,6 +87,7 @@ namespace rs2
     private:
         viewer_model& viewer;
         void process(rs2::frame f, const rs2::frame_source& source);
+        void store_latest(rs2::frame f);
         std::vector<rs2::frame> handle_frame(rs2::frame f, const rs2::frame_source& source);
 
         void map_id(rs2::frame new_frame, rs2::frame old_frame);
@@ -97,9 +100,13 @@ namespace rs2
 
         void zero_first_pixel(const rs2::frame& f);
         rs2::frame last_tex_frame;
+        // Keep these above processing_block: members are destroyed bottom-up, and its callback writes into them.
+        // Holding more than the newest frame per stream would use up the SDK's frame pools when drawing is slow.
+        std::mutex latest_mutex;
+        std::map<int, rs2::frame> latest_frames;
+        rs2::frame latest_set;  // the newest frame-set as it arrived, for callers that need it whole (depth-quality)
         rs2::processing_block processing_block;
         std::shared_ptr<pointcloud> pc;
-        rs2::frameset model;
         std::shared_ptr<processing_block_model> pc_gen;
         rs2::disparity_transform disp_to_depth;
 

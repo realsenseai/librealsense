@@ -584,6 +584,31 @@ namespace rs2
         }
     };
 
+    class mjpeg_decoder : public filter
+    {
+    public:
+        /**
+        * Creates MJPEG decoder processing block.
+        * This block accepts compressed MJPEG frames and outputs RGB8 frames.
+        */
+        mjpeg_decoder() : filter(init(), 1) { }
+
+    protected:
+        mjpeg_decoder(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}
+
+    private:
+        std::shared_ptr<rs2_processing_block> init()
+        {
+            rs2_error* e = nullptr;
+            auto block = std::shared_ptr<rs2_processing_block>(
+                rs2_create_mjpeg_decoder(&e),
+                rs2_delete_processing_block);
+            error::handle(e);
+
+            return block;
+        }
+    };
+
     class y411_decoder : public filter
     {
     public:

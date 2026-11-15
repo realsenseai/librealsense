@@ -20,6 +20,9 @@ public:
     size_t get_vertex_count() const;
     float2 * get_texture_coordinates();
 
+private:
+    bool is_device_cloud() const;
+
 };
 MAP_EXTENSION( RS2_EXTENSION_POINTS, librealsense::points );
 

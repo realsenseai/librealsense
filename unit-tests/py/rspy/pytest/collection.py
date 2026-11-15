@@ -109,7 +109,7 @@ def filter_and_sort_items(config, items):
         skip_no_device = pytest.mark.skip(reason="--live: test has no device requirement")
         for item in items:
             has_device = any(item.iter_markers("device")) or any(item.iter_markers("device_each"))
-            if not has_device:
+            if not has_device and not item.get_closest_marker("infra"):
                 item.add_marker(skip_no_device)
 
     # Skip device tests when --not-live is specified (no hardware, e.g. GHA runners)
@@ -117,7 +117,7 @@ def filter_and_sort_items(config, items):
         skip_device = pytest.mark.skip(reason="--not-live: test requires a live device")
         for item in items:
             has_device = any(item.iter_markers("device")) or any(item.iter_markers("device_each"))
-            if has_device:
+            if has_device or item.get_closest_marker("infra"):
                 item.add_marker(skip_device)
 
     def get_priority(item):

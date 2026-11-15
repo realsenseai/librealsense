@@ -11,7 +11,7 @@ from app.api.dependencies import get_realsense_manager
 
 router = APIRouter()
 
-@router.post("/activate", response_model=PointCloudStatus)
+@router.post("/activate/", response_model=PointCloudStatus)
 async def activate_point_cloud(
     device_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
@@ -21,7 +21,7 @@ async def activate_point_cloud(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/deactivate", response_model=PointCloudStatus)
+@router.post("/deactivate/", response_model=PointCloudStatus)
 async def deactivate_point_cloud(
     device_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),

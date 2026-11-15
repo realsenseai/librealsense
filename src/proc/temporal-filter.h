@@ -10,6 +10,7 @@
 namespace librealsense
 {
     const size_t PRESISTENCY_LUT_SIZE = 256;
+    const uint8_t HISTORY_SIZE = 8;  // frames the history spans, 1 bit each
 
     class temporal_filter : public depth_processing_block
     {
@@ -86,7 +87,7 @@ namespace librealsense
                 }
             }
 
-            cur_frame_index = (cur_frame_index + 1) % 8;  // at end of cycle
+            cur_frame_index = (cur_frame_index + 1) % HISTORY_SIZE;  // at end of cycle
         }
 
     private:
@@ -98,11 +99,15 @@ namespace librealsense
             std::vector< uint8_t > last_frame;  // last frame received for this stream
             std::vector< uint8_t > history;     // the last 8 frames, 1 bit per frame
             uint8_t cur_frame_index = 0;
+            rs2_intrinsics geometry{};          // pixel mapping the history was built on
+            double last_timestamp = 0;          // [ms] of the last frame, to spot a stream restart
         };
 
         void reset_history();
-        // The history that belongs to the frame's own stream, sized for it
+        static void clear_state( stream_state & state );
+        // The history that belongs to the frame's own stream, sized for it and reset when its geometry changes or it restarts
         stream_state & state_of( const rs2::frame & f );
+        static rs2_intrinsics geometry_of( const rs2::stream_profile & profile );
 
         void on_set_persistence_control(uint8_t val);
         void on_set_alpha(float val);

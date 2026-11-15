@@ -210,6 +210,25 @@ class sensor:
     def add_profile(self, profile):
         self._profiles.append(profile)
 
+    def supports(self, option_type):
+        return False
+
+    def open(self, profiles):
+        self.opened_profiles = profiles
+        self._active = list(profiles)
+
+    def get_active_streams(self):
+        return getattr(self, "_active", [])
+
+    def start(self, callback):
+        pass
+
+    def stop(self):
+        pass
+
+    def close(self):
+        self._active = []
+
     def is_depth_sensor(self):
         return False
 
@@ -276,6 +295,7 @@ class stream_profile:
         self._stream_type = stream_type
         self._format = format
         self._index = index
+        self._default = False
 
     def stream_type(self):
         return self._stream_type
@@ -286,13 +306,20 @@ class stream_profile:
     def index(self):
         return self._index
 
+    def stream_index(self):
+        return self._index
+
+    def is_default(self):
+        return self._default
+
     def is_video_stream_profile(self):
         return isinstance(self, video_stream_profile)
 
     def as_video_stream_profile(self):
         if self.is_video_stream_profile():
             return self
-        raise RuntimeError("Not a video stream profile")
+        # Like the SDK: casting a motion profile does not raise, it reports 0x0
+        return video_stream_profile(self._stream_type, self._format, 0, 0, self.fps(), self._index)
 
 # Mock for video stream profile
 class video_stream_profile(stream_profile):
@@ -694,6 +721,7 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
                 depth_sensor_obj.add_profile(video_stream_profile(
                     stream.depth, format.z16, res[0], res[1], fps
                 ))
+        depth_sensor_obj.get_stream_profiles()[2]._default = True
         mock_device.add_sensor(depth_sensor_obj)
 
     if with_color:

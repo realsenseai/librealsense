@@ -85,6 +85,7 @@ namespace rs2
 
         void link_hovered();
         void cross_hovered();
+        void resize_hovered() { _resize_hovered = true; }  // horizontal resize cursor, e.g. over the pane's edge
 
         void set_hovered_over_input() { _hovers_any_input_window = true; }
         bool get_hovered_over_input() const { return _hovers_any_input_window; }
@@ -144,6 +145,8 @@ namespace rs2
         GLFWcursor*              _hand_cursor = nullptr;
         bool                     _cross_hovered = false;
         GLFWcursor*              _cross_cursor = nullptr;
+        bool                     _resize_hovered = false;
+        GLFWcursor*              _resize_cursor = nullptr;
 
         std::string              _title;
         std::shared_ptr<visualizer_2d> _2d_vis;

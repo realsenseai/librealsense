@@ -6,9 +6,9 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include <librealsense2/hpp/rs_export.hpp>
 #include <src/types.h>
 
-#if defined( BUILD_EASYLOGGINGPP ) && defined( BUILD_SHARED_LIBS )
-// A shared realsense2 doesn't export ELPP's storage, so rsutils objects linked into this
-// module (e.g. dispatcher) need our own -- see rsutils/easylogging/easyloggingpp.h
+#if defined( BUILD_EASYLOGGINGPP ) && defined( BUILD_SHARED_LIBS ) && ! defined( __linux__ )
+// A shared realsense2 doesn't export ELPP's storage on Windows/macOS, so rsutils objects linked into
+// this module (e.g. dispatcher) need our own; on Linux we share the library's -- see rsutils/easylogging/easyloggingpp.h
 INITIALIZE_EASYLOGGINGPP
 #endif
 
@@ -37,6 +37,7 @@ PYBIND11_MODULE(NAME, m) {
     init_serializable_device(m);
     init_util(m);
     init_eth_config(m);
+    init_nn(m);
     init_rum(m);
     
     /** rs_export.hpp **/

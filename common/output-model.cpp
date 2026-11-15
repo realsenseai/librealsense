@@ -1250,11 +1250,14 @@ void stream_dashboard::draw_dashboard(ux_window& win, rect& r)
 
 void frame_drops_dashboard::process_frame(rs2::frame f)
 {
+    // OD runs at a FW-fixed rate (e.g. 15 fps when 30 is requested): exclude it from drop counting
+    bool const is_od = f.get_profile().stream_type() == RS2_STREAM_OBJECT_DETECTION;
+
     shared_data.write([&](){
         double ts = glfwGetTime();
         if (method == 1) ts = f.get_timestamp() / 1000.f;
         auto it = stream_to_time.find(f.get_profile().unique_id());
-        if (it != stream_to_time.end())
+        if (it != stream_to_time.end() && !is_od)
         {
             auto last = stream_to_time[f.get_profile().unique_id()];
 
@@ -1268,7 +1271,8 @@ void frame_drops_dashboard::process_frame(rs2::frame f)
             }
         }
 
-        counter++;
+        if (!is_od)
+            counter++;
 
         if (ts - last_time > 1.f)
         {

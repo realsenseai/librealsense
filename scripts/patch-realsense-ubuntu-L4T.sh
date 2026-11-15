@@ -95,12 +95,13 @@ case ${JETSON_L4T_VERSION} in
 		[[ $JETSON_L4T_VERSION = 35.1 ]] && RELEASE_STRING="Release"
 		KBASE=./Tegra/kernel/kernel-$KERNEL_RELEASE
 	;;
-	36.3 | 36.4 | 36.4.3 | 36.4.4 | 36.4.7 | 36.5)
+	36.3 | 36.4 | 36.4.3 | 36.4.4 | 36.4.7 | 36.5 | 36.5.2)
 		# 36.3 --> JP 6.0
 		# 36.4 -> JP 6.1
 		# 36.4.3 --> JP 6.2
 		# 36.4.4, 36.4.7 --> JP 6.2.1
 		# 36.5 --> JP 6.2.2
+		# 36.5.2 --> JP 6.2.3
 		PATCHES_REV=6.0
 		KERNEL_RELEASE=5.15
 		UBUNTU_CODENAME=jammy

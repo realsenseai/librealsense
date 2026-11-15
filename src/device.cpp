@@ -10,9 +10,6 @@
 #include "sync.h"
 #include "context.h"  // rs2_device_info
 #include "core/sensor-interface.h"
-#include "sensor.h"  // sensor_base::is_opened
-#include "perception-sensor.h"
-#include "core/supported-embedded-filters-interface.h"
 #include "librealsense-exception.h"
 
 #include <rsutils/string/from.h>
@@ -129,56 +126,6 @@ sensor_interface& device::get_sensor(size_t subdevice)
     {
         throw invalid_value_exception("invalid subdevice value");
     }
-}
-
-bool device::is_perception_active() const
-{
-    for( size_t i = 0; i < _sensors.size(); ++i )
-    {
-        auto & s = *_sensors[i];
-        if( ! Is< perception_sensor >( &s ) )
-            continue;
-        if( s.is_streaming() )
-            return true;
-        // A perception sensor that is opened but not yet streaming is already "active" for our purposes
-        auto sb = dynamic_cast< const sensor_base * >( &s );  // is_opened() is not on sensor_interface
-        if( sb && sb->is_opened() )
-            return true;
-    }
-    return false;
-}
-
-bool device::is_perception_blocking_filter_enabled() const
-{
-    for( size_t i = 0; i < _sensors.size(); ++i )
-    {
-        auto supported = As< supported_embedded_filters_interface >( _sensors[i].get() );
-        if( ! supported )
-            continue;
-        for( auto & filter : supported->get_supported_embedded_filters() )
-        {
-            auto type = filter->get_type();
-            if( type != RS2_EMBEDDED_FILTER_TYPE_DECIMATION && type != RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
-                continue;
-            if( filter->supports_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED )
-                && filter->get_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED ).query() != 0.f )
-                return true;
-        }
-    }
-    return false;
-}
-
-void device::throw_if_perception_active() const
-{
-    if( is_perception_active() )
-        throw wrong_api_call_sequence_exception( "Cannot enable the embedded filter while perception stream is active" );
-}
-
-void device::throw_if_perception_blocking_filter_enabled() const
-{
-    if( is_perception_blocking_filter_enabled() )
-        throw wrong_api_call_sequence_exception( "Cannot start perception stream while embedded decimation or temporal filter is enabled; "
-            "they cannot run at the same time. Disable the embedded filter first." );
 }
 
 size_t device::find_sensor_idx(const sensor_interface& s) const

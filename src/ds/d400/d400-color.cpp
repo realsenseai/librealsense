@@ -88,6 +88,15 @@ namespace librealsense
         {
             ext_graph.register_extrinsics(*_color_stream, *_depth_stream, _color_extrinsic);
             register_stream_to_extrinsic_group(*_color_stream, 0);
+
+            // D401/D405 USB dual-RGB: Color 1 is the right imager, as on GMSL. Color 0 keeps its
+            // calibrated extrinsics so a D405 without the raw FW is unchanged.
+            if( _pid == RS405_PID )
+            {
+                _color_stream2 = std::make_shared< stream >( RS2_STREAM_COLOR );
+                ext_graph.register_same_extrinsics( *_color_stream2, *_right_ir_stream );
+                register_stream_to_extrinsic_group( *_color_stream2, 0 );
+            }
         }
 
         std::vector<platform::uvc_device_info> color_devs_info;
@@ -383,10 +392,10 @@ namespace librealsense
             }
         }
 
-        // D401 GMSL raw dual-RGB: register the raw->RGB8 debayer AFTER the ISP blocks so ISP wins the tie
+        // D401 raw dual-RGB: register the raw->RGB8 debayer AFTER the ISP blocks so ISP wins the tie
         // for a lone Color 0 RGB8 (registration order breaks ties in find_pbf_matching_most_profiles); raw
         // wins only when Color 1 is also requested. Per-pin routing is set in d400_device::init().
-        if( _is_mipi_device && _pid == ds::RS401_GMSL_PID && _fw_version >= firmware_version( "5.17.4.13" ) )
+        if( is_d401_raw_dual_rgb() )
         {
             // Native color 1288x808; raw payload is packed MIPI RAW10 (SBGGR10P/pBAA on 1.0.6.10+, or the
             // older BA81 padded to 1612). The converter recovers the true stride from the frame size, so

@@ -273,6 +273,12 @@ frame_interface * software_sensor::allocate_new_frame( rs2_extension extension,
     else
     {
         frame->set_stream( std::dynamic_pointer_cast< stream_profile_interface >( profile->shared_from_this() ) );
+
+        auto sd = dynamic_cast< software_device * >( _owner );
+        if( ! sd )
+            throw std::runtime_error( "Owner is not a software device" );
+
+        sd->register_extrinsic( *profile );
     }
     return frame;
 }
@@ -295,11 +301,6 @@ frame_interface * software_sensor::allocate_new_video_frame( video_stream_profil
             throw std::runtime_error("Frame is not video frame");
 
         vid_frame->assign( profile->get_width(), profile->get_height(), stride, bpp * 8 );
-        auto sd = dynamic_cast< software_device * >( _owner );
-        if (!sd)
-            throw std::runtime_error("Owner is not a software device");
-
-        sd->register_extrinsic( *profile );
     }
     return frame;
 }

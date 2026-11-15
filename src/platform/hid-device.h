@@ -21,6 +21,7 @@ struct hid_profile
     std::string sensor_name;
     uint32_t frequency;
     double sensitivity;
+    bool apply_sensitivity_to_accel = false;  // accel keeps its FW default unless a level was explicitly set
 };
 
 

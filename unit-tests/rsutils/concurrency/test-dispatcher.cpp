@@ -192,6 +192,34 @@ TEST_CASE("stop() notify flush to finish")
     stop_thread.join();
 }
 
+TEST_CASE( "stop() wakes a sleeping dispatched item" )
+{
+    // A polling item sleeping in try_sleep() must be woken by stop(), not have stop() wait out
+    // the sleep - sensor close() stops such pollers and was blocked for the remaining sleep time
+    dispatcher dispatcher( 10, "test" );
+    dispatcher.start();
+
+    std::atomic_bool sleep_completed{ true };
+    std::atomic_bool item_returned{ false };
+    std::promise< void > dispatched;
+    dispatcher.invoke( [&]( dispatcher::cancellable_timer c ) {
+        dispatched.set_value();
+        sleep_completed = c.try_sleep( std::chrono::seconds( 5 ) );
+        item_returned = true;
+    } );
+
+    // Make sure the above invoke function is dispatched; whether stop() lands before or during
+    // the sleep, it must not wait the sleep out
+    REQUIRE( dispatched.get_future().wait_for( std::chrono::seconds( 5 ) ) == std::future_status::ready );
+
+    stopwatch sw;
+    dispatcher.stop();
+    CHECK( sw.get_elapsed() < std::chrono::seconds( 1 ) );
+    CHECK( ! sleep_completed );
+    // stop() still returns only after the in-flight item is done
+    CHECK( item_returned );
+}
+
 TEST_CASE( "dispatcher name" )
 {
     CHECK( dispatcher( 10, "my-dispatcher" ).name() == "my-dispatcher" );

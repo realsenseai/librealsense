@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D555"),
+    pytest.mark.device_exclude("D585 Prototype"),  # FW does not send logs yet
     pytest.mark.context("nightly"),
 ]
 
@@ -95,15 +96,25 @@ def fw_logger(test_device, tmp_path):
         root.set( 'version', smcu_version )
         tree.write( events_dummy_path )
 
-    yield logger, raw_message, parsed_message, events_real_path, definitions_path
+    yield logger, raw_message, parsed_message, events_real_path, events_dummy_path, definitions_path
 
     for p in (events_real_path, events_dummy_path, definitions_path):
         if os.path.exists( p ):
             os.remove( p )
 
 
+def _ensure_event_defined( events_paths, event_id ):
+    # The first log from the camera can be any FW event, so make sure the test events files define it
+    for path in events_paths:
+        tree = ET.parse( path )
+        root = tree.getroot()
+        if not any( e.get( 'id' ) == str( event_id ) for e in root.iter( 'Event' ) ):
+            ET.SubElement( root, 'Event', id=str( event_id ), numberOfArguments="0", format=f"Event{event_id}" )
+            tree.write( path )
+
+
 def test_load_unsupported_definitions_file(fw_logger):
-    logger, _raw, _parsed, events_real_path, _definitions_path = fw_logger
+    logger, _raw, _parsed, events_real_path, _events_dummy_path, _definitions_path = fw_logger
     with open( events_real_path, 'r' ) as f:
         definitions = f.read()
     with pytest.raises(RuntimeError, match=re.escape("Did not find 'Source' node with id 0")):
@@ -111,13 +122,20 @@ def test_load_unsupported_definitions_file(fw_logger):
 
 
 def test_load_supported_definitions_file(fw_logger):
-    logger, raw_message, parsed_message, _events_real_path, definitions_path = fw_logger
+    logger, raw_message, parsed_message, events_real_path, events_dummy_path, definitions_path = fw_logger
     with open( definitions_path, 'r' ) as f:
         definitions = f.read()
     logger.init_parser( definitions )
     logger.start_collecting()
     try:
         logger.get_firmware_log( raw_message ) # Get a log entry from the camera with unknown content
+        data = bytes( raw_message.get_data() )
+        assert len( data ) >= 6, f'Expected a FW log, got {len( data )} bytes'
+        event_id = int.from_bytes( data[4:6], 'little' )  # fw_log_binary_common::event_id
+        log.debug( 'Received event id: %d', event_id )
+        _ensure_event_defined( ( events_real_path, events_dummy_path ), event_id )
+        with open( definitions_path, 'r' ) as f:
+            logger.init_parser( f.read() )
         logger.parse_log( raw_message, parsed_message )
         log.debug( 'Parsed message: %s', parsed_message.get_message() )
     finally:

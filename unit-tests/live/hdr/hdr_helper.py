@@ -105,12 +105,21 @@ def perform_manual_hdr_test(hdr_config, test_title, resolution=(640, 480)):
     pipe.start(cfg)
 
     log.debug("Batch size: %s", batch_size)
-    for i in range(0, batch_size * 5):
+    batches_needed = 4
+    max_discarded_batches = 4  # extra budget to discard batches hit by a dropped frame (within frame-drop KPI) and resync
+    batches_done = 0
+    batch_frames = 0
+    in_batch = False  # batches start on seq_id 0 so a dropped frame can't shift the window
+    prev_frame_number = None
+    for i in range(0, batch_size * (batches_needed + max_discarded_batches)):
+        if batches_done == batches_needed:
+            break
         data = pipe.wait_for_frames()
         depth_frame = data.get_depth_frame()
         frame_number = depth_frame.get_frame_number()
 
         if i < batch_size:  # skip the first batch of frames
+            prev_frame_number = frame_number
             continue
 
         seq_id = depth_frame.get_frame_metadata(rs.frame_metadata_value.sequence_id)
@@ -118,7 +127,16 @@ def perform_manual_hdr_test(hdr_config, test_title, resolution=(640, 480)):
         frame_gain = depth_frame.get_frame_metadata(rs.frame_metadata_value.gain_level)
         seq_size = depth_frame.get_frame_metadata(rs.frame_metadata_value.sequence_size)
 
-        seq_id_counts[seq_id] = seq_id_counts.get(seq_id, 0) + 1
+        if prev_frame_number is not None and frame_number != prev_frame_number + 1 and in_batch:
+            log.warning("Frame drop detected (%s -> %s), discarding current batch", prev_frame_number, frame_number)
+            in_batch = False
+        prev_frame_number = frame_number
+
+        if not in_batch and seq_id == 0:
+            in_batch = True
+            batch_frames = 0
+            seq_id_counts.clear()
+
         log.debug("Frame %s - Sequence ID: %s, Exposure: %s, Gain: %s", frame_number, seq_id, frame_exposure, frame_gain)
 
         current_controls = hdr_config["hdr-preset"]["items"][seq_id]["controls"]
@@ -130,14 +148,21 @@ def perform_manual_hdr_test(hdr_config, test_title, resolution=(640, 480)):
         check.equal(frame_gain, expected_gain, f"Gain - Expected: {expected_gain}, Actual: {frame_gain}")
         check.equal(seq_size, len(hdr_config["hdr-preset"]["items"]))
 
-        if i % batch_size == batch_size - 1:
+        if not in_batch:
+            continue
+
+        seq_id_counts[seq_id] = seq_id_counts.get(seq_id, 0) + 1
+        batch_frames += 1
+        if batch_frames == batch_size:
             check.equal(seq_id_counts, expected_iterations,
                         f"Sequence ID counts do not match expected: {seq_id_counts} != {expected_iterations}")
-            seq_id_counts.clear()
+            batches_done += 1
+            in_batch = False
 
             log.debug("----")
 
     pipe.stop()
+    check.equal(batches_done, batches_needed, "Not enough full HDR batches collected (too many frame drops)")
 
 
 def perform_auto_hdr_test(hdr_config, test_title, resolution=(640, 480)):

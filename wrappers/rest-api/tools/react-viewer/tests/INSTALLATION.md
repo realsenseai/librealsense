@@ -34,8 +34,9 @@ Run the smoke test:
 # Unit tests
 npm test
 
-# E2E tests (requires dev server running)
-npm run test:e2e
+# E2E tests (Playwright starts the server; build the viewer first)
+npm run build && npm run bundle
+npm run test:e2e -- --grep-invert @real-device
 ```
 
 ## Step 4: Run with Coverage
@@ -56,21 +57,13 @@ npm test -- --watch
 
 Changes to test files or source files will automatically re-run tests.
 
-### Run Tests with UI
-
-```bash
-npm run test:ui
-```
-
-Opens Vitest UI in browser for interactive test exploration.
-
 ### Debug E2E Tests
 
 ```bash
-npm run test:e2e:ui
+npm run test:e2e -- --debug
 ```
 
-Opens Playwright UI for debugging E2E tests step-by-step.
+Opens the Playwright Inspector for stepping through E2E tests.
 
 ## Next Steps
 
@@ -86,12 +79,12 @@ The `@/` alias is configured in both `vite.config.ts` and `vitest.config.ts`. If
 
 ### E2E tests fail to connect
 
-Ensure the dev server is running:
+Ensure the viewer is built, so the server has something to serve:
 ```bash
-npm run dev
+npm run build && npm run bundle
 ```
 
-And backend is available on `http://localhost:8000`
+Playwright starts the server itself; override its address with `API_URL`.
 
 ### MSW warnings in console
 

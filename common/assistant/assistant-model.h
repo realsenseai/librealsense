@@ -6,6 +6,7 @@
 #include "assistant-chat-client.h"
 #include "assistant-image-cache.h"
 #include "rendering.h"
+#include <imgui.h>
 #include <rsutils/concurrency/concurrency.h>
 #include <vector>
 #include <string>
@@ -66,6 +67,7 @@ namespace rs2
         void draw_panel(ux_window& win, float bottom_clearance);
         bool draw_icon_button(const char* icon); // small circular badge button, used in the header
         void draw_input_row(ux_window& win, float avail_w);
+        void draw_disclaimer(ux_window& win, ImVec2 pos, ImVec2 size); // one-time, persisted in the viewer config
 
         // assistant-messages.cpp
         void draw_greeting(ux_window& win, float avail_h);
@@ -84,6 +86,7 @@ namespace rs2
         bool _open = false;
         bool _expanded = false;
         bool _focus_input_next_frame = false; // set for one frame when the panel just opened
+        float _disclaimer_card_h = 260.f; // last frame's card height, for vertical centering; seeded with a typical height
         assistant_health _health = assistant_health::unknown;
         bool _health_check_started = false;
         std::vector<assistant_chat_message> _messages;

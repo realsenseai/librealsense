@@ -1,0 +1,28 @@
+name: Build on Linux
+description: Configure with CMake in a build directory and build
+
+inputs:
+  cmake-options:
+    description: CMake options, one per line
+    default: ""
+
+runs:
+  using: composite
+
+  steps:
+    - name: Configure CMake
+      shell: bash
+      env:
+        CMAKE_OPTIONS: ${{ inputs.cmake-options }}
+        BUILD_TYPE: ${{ env.LRS_RUN_CONFIG }}
+      # xargs splits the options like a shell would, so quoted values such as -DFOO="a b" stay one argument
+      run: |
+        mkdir -p build
+        cd build
+        printf '%s\n' "$CMAKE_OPTIONS" | xargs cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+
+    - name: Build
+      shell: bash
+      run: |
+        cd build
+        cmake --build . -- -j$(nproc)

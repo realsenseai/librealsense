@@ -129,7 +129,23 @@ namespace librealsense
                         std::this_thread::sleep_for( reconnect_delay );
                     }
                     if( auto strong = ctx.lock() )
-                        strong->invoke_devices_changed_callbacks( {}, devs );
+                    {
+                        // The reset can change what the device enumerates as (e.g. its PID after a mode switch)
+                        auto added = devs;
+                        try
+                        {
+                            for( auto const & dev : strong->query_devices( RS2_PRODUCT_LINE_ANY ) )
+                                if( dev->get_address() == devs.front()->get_address() )
+                                    added = { dev };
+                        }
+                        catch( const std::exception & e )
+                        {
+                            LOG_WARNING( "Re-enumeration after reset failed: " << e.what() );
+                        }
+                        if( added == devs )
+                            LOG_WARNING( "Device " << devs.front()->get_address() << " not found after reset; reconnecting its old identity" );
+                        strong->invoke_devices_changed_callbacks( {}, added );
+                    }
                     else
                     {
                         // Context destroyed during the reconnect delay - normal teardown with a reset in flight, nothing is left stranded

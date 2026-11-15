@@ -20,7 +20,8 @@ namespace librealsense
     {
     public:
         uvc_pu_auto_exposure_option( const std::weak_ptr< uvc_sensor > & ep,
-                                     const std::weak_ptr< option > & exposure_option );
+                                     const std::weak_ptr< option > & exposure_option,
+                                     platform::processing_unit pu = { 0, 0, platform::DEFAULT_PU_NODE } );
 
         void set( float value ) override;
 

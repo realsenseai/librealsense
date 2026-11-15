@@ -59,6 +59,7 @@ import asyncio
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.errors import setup_exception_handlers
@@ -90,6 +91,11 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Set up exception handlers
 setup_exception_handlers(app)
 
+# If the react viewer is built, mount it on root (/)
+_static_dir = Path(__file__).parent / "static"
+if (_static_dir / "index.html").exists():
+    app.router.default = StaticFiles(directory=_static_dir, html=True)
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -104,6 +110,13 @@ async def startup_event():
 combined_app = socketio.ASGIApp(socketio_server=sio, other_asgi_app=app, socketio_path='socket')
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=settings.PROJECT_NAME)
+    # localhost by default, which also avoids Windows Firewall prompts
+    parser.add_argument("--host", default="127.0.0.1", help="interface to listen on; 0.0.0.0 accepts remote clients")
+    parser.add_argument("--port", type=int, choices=range(1, 65536), metavar="PORT", default=8000, help="port to listen on (1-65535)")
+    args = parser.parse_args()
+
     # Disable reload when running as a bundled executable (PyInstaller)
     # Reload mode doesn't work in PyInstaller and causes issues with device access
     is_bundled = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
@@ -111,19 +124,18 @@ if __name__ == "__main__":
     
     if is_bundled:
         # When bundled, pass the app object directly (string import doesn't work)
-        # Bind to localhost only to avoid Windows Firewall prompts
         uvicorn.run(
             combined_app,
-            host="127.0.0.1",
-            port=8000,
+            host=args.host,
+            port=args.port,
             log_level="info"
         )
     else:
         # In development, use string reference to enable reload
         uvicorn.run(
             "main:combined_app",
-            host="127.0.0.1",
-            port=8000,
+            host=args.host,
+            port=args.port,
             reload=reload_enabled,
             log_level="debug"
         )

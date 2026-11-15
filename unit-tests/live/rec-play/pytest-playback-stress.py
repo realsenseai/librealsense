@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.timeout(1500),
     pytest.mark.context("weekly"),
+    pytest.mark.infra,  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
 ]
 
 frames_in_bag_file = 64

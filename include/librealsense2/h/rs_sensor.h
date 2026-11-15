@@ -61,6 +61,7 @@ typedef enum rs2_stream
     RS2_STREAM_OCCUPANCY                        , /**< occupancy info */
     RS2_STREAM_LABELED_POINT_CLOUD              , /**< labeled point cloud stream */
     RS2_STREAM_OBJECT_DETECTION                 , /**< object detection stream */
+    RS2_STREAM_POINT_CLOUD                      , /**< device-generated point cloud stream (D5xx EP12 Mapping) */
     RS2_STREAM_COUNT
 } rs2_stream;
 const char* rs2_stream_to_string(rs2_stream stream);
@@ -682,6 +683,23 @@ void rs2_set_motion_device_intrinsics(const rs2_sensor* sensor, const rs2_stream
 * \return                the max usable range in meters
 */
 float rs2_get_max_usable_depth_range(rs2_sensor const * sensor, rs2_error** error);
+
+/**
+* Get the occupancy grid and labeled point cloud params of a depth mapping sensor
+* \param[in] sensor      depth mapping sensor
+* \param[out] error      if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                the params as a JSON string in a rs2_raw_data_buffer, which should be released by rs2_delete_raw_data
+*/
+const rs2_raw_data_buffer* rs2_get_depth_mapping_params(rs2_sensor const* sensor, rs2_error** error);
+
+/**
+* Set occupancy grid and labeled point cloud params of a depth mapping sensor. Only the named fields change.
+* Blocks until the device has applied the params, and fails with the device's message if it rejects them.
+* \param[in] sensor                depth mapping sensor
+* \param[in] params_json_str       partial params as a JSON string
+* \param[out] error                if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_set_depth_mapping_params(rs2_sensor const* sensor, const char* params_json_str, rs2_error** error);
 
 #ifdef __cplusplus
 }

@@ -7,6 +7,8 @@
 #include <src/calibration-engine-interface.h>  // should remain for members _mode, _state, _result
 #include <src/ds/ds-calib-common.h>
 
+#include <rsutils/deferred.h>
+
 
 namespace librealsense
 {
@@ -59,7 +61,7 @@ namespace librealsense
                                                             std::function< void( const int count ) > progress_func,
                                                             bool wait_for_final_results = true ) const;
         std::vector< uint8_t > get_calibration_results( float * const health = nullptr ) const;
-        std::shared_ptr< option > change_preset();
+        rsutils::deferred change_preset();
 
         mutable std::vector< uint8_t > _curr_calibration;
         std::shared_ptr<d500_debug_protocol_calibration_engine> _calib_engine;

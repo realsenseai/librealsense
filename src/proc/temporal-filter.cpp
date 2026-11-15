@@ -8,15 +8,19 @@
 #include "environment.h"
 #include "proc/synthetic-stream.h"
 #include "proc/temporal-filter.h"
+#include "stream.h"
+#include "core/video.h"
 
 #include <rsutils/string/from.h>
 
 #include <algorithm>
+#include <cstring>
 
 
 namespace librealsense
 {
     const size_t PERSISTENCE_MAP_NUM = 9;
+    const double ms_in_second = 1000.;
 
     // The persistence parameter/holes filling mode
     const uint8_t persistence_min = 0;
@@ -53,7 +57,7 @@ namespace librealsense
             persistence_max,
             persistence_step,
             persistence_default,
-            &_persistence_param, "Persistency mode");
+            &_persistence_param, "Persistency mode. Rules for replacing a missing pixel with its last valid value");
 
         temporal_persistence_control->set_description(0, "Disabled");
         temporal_persistence_control->set_description(1, "Valid in 8/8");
@@ -85,7 +89,7 @@ namespace librealsense
             temp_alpha_max,
             temp_alpha_step,
             temp_alpha_default,
-            &_alpha_param, "Alpha factor of Exp. moving average, 1=no filter, 0=infinite filter");
+            &_alpha_param, "Alpha factor of Exp. moving average, 1=no filter, 0=infinite filter. Smooths against previous frames");
         temporal_filter_alpha->on_set([this](float val)
         {
             on_set_alpha(val);
@@ -96,7 +100,7 @@ namespace librealsense
             temp_delta_max,
             temp_delta_step,
             temp_delta_default,
-            &_delta_param, "Edge-preserving (gradient) threshold");
+            &_delta_param, "Step-size boundary, the threshold used to preserve surfaces (edges). Higher = smooths over bigger depth differences");
 
         auto weak_temporal_filter_delta = std::weak_ptr<ptr_option<uint8_t>>();
         temporal_filter_delta->on_set([this, weak_temporal_filter_delta](float val)
@@ -181,7 +185,20 @@ namespace librealsense
     // setters take - so the map needs no locking of its own
     temporal_filter::stream_state & temporal_filter::state_of( const rs2::frame & f )
     {
-        auto & state = _states[{ f.get_profile().stream_type(), f.get_profile().stream_index() }];
+        auto profile = f.get_profile();
+        auto & state = _states[{ profile.stream_type(), profile.stream_index() }];
+
+        // Rotation keeps the frame size but moves every pixel, so history must go when geometry changes. Profile identity
+        // can't tell - upstream blocks re-clone it per frame with several streams, and options change intrinsics under it.
+        auto const geometry = geometry_of( profile );
+        bool const geometry_changed = std::memcmp( &geometry, &state.geometry, sizeof( geometry ) ) != 0;
+        state.geometry = geometry;
+
+        // The filter isn't told of a stream restart; time going back, or a gap longer than the history spans, means one
+        auto const timestamp = f.get_timestamp();
+        double const max_gap_ms = profile.fps() > 0 ? HISTORY_SIZE * ms_in_second / profile.fps() : ms_in_second;
+        bool const restarted = timestamp < state.last_timestamp || timestamp - state.last_timestamp > max_gap_ms;
+        state.last_timestamp = timestamp;
 
         auto const size_bytes = _current_frm_size_pixels * _bpp;
         if( state.last_frame.size() != size_bytes )
@@ -190,8 +207,32 @@ namespace librealsense
             state.history.assign( size_bytes, 0 );
             state.cur_frame_index = 0;
         }
+        else if( geometry_changed || restarted )
+            clear_state( state );
 
         return state;
+    }
+
+
+    // Intrinsics describe where each pixel looks; profiles without them fall back to the dimensions
+    rs2_intrinsics temporal_filter::geometry_of( const rs2::stream_profile & profile )
+    {
+        rs2_intrinsics geometry{};
+        auto vsp = dynamic_cast< video_stream_profile_interface * >( profile.get()->profile );
+        if( ! vsp )
+            return geometry;
+
+        try
+        {
+            geometry = vsp->get_intrinsics();
+        }
+        catch( const std::exception & )
+        {
+            geometry = {};
+        }
+        geometry.width = vsp->get_width();
+        geometry.height = vsp->get_height();
+        return geometry;
     }
 
 
@@ -199,11 +240,15 @@ namespace librealsense
     void temporal_filter::reset_history()
     {
         for( auto & state : _states )
-        {
-            std::fill( state.second.last_frame.begin(), state.second.last_frame.end(), 0 );
-            std::fill( state.second.history.begin(), state.second.history.end(), 0 );
-            state.second.cur_frame_index = 0;
-        }
+            clear_state( state.second );
+    }
+
+
+    void temporal_filter::clear_state( stream_state & state )
+    {
+        std::fill( state.last_frame.begin(), state.last_frame.end(), 0 );
+        std::fill( state.history.begin(), state.history.end(), 0 );
+        state.cur_frame_index = 0;
     }
 
     rs2::frame temporal_filter::prepare_target_frame(const rs2::frame& f, const rs2::frame_source& source)

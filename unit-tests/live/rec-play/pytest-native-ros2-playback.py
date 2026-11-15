@@ -22,6 +22,8 @@ from pytest_check import check
 from rspy import repo
 from playback_helper import PlaybackStatusVerifier
 
+pytestmark = pytest.mark.infra  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
+
 log = logging.getLogger(__name__)
 
 PLAYBACK_TIMEOUT = 30  # generous; fixtures hold ~5s of data, walked at full speed

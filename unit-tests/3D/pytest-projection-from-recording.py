@@ -6,6 +6,9 @@ import numpy as np
 import pyrealsense2 as rs
 from rspy import repo
 import os.path
+import pytest
+
+pytestmark = pytest.mark.infra  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
 
 # a pixel whose 4-neighbors are missing, or further away than this, sits on a depth discontinuity -
 # there the reverse (color -> depth) beam search is inherently ambiguous

@@ -159,11 +159,14 @@ namespace librealsense
         virtual void device_specific_initialization();
 
         friend class auto_calibrated;
+        friend class d500_auto_calibrated;
 
-        void set_exposure( sensor_base * sensor, const exposure_control & val );
-        void set_auto_exposure( sensor_base * sensor, const auto_exposure_control & val );
-        void get_exposure( sensor_base * sensor, exposure_control * ptr ) const;
-        void get_auto_exposure( sensor_base * sensor, auto_exposure_control * ptr ) const;
+        void set_exposure( sensor_base * sensor, const exposure_control & val, rs2_option id = RS2_OPTION_EXPOSURE );
+        void set_auto_exposure( sensor_base * sensor, const auto_exposure_control & val,
+                                rs2_option id = RS2_OPTION_ENABLE_AUTO_EXPOSURE );
+        void get_exposure( sensor_base * sensor, exposure_control * ptr, rs2_option id = RS2_OPTION_EXPOSURE ) const;
+        void get_auto_exposure( sensor_base * sensor, auto_exposure_control * ptr,
+                                rs2_option id = RS2_OPTION_ENABLE_AUTO_EXPOSURE ) const;
 
         void get_laser_power(laser_power_control* ptr) const;
         void get_laser_state(laser_state_control* ptr) const;
@@ -221,6 +224,8 @@ namespace librealsense
         debug_interface * _debug_interface;
         sensor_base * _depth_sensor = nullptr;
         sensor_base * _color_sensor = nullptr;
+        // No color sensor: the RGB exposure / gain / AE are depth sensor options under the DUAL_RGB IDs
+        bool _dual_rgb = false;
         bool _enabled = false;
         std::shared_ptr<advanced_mode_preset_option> _preset_opt;
         bool _amplitude_factor_support = false;
@@ -233,6 +238,8 @@ namespace librealsense
         void set_all( const preset & p );
         void set_all_depth( const preset & p );
         void set_all_rgb( const preset & p );
+        void get_dual_rgb( preset * p ) const;
+        void set_all_dual_rgb( const preset & p );
         bool should_set_rgb_preset() const;
         bool should_set_hdr_preset(const preset& p);
         void set_hdr_preset(const preset& p);
@@ -243,6 +250,8 @@ namespace librealsense
         void unregister_from_visual_preset_option();
         void register_to_depth_scale_option();
         void unregister_from_depth_scale_option();
+
+        void set( const STDepthTableControl & table, EtAdvancedModeRegGroup cmd ) const;
 
         template<class T>
         void set(const T& strct, EtAdvancedModeRegGroup cmd) const

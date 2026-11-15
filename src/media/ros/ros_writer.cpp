@@ -71,7 +71,8 @@ namespace librealsense
             return;
         }
 
-        if (Is<labeled_points>(frame.frame))
+        if (Is<labeled_points>(frame.frame)
+            || (Is<points>(frame.frame) && stream_id.stream_type == RS2_STREAM_POINT_CLOUD))
         {
             write_labeled_points_frame(stream_id, timestamp, std::move(frame));
             return;
@@ -343,11 +344,13 @@ namespace librealsense
     {
         sensor_msgs::Image image;
 
-        auto labeled_points_frame = dynamic_cast<librealsense::labeled_points*>(frame.frame);
+        // Labeled point cloud and device point cloud: the raw frame buffer, no 2D geometry
+        const bool device_points = stream_id.stream_type == RS2_STREAM_POINT_CLOUD;
+        auto labeled_points_frame = device_points ? frame.frame : dynamic_cast<librealsense::labeled_points*>(frame.frame);
         if (!labeled_points_frame) 
             throw invalid_value_exception("null pointer recieved from dynamic pointer casting.");
 
-        convert(RS2_FORMAT_Y8, image.encoding);
+        convert(device_points ? frame->get_stream()->get_format() : RS2_FORMAT_Y8, image.encoding);
         image.is_bigendian = is_big_endian();
         auto size = frame->get_frame_data_size();
         auto p_data = frame->get_frame_data();

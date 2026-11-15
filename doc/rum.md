@@ -7,7 +7,8 @@ upload.
 
 ## What is collected
 
-A small JSON report (a few KB), aggregated — counts and configurations, never raw events:
+A small JSON report, aggregated — counts and configurations, never raw events. The upload is capped
+at 64 KB; once full, the least-used stream configurations are dropped to make room:
 
 - **SDK build**: version, build type, backend, and the build-time flags it was compiled with.
 - **System**: OS and CPU architecture.

@@ -1,239 +1,180 @@
 /**
  * Real Device E2E Tests
- * 
- * These tests run against actual RealSense hardware.
- * They are tagged with @real-device and only run when REAL_DEVICE=true.
- * 
- * Prerequisites:
- * - RealSense camera connected via USB
- * - Backend API server running (npm run dev:api)
- * - Frontend dev server running (npm run dev)
- * 
- * Usage:
- *   REAL_DEVICE=true npx playwright test --project=real-device
+ *
+ * Need a camera, and the viewer built and bundled so the server serves it
+ * (npm run build && npm run bundle). Playwright starts the server; see playwright.config.ts.
+ *
+ *   npx playwright test --grep @real-device
  */
 
-import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal } from './fixtures'
-import type { Locator } from '@playwright/test'
+import { test, expect, dismissToasts } from './fixtures'
+import type { Locator, Page } from '@playwright/test'
+import type { DeviceInfo, SensorInfo } from '../../src/api/types'
 
-// Per-stream toggles only render inside an expanded sensor module
-async function expandSensorModules(deviceCard: Locator) {
-  const headers = deviceCard.locator('button[aria-expanded]')
-  for (let i = 0; i < await headers.count(); i++) {
-    const header = headers.nth(i)
-    if (await header.getAttribute('aria-expanded') === 'false') await header.click()
-  }
+// Start/stop is rendered once per sensor module, so it has to be scoped to the module
+// holding the depth toggle - .first() can land on the colour sensor's disabled button.
+function depthSensorModule(page: Page): Locator {
+  return page.locator('[data-testid="sensor-module"]')
+    .filter({ has: page.locator('[data-testid="toggle-stream-depth"]') })
 }
 
-// Skip entire file in mock mode
-test.beforeEach(async ({ testMode, page }) => {
-  test.skip(testMode !== 'real', 'Real device tests require REAL_DEVICE=true')
-  
-  // Clear localStorage to ensure consistent test state, but also set version
-  // to prevent What's New modal from appearing
-  await page.addInitScript(() => {
-    localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-  })
+/**
+ * Opens the card for the camera under test, selected by serial rather than by position,
+ * and expands its sensor modules - stream toggles and controls only render inside one.
+ */
+async function openDeviceCard(page: Page, device: DeviceInfo): Promise<void> {
+  const deviceCard = page.locator('[data-testid="device-card"]')
+    .filter({ hasText: device.serial_number })
+  // Drive the toggle, not the card: an active card has no click handler, so clicking it
+  // delivers the click to whatever control sits at its centre.
+  const toggle = deviceCard.locator('button[title$="device"]')
+  if (await toggle.getAttribute('title') === 'Activate device') await toggle.click()
+  await expect(deviceCard.locator('[title="Deactivate device"]')).toBeVisible()
+  await expect(page.locator('[title="Loading..."]')).toHaveCount(0, { timeout: 15000 })
+  await dismissToasts(page)
+
+  // Only the sensor headers: an unscoped button[aria-expanded] also matches the control
+  // sections and groups nested inside them, and opening one renders more of them.
+  const closed = deviceCard.locator('[data-testid="sensor-module"] > div > button[aria-expanded="false"]')
+  while (await closed.count()) await closed.first().click()
+}
+
+async function startDepthStream(page: Page, device: DeviceInfo): Promise<void> {
+  await openDeviceCard(page, device)
+  await page.locator('[data-testid="toggle-stream-depth"]').first().check()
+
+  const startButton = depthSensorModule(page).locator('[data-testid="start-streaming"]')
+  await expect(startButton).toBeEnabled()
+  await startButton.click()
+  await expect(page.locator('video.stream-video').first()).toBeVisible({ timeout: 20000 })
+}
+
+async function stopDepthStream(page: Page): Promise<void> {
+  const stopButton = depthSensorModule(page).locator('[data-testid="stop-streaming"]')
+  await stopButton.click()
+  await expect(stopButton).toHaveCount(0, { timeout: 15000 })
+}
+
+/** Opens a sensor's controls and filters them, so the wanted option is on screen. */
+async function openControls(page: Page, device: DeviceInfo, sensorName: string, query: string): Promise<Locator> {
+  await openDeviceCard(page, device)
+  // Scope to the module for the sensor the API gave us, not whichever renders first.
+  const sensorModule = page.locator('[data-testid="sensor-module"]').filter({ hasText: sensorName })
+  // A query force-opens the control sections, which are collapsed by default.
+  await sensorModule.getByPlaceholder('Search controls').fill(query)
+  return sensorModule
+}
+
+// A failed test can leave the camera streaming server-side with no Stop button rendered,
+// and the next test then cannot start it. Stop via the API, which covers that case too.
+test.afterEach(async ({ device, baseURL }) => {
+  const sensorsUrl = `${baseURL}/api/v1/devices/${device.device_id}/sensors/`
+  const sensors: SensorInfo[] = await (await fetch(sensorsUrl)).json()
+  for (const sensor of sensors) {
+    await fetch(`${sensorsUrl}${sensor.sensor_id}/stop`, { method: 'POST' })
+  }
 })
 
 test.describe('@real-device Real Device Tests', () => {
-  test.describe('Device Detection', () => {
-    test('detects connected RealSense device', async ({ page, getDevices }) => {
-      const devices = await getDevices()
-      expect(devices.length).toBeGreaterThan(0)
-      
-      await page.goto('/')
-      
-      // Dismiss What's New modal if it appears
-      await dismissWhatsNewModal(page)
-      
-      // Wait for device to appear in UI
-      await expect(page.locator('text=/D4[0-9]{2}|Intel RealSense/i').first()).toBeVisible({
-        timeout: 15000,
-      })
-    })
-
-    test('displays correct device information', async ({ page, getDevices }) => {
-      const devices = await getDevices()
-      const device = devices[0]
-      
-      await page.goto('/')
-      
-      // Dismiss What's New modal if it appears
-      await dismissWhatsNewModal(page)
-      
-      // Check serial number is displayed
-      await expect(page.locator(`text=${device.serial_number}`)).toBeVisible({ timeout: 10000 })
-      
-      // Check firmware version is displayed
-      await expect(page.locator(`text=/${device.firmware_version}/`)).toBeVisible()
-    })
-  })
-
-  test.describe('Streaming', () => {
-    test('can start and stop depth streaming', async ({ page, waitForDevice }) => {
-      await page.goto('/')
-      await waitForDevice(page)
-      
-      // Activate device
-      const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
-      
-      // Wait for device to finish loading sensors
-      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
-      
-      // Sensor modules are collapsed by default; expand them to reveal the stream toggles
-      await expandSensorModules(deviceCard)
-
-      // Enable depth stream
-      const depthToggle = page.locator('[data-testid="toggle-stream-depth"]').first()
-      await depthToggle.check()
-      
-      // Start streaming
-      const startButton = page.locator('button:has-text("Start"), [data-testid="start-streaming"]').first()
-      await startButton.click()
-      
-      // Verify stream is active
-      await expect(page.locator('video, canvas').first()).toBeVisible({ timeout: 15000 })
-      
-      // Stop streaming
-      const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
-      await stopButton.click()
-      
-      // Allow cleanup time
-      await page.waitForTimeout(1000)
-    })
-
-    test('displays depth frames', async ({ page, waitForDevice }) => {
-      await page.goto('/')
-      await waitForDevice(page)
-      
-      // Activate and start streaming
-      const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
-      
-      // Wait for device to finish loading sensors
-      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
-      
-      await expandSensorModules(deviceCard)
-
-      const depthToggle = page.locator('[data-testid="toggle-stream-depth"]').first()
-      await depthToggle.check()
-      
-      const startButton = page.locator('button:has-text("Start"), [data-testid="start-streaming"]').first()
-      await startButton.click()
-      
-      // Wait for frames
-      await page.waitForTimeout(3000)
-      
-      // Check frame counter is incrementing
-      const frameCounter = page.locator('text=/frame.*[0-9]+/i').first()
-      const firstValue = await frameCounter.textContent()
-      
-      await page.waitForTimeout(1000)
-      const secondValue = await frameCounter.textContent()
-      
-      // Frame number should have changed
-      expect(firstValue).not.toBe(secondValue)
-      
-      // Cleanup
-      const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
-      await stopButton.click()
-    })
-  })
-
-  test.describe('Sensor Options', () => {
-    test('can modify exposure setting', async ({ page, waitForDevice }) => {
-      await page.goto('/')
-      await waitForDevice(page)
-      
-      // Activate device
-      const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
-      
-      // Wait for options to load
-      await page.waitForTimeout(1000)
-      
-      // Find exposure slider
-      const exposureSlider = page.locator('input[type="range"]').first()
-      if (await exposureSlider.isVisible()) {
-        // Modify the value
-        await exposureSlider.fill('5000')
-        
-        // Verify change was applied
-        await page.waitForTimeout(500)
-      }
-    })
-  })
-
-  test.describe('Multi-Camera', () => {
-    test('handles multiple cameras if connected', async ({ page, getDevices }) => {
-      const devices = await getDevices()
-      
-      // Skip if only one device
-      test.skip(devices.length < 2, 'Need 2+ devices for multi-camera test')
-      
-      await page.goto('/')
-      
-      // Dismiss What's New modal if it appears
-      await dismissWhatsNewModal(page)
-      
-      // Should see multiple device cards
-      const deviceCards = page.locator('.device-card, [data-testid="device-card"]')
-      await expect(deviceCards).toHaveCount(devices.length, { timeout: 10000 })
-      
-      // Each device serial should be visible
-      for (const device of devices) {
-        await expect(page.locator(`text=${device.serial_number}`)).toBeVisible()
-      }
-    })
-  })
-})
-
-test.describe('@real-device Performance Tests', () => {
-  test.beforeEach(async ({ testMode, page }) => {
-    test.skip(testMode !== 'real', 'Real device tests require REAL_DEVICE=true')
-    
-    // Set version in localStorage to prevent What's New modal
-    await page.addInitScript(() => {
-      localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-    })
-  })
-
-  test('streaming maintains acceptable frame rate', async ({ page, waitForDevice }) => {
+  test('displays correct device information', async ({ page, device }) => {
     await page.goto('/')
-    await waitForDevice(page)
-    
-    // Activate and start streaming
-    const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-    await deviceCard.click()
-    
-    // Wait for device to finish loading sensors
-    await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
-    
-    await expandSensorModules(deviceCard)
 
-    const depthToggle = page.locator('[data-testid="toggle-stream-depth"]').first()
-    await depthToggle.check()
-    
-    const startButton = page.locator('button:has-text("Start"), [data-testid="start-streaming"]').first()
-    await startButton.click()
-    
-    // Wait for streaming to stabilize
-    await page.waitForTimeout(5000)
-    
-    // Sample FPS from metadata
-    const fpsText = page.locator('text=/[0-9]+ fps/i').first()
-    if (await fpsText.isVisible()) {
-      const fpsValue = await fpsText.textContent()
-      const fps = parseInt(fpsValue?.match(/([0-9]+)/)?.[1] || '0')
-      
-      // Should be at least 15 FPS
-      expect(fps).toBeGreaterThanOrEqual(15)
+    // Generous: the card only renders once the socket is up, measured at ~16s on a cold start
+    const card = page.locator('[data-testid="device-card"]').filter({ hasText: device.serial_number })
+    await expect(card).toBeVisible({ timeout: 40000 })
+    await expect(card).toContainText(device.firmware_version!)
+  })
+
+  test('displays depth frames', async ({ page, device }) => {
+    await page.goto('/')
+
+    await startDepthStream(page, device)
+
+    // The frame number lives only in the metadata overlay, behind its toggle
+    const tile = page.locator('video.stream-video').first().locator('..')
+    await tile.locator('[data-testid="toggle-metadata"]').click({ timeout: 20000 })
+
+    // Frame number must keep climbing, and the browser must really decode the frames
+    const frameNumber = tile.locator('[data-testid="metadata-frame-number"]')
+    const first = Number(await frameNumber.textContent())
+    await expect
+      .poll(async () => Number(await frameNumber.textContent()), { timeout: 15000 })
+      .toBeGreaterThan(first)
+
+    // The tile renders before WebRTC has negotiated, so this has to be polled
+    await expect
+      .poll(() => page.locator('video.stream-video').first()
+        .evaluate((v: HTMLVideoElement) => v.getVideoPlaybackQuality().totalVideoFrames))
+      .toBeGreaterThan(0)
+
+    await stopDepthStream(page)
+  })
+
+  test('renders a point cloud in 3D', async ({ page, device }) => {
+    await page.goto('/')
+    await startDepthStream(page, device)
+
+    const video = page.locator('video.stream-video').first()
+    const activated = page.waitForResponse(r => r.url().includes('/point_cloud/activate'))
+    await page.getByRole('button', { name: '3D View' }).click()
+    expect((await activated).ok()).toBe(true)
+    await expect(video).toBeHidden()
+
+    // Export PLY enables only once vertices reach the store, so it stands for the whole
+    // path: SDK point cloud -> socket -> viewer. The canvas itself cannot be read back,
+    // as three.js renders without preserveDrawingBuffer.
+    await expect(page.getByRole('button', { name: 'Export PLY' })).toBeEnabled({ timeout: 20000 })
+    await expect(page.locator('canvas')).toBeVisible()
+
+    await page.getByRole('button', { name: '2D View' }).click()
+    await expect(video).toBeVisible()
+
+    await stopDepthStream(page)
+  })
+
+  // A stream not torn down cleanly leaves the device unable to restart.
+  test('can restart a stream after stopping it', async ({ page, device }) => {
+    await page.goto('/')
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await startDepthStream(page, device)
+      await stopDepthStream(page)
+      await expect(page.locator('video.stream-video')).toHaveCount(0)
     }
-    
-    // Cleanup
-    const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
-    await stopButton.click()
+  })
+
+  test('can modify exposure setting', async ({ page, device, baseURL }) => {
+    await page.goto('/')
+
+    const sensorsUrl = `${baseURL}/api/v1/devices/${device.device_id}/sensors/`
+    const sensors = await (await fetch(sensorsUrl)).json()
+    const sensor = sensors.find((s: SensorInfo) => s.options.some(o => o.option_id === 'exposure'))
+    expect(sensor, 'no sensor exposes an exposure control').toBeTruthy()
+    const exposure = sensor!.options.find(o => o.option_id === 'exposure')!
+    const target = Math.min(exposure.max_value, Math.round(Number(exposure.default_value) * 2))
+
+    const sensorModule = await openControls(page, device, sensor!.name, 'exposure')
+
+    // No need to switch auto-exposure off first: the SDK registers exposure as an
+    // auto_disabling_control on both depth and colour, so writing it turns AE off.
+    const slider = sensorModule.locator('[data-testid="option-exposure"] input[type="range"]')
+    await expect(slider).toBeVisible()
+    await slider.fill(String(target))
+    await slider.dispatchEvent('mouseup')   // the PUT is only sent on mouseup
+
+    // BE + SDK took it...
+    await expect
+      .poll(async () => {
+        const url = `${sensorsUrl}${sensor!.sensor_id}/options/exposure/`
+        return (await (await fetch(url)).json()).current_value
+      }, { timeout: 10000 })
+      .toBe(target)
+
+    // ...and the FE shows it after a reload, i.e. read back from the server rather than
+    // left over from the fill. Asserting the slider before this only re-reads our typing.
+    await page.reload()
+    const reopened = await openControls(page, device, sensor!.name, 'exposure')
+    await expect(reopened.locator('[data-testid="option-exposure"] input[type="range"]'))
+      .toHaveValue(String(target))
   })
 })

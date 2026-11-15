@@ -21,6 +21,7 @@
 #include "d500-safety.h"
 #include "d500-depth-mapping.h"
 #include "d500-object-detection.h"
+#include "d500-nn-loader.h"
 #include "sync.h"
 #include <src/ds/ds-thermal-monitor.h>
 #include <src/ds/d500/d500-options.h>
@@ -121,6 +122,7 @@ namespace librealsense
         , public d500_motion
         , public d500_dual_color
         , public d500_object_detection
+        , public d500_nn_loader
         , public d500_depth_mapping
         , public ds_advanced_mode_base
         , public extended_firmware_logger_device
@@ -134,35 +136,19 @@ namespace librealsense
             , d500_motion( dev_info )
             , d500_dual_color( dev_info )
             , d500_object_detection( dev_info )
+            , d500_nn_loader( dev_info )
             , d500_depth_mapping( dev_info )
             , ds_advanced_mode_base()
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Decimation Filter DPP composite option - USB-only, skipped on MIPI, alongside the DDS-connected
-            // path's own independent scalar-option decimation filter.
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< decimation_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            register_dpp_embedded_filters();
 
-            // Temporal Filter DPP composite option - reuses the same FW/MIPI gate as Decimation
-            // above (same protocol family, introduced together on this SKU).
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< temporal_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Improved Close Range Control composite option - USB toggle, formerly the scalar "Improved
-            // Close Range Depth". Skipped on MIPI (the driver publishes it as minz_configuration, without
-            // the dpp_header written here); FW-gated for the older scalar-only semantics at this same id.
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< hdrd_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Dual-RGB rectification toggle, supported by the D585 2C USB firmware only. Depth and both
-            // color streams share the depth sensor here, so its streaming state gates the option.
-            if( ! _is_mipi_device && ( get_pid() == ds::D585_2C_PID || get_pid() == ds::D585_2C_PROTO_PID )
-                && d500_device::_fw_version >= firmware_version( "7.58.46064.14668" ) )
+            // Dual-RGB rectification toggle. Depth and both color streams share the depth sensor here,
+            // so its streaming state gates the option.
+            if( ( get_pid() == ds::D585_2C_PID || get_pid() == ds::D585_2C_PROTO_PID )
+                && d500_device::_fw_version >= firmware_version( _is_mipi_device ? "7.59.46610.16541" : "7.58.46064.14668" ) )
             {
                 auto rectification = std::make_shared< dual_rgb_rectification_option >( d500_device::_hw_monitor,
                                                                                         get_raw_depth_sensor() );
@@ -193,16 +179,40 @@ namespace librealsense
             return create_default_matcher( streams );
         }
 
+        // Color may run at a resolution of its own, shared by both color streams; every stream shares the frame rate.
+        bool contradicts( const stream_profile_interface * a, const std::vector< stream_profile > & others ) const override
+        {
+            bool const a_is_color = a->get_stream_type() == RS2_STREAM_COLOR;
+            std::vector< stream_profile > same_group;
+            for( auto & sp : others )
+            {
+                if( ( sp.stream == RS2_STREAM_COLOR ) == a_is_color )
+                    same_group.push_back( sp );
+                else if( a->get_framerate() != 0 && sp.fps != 0 && a->get_framerate() != sp.fps )
+                    return true;
+            }
+            return device::contradicts( a, same_group );
+        }
+
+        // On Windows, starting the IMU after the depth sensor was opened stops one of its video streams unless all
+        // run at 1280x720@30, so each sensor starts before the next one opens. Linux streams fine either way.
+        bool start_sensors_when_opened() const override { return true; }
+
         std::vector<tagged_profile> get_profiles_tags() const override
         {
             std::vector<tagged_profile> tags;
 
-            tags.push_back({ RS2_STREAM_DEPTH, -1, 1280, 720, RS2_FORMAT_Z16, 25, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-            tags.push_back({ RS2_STREAM_INFRARED, -1, 1280, 720, RS2_FORMAT_Y8, 25, profile_tag::PROFILE_TAG_SUPERSET });
-            tags.push_back({ RS2_STREAM_COLOR, 1, 1280, 720, RS2_FORMAT_RGB8, 25, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-            tags.push_back({ RS2_STREAM_COLOR, 2, 1280, 720, RS2_FORMAT_RGB8, 25, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            // The shared-imager default is 25 fps on USB; MIPI publishes no 25 fps profiles, so 30 there.
+            // MIPI also requires accel and gyro at equal fps, USB uses 100 for accel.
+            int video_fps = _is_mipi_device ? 30 : 25;
+            int accel_fps = _is_mipi_device ? static_cast< int >( odr::IMU_FPS_200 ) : static_cast< int >( odr::IMU_FPS_100 );
+
+            tags.push_back({ RS2_STREAM_DEPTH, -1, 1280, 720, RS2_FORMAT_Z16, video_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            tags.push_back({ RS2_STREAM_INFRARED, -1, 1280, 720, RS2_FORMAT_Y8, video_fps, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_COLOR, 1, 1280, 720, RS2_FORMAT_RGB8, video_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            tags.push_back({ RS2_STREAM_COLOR, 2, 1280, 720, RS2_FORMAT_RGB8, video_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-            tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, accel_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_OBJECT_DETECTION, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
             d500_depth_mapping::add_profile_tag_if_active( tags );
 
@@ -217,6 +227,7 @@ namespace librealsense
         , public d500_color
         , public d500_motion
         , public d500_object_detection
+        , public d500_nn_loader
         , public d500_depth_mapping
         , public ds_advanced_mode_base
         , public extended_firmware_logger_device
@@ -230,27 +241,14 @@ namespace librealsense
             , d500_color( dev_info, RS2_FORMAT_NV12 )
             , d500_motion( dev_info )
             , d500_object_detection( dev_info )
+            , d500_nn_loader( dev_info )
             , d500_depth_mapping( dev_info )
             , ds_advanced_mode_base()
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Decimation Filter DPP composite option - USB-only, skipped on MIPI (no V4L2 CID
-            // for the depth-XU selector 0x11).
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< decimation_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Temporal Filter DPP composite option - reuses the same FW/MIPI gate as Decimation
-            // above (same protocol family, introduced together on this SKU).
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< temporal_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Improved Close Range Control composite option - USB toggle, formerly the
-            // scalar "Improved Close Range Depth". Skipped on MIPI (no V4L2 CID for the depth-XU
-            // selector 0x14); gated on FW for older scalar-only semantics at this same id.
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< hdrd_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            register_dpp_embedded_filters();
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override
@@ -308,23 +306,7 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Decimation Filter DPP composite option - USB toggle.
-            if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< decimation_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Temporal Filter DPP composite option - reuses the same FW gate as Decimation
-            // above (same protocol family, introduced together on this SKU).
-            if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< temporal_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Improved Close Range Control composite option - USB toggle. Gated on FW: older
-            // firmware still speaks the old scalar-only "Improved Close Range Depth" semantics at
-            // this same XU control id (0x14), not the new composite/dpp_header wire format.
-            if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< hdrd_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            register_dpp_embedded_filters();
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override
@@ -475,7 +457,7 @@ namespace librealsense
             if( d500_device::_fw_version >= firmware_version( "7.58.39807.10573" ) )
             {
                 register_feature( std::make_shared< decimation_filter_feature >(
-                    dynamic_cast< d500_depth_sensor & >( depth_sensor ) ) );
+                    dynamic_cast< d500_depth_sensor & >( depth_sensor ), _is_mipi_device ) );
             }
 
             // Temporal Filter DPP composite option - D555 only, same FW gate as Decimation
@@ -483,7 +465,7 @@ namespace librealsense
             if( d500_device::_fw_version >= firmware_version( "7.58.39807.10573" ) )
             {
                 register_feature( std::make_shared< temporal_filter_feature >(
-                    dynamic_cast< d500_depth_sensor & >( depth_sensor ) ) );
+                    dynamic_cast< d500_depth_sensor & >( depth_sensor ), _is_mipi_device ) );
             }
 
             // Improved Close Range Control composite option - D555 only, same FW gate as
@@ -491,7 +473,7 @@ namespace librealsense
             if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
             {
                 register_feature( std::make_shared< hdrd_filter_feature >(
-                    dynamic_cast< d500_depth_sensor & >( depth_sensor ) ) );
+                    *this, dynamic_cast< d500_depth_sensor & >( depth_sensor ), _is_mipi_device ) );
             }
         }
 
@@ -535,6 +517,9 @@ namespace librealsense
 
         try
         {
+            if( ds::is_dual_rgb_pid( pid ) )
+                return std::make_shared< rs5x5_device >( dev_info );
+
             switch( pid )
             {
             case ds::D555_PID:
@@ -543,10 +528,6 @@ namespace librealsense
                 return std::make_shared< rs585_legacy_device >( dev_info );
             case ds::D585S_PID:
                 return std::make_shared< rs585s_device >( dev_info );
-            case ds::D535_2C_PID:
-            case ds::D585_2C_PID:
-            case ds::D585_2C_PROTO_PID:
-                return std::make_shared< rs5x5_device >( dev_info );
             case ds::D535_3C_PID:
             case ds::D535F_PID:
             case ds::D585_3C_PID:

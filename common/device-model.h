@@ -131,6 +131,7 @@ namespace rs2
             static const char* is_measuring{ "viewer_model.is_measuring" };
             static const char* output_open{ "viewer_model.output_open" };
             static const char* dashboard_open{ "viewer_model.dashboard_open" };
+            static const char* panel_width{ "viewer_model.panel_width" };
             static const char* search_term{ "viewer_model.search_term" };
 
             static const char* log_to_console{ "viewer_model.log_to_console" };
@@ -154,6 +155,7 @@ namespace rs2
             static const char* hwlogger_xml{ "viewer_model.hwlogger_xml" };
 
             static const char* last_ip{ "viewer_model.last_ip" };
+            static const char* assistant_disclaimer_accepted{ "viewer_model.assistant_disclaimer_accepted" };
 
             static const char* lpc_point_size{ "viewer_model.lpc_point_size" };
             static const char* show_safety_zones_3d{ "viewer_model.show_safety_zones_3d" };
@@ -366,6 +368,7 @@ namespace rs2
         bool is_color_streaming() const;
         bool metadata_supported = false;
         bool get_curr_advanced_controls = true;
+        std::string _last_visual_preset;
         device dev;
         std::string id;
         bool is_recording = false;
@@ -390,15 +393,14 @@ namespace rs2
 
         bool show_advanced_mode_popup = false;
         
-        bool subdevice_has_perception_stream_enabled( const subdevice_model & sub ) const;
-        bool are_color_and_depth_streaming() const;
+        bool subdevice_has_stream_enabled( const subdevice_model & sub, rs2_stream type ) const;
+        bool is_stream_active( rs2_stream type ) const;  // enabled on a streaming subdevice
+        bool subdevice_has_perception( const subdevice_model & sub ) const;  // object detection or occupancy enabled
+        bool subdevice_needs_color( const subdevice_model & sub ) const;
         void stop_perception_if_video_stopped( viewer_model & viewer );
-        // Perception and the decimation/temporal embedded filters are mutually exclusive.
-        bool is_perception_streaming() const;
-        bool is_perception_blocking_filter_enabled() const;
 
         void draw_info_icon(ux_window& window, ImFont* font, const ImVec2& size);
-        int draw_seek_bar();
+        int draw_seek_bar(float extra_width);
         int draw_playback_controls(ux_window& window, ImFont* font, viewer_model& view);
         advanced_mode_control amc;
         std::string pretty_time(std::chrono::nanoseconds duration);

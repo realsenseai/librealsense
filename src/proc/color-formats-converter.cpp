@@ -5,6 +5,7 @@
 
 #include "option.h"
 #include "image-avx.h"
+#include <rsutils/os/os.h>
 #include "image.h"
 
 #define STB_IMAGE_STATIC
@@ -19,32 +20,6 @@
 #include <tmmintrin.h> // For SSSE3 intrinsics
 #endif
 #include "neon/image-neon.h"
-
-#if defined (ANDROID) || (defined (__linux__) && !defined (__x86_64__)) || (defined (__APPLE__) && !defined (__x86_64__))
-
-bool has_avx() { return false; }
-
-#else
-
-#ifdef _WIN32
-#include <intrin.h>
-#define cpuid(info, x)    __cpuidex(info, x, 0)
-#else
-#include <cpuid.h>
-void cpuid(int info[4], int info_type) {
-    __cpuid_count(info_type, 0, info[0], info[1], info[2], info[3]);
-}
-#endif
-
-bool has_avx()
-{
-    int info[4];
-    cpuid(info, 0);
-    cpuid(info, 0x80000000);
-    return (info[2] & ((int)1 << 28)) != 0;
-}
-
-#endif
 
 // explanations for converting YUV values to RGB can be found in:
 // https://en.wikipedia.org/wiki/YUV#Y%E2%80%B2UV444_to_RGB888_conversion
@@ -68,13 +43,11 @@ namespace librealsense
         }
 #endif
 #if defined __SSSE3__ && ! defined ANDROID
-        static bool do_avx = has_avx();
-#ifdef __AVX2__
-
-        if (do_avx)
+#ifdef AVX2_SUPPORT
+        // Y8/Y16 are memory bound and gain nothing from AVX2, so they stay on SSSE3
+        static bool do_avx = rsutils::os::cpu_supports_avx2();
+        if (do_avx && n % 32 == 0 && FORMAT != RS2_FORMAT_Y8 && FORMAT != RS2_FORMAT_Y16)
         {
-            if (FORMAT == RS2_FORMAT_Y8) unpack_yuy2_avx_y8(d, s, n);
-            if (FORMAT == RS2_FORMAT_Y16) unpack_yuy2_avx_y16(d, s, n);
             if (FORMAT == RS2_FORMAT_RGB8) unpack_yuy2_avx_rgb8(d, s, n);
             if (FORMAT == RS2_FORMAT_RGBA8) unpack_yuy2_avx_rgba8(d, s, n);
             if (FORMAT == RS2_FORMAT_BGR8) unpack_yuy2_avx_bgr8(d, s, n);
@@ -637,8 +610,6 @@ namespace librealsense
         // a multiple of 16. For non-aligned widths (e.g. 424) the offsets drift and lines shift.
         if (width % 16 == 0)
         {
-            static bool do_avx = has_avx();
-
             auto src = reinterpret_cast<const __m128i*>(s);
             auto dst = reinterpret_cast<__m128i*>(d[0]);
 
@@ -1270,10 +1241,11 @@ namespace librealsense
     void unpack_mjpeg( uint8_t * const dest[], const uint8_t * source, int width, int height, int actual_size, int input_size)
     {
         int w, h, bpp;
-        auto uncompressed_rgb = stbi_load_from_memory(source, actual_size, &w, &h, &bpp, false);
+        // input_size is the compressed payload length; actual_size is the decoded target size
+        auto uncompressed_rgb = stbi_load_from_memory(source, input_size, &w, &h, &bpp, 3);
         if (uncompressed_rgb)
         {
-            auto uncompressed_size = w * h * bpp;
+            auto uncompressed_size = w * h * 3;  // bpp reports the source channel count, not the requested 3
             if (uncompressed_size != actual_size)
             {
                 LOG_WARNING( "MJPEG decode size mismatch. Expected " << actual_size << ", got "

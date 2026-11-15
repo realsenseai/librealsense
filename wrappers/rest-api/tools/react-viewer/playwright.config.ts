@@ -2,101 +2,74 @@ import { defineConfig, devices } from '@playwright/test'
 
 /**
  * E2E Test Configuration for React Viewer
- * 
- * Dual-mode testing support:
- * - Mock mode (default): Uses MSW to mock API responses
- * - Real device mode: Tests against actual RealSense devices
- * 
+ *
+ * Playwright owns the API server: it starts it, waits for /health, and kills it. The
+ * server also serves the built viewer (npm run build && npm run bundle), so these tests
+ * exercise the artifact that ships rather than a dev server. Which suite runs is chosen
+ * per invocation, not here:
+ *
+ *   npx playwright test --grep-invert @real-device   # no camera needed
+ *   npx playwright test --grep @real-device          # needs a camera
+ *
  * Environment variables:
- * - REAL_DEVICE=true: Enable real device testing
- * - DEVICE_SERIAL: Target a specific device by serial number
- * - API_URL: Override the API base URL (default: http://localhost:8000)
- * 
- * Usage:
- *   npm run test:e2e                    # Mock mode (default)
- *   REAL_DEVICE=true npm run test:e2e   # Real device mode
+ * - API_URL: where to run the server (default: http://localhost:8000)
+ * - PYTHON_BIN: interpreter that has the SDK bindings (default: python3)
+ * - DEVICE_SERIAL: drive this camera instead of whichever enumerates first
  */
 
-const isRealDeviceMode = process.env.REAL_DEVICE === 'true'
 const apiUrl = process.env.API_URL || 'http://localhost:8000'
+const python = process.env.PYTHON_BIN || 'python3'
 
 export default defineConfig({
   testDir: './tests/e2e',
-  
-  /* Run tests in files in parallel */
-  fullyParallel: !isRealDeviceMode, // Serial execution for real devices to avoid conflicts
-  
+
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  
-  /* Retry on CI only, more retries for real device tests */
-  retries: process.env.CI ? (isRealDeviceMode ? 3 : 2) : 0,
-  
-  /* Single worker for real device tests to avoid resource conflicts */
-  workers: isRealDeviceMode ? 1 : (process.env.CI ? 1 : undefined),
-  
-  /* Longer timeout for real device operations */
-  timeout: isRealDeviceMode ? 60000 : 30000,
+
+  // One camera: a second worker would fight over it.
+  workers: 1,
+
+  timeout: 60000,
   expect: {
-    timeout: isRealDeviceMode ? 15000 : 5000,
+    timeout: 15000,
   },
-  
+
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html'],
     ['list'],
     ...(process.env.CI ? [['github'] as ['github']] : []),
   ],
-  
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
-    
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
-    
+    baseURL: apiUrl,
+
+    trace: 'retain-on-failure',
+
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
-    
+
     /* Capture video on failure */
     video: 'retain-on-failure',
   },
 
-  /* Configure projects for major browsers */
+  // stdout:'pipe' puts the server's log in the same stream as the test output, so a
+  // server error lands next to the test it broke instead of in a separate file.
+  webServer: {
+    command: `"${python}" -m uvicorn main:combined_app --host 127.0.0.1 --port ${new URL(apiUrl).port}`,
+    cwd: '../..',
+    url: `${apiUrl}/api/v1/health`,
+    // The wrapper always sets API_URL, so CI never reuses a server it did not start; a local
+    // run without it picks up the one the developer already has on :8000.
+    reuseExistingServer: !process.env.API_URL,
+    stdout: 'pipe',
+    timeout: 120000,
+  },
+
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    // Real device project - runs only chromium for consistency
-    {
-      name: 'real-device',
-      use: { 
-        ...devices['Desktop Chrome'],
-      },
-      // Only run tests tagged with @real-device when in real device mode
-      grep: /@real-device/,
-    },
-
-    // Uncomment for webkit/safari testing
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
   ],
-
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
 })

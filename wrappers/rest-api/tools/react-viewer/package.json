@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --logLevel warn",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "bundle": "node scripts/bundle-for-prod.js",
@@ -21,7 +21,7 @@
     "@react-three/drei": "^9.88.0",
     "@react-three/fiber": "^8.14.0",
     "@tauri-apps/api": "^1.5.3",
-    "axios": "1.18.1",
+    "axios": "1.20.0",
     "lucide-react": "^0.290.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -59,7 +59,8 @@
     "vitest": "^0.34.6"
   },
   "overrides": {
-    "ws": "8.21.0",
-    "form-data": "4.0.6"
+    "ws": "8.21.1",
+    "form-data": "4.0.6",
+    "follow-redirects": "1.16.1"
   }
 }

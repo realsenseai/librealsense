@@ -170,11 +170,15 @@ namespace librealsense
         {
             try
             {
-                if (_callback)
+                // Hold our own reference for the duration of the call: set_callback() may replace
+                // _callback from another thread (e.g. a record sensor re-hooking during stop()) while a
+                // frame is still being delivered, and the old callback must not be destroyed under us.
+                auto callback = get_callback();
+                if (callback)
                 {
                     frame_interface* ref = nullptr;
                     std::swap(frame.frame, ref);
-                    _callback->on_frame((rs2_frame*)ref);
+                    callback->on_frame((rs2_frame*)ref);
                 }
             }
             catch( const std::exception & e )
@@ -212,6 +216,8 @@ namespace librealsense
             return RS2_EXTENSION_MOTION_FRAME;
         case RS2_STREAM_LABELED_POINT_CLOUD:
             return RS2_EXTENSION_LABELED_POINTS;
+        case RS2_STREAM_POINT_CLOUD:
+            return RS2_EXTENSION_POINTS;
 
         case RS2_STREAM_OBJECT_DETECTION:
             return RS2_EXTENSION_OBJECT_DETECTION_FRAME;

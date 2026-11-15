@@ -10,9 +10,10 @@ import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
+import { isDesktopApp } from './api/backend'
 
 function App() {
-  const { viewMode, isConnected, getActiveDevices } = useAppStore()
+  const { viewMode, connection, getActiveDevices } = useAppStore()
 
   const activeDevices = getActiveDevices()
   const hasActiveDevices = activeDevices.length > 0
@@ -39,6 +40,7 @@ function App() {
       <WhatsNew />
       
       {/* Loading Splash Screen */}
+      {isDesktopApp && connection === 'starting' && <LoadingSplash message="Connecting to the RealSense backend..." />}
       {isAnyDeviceLoading && (
         <LoadingSplash message={`Initializing ${loadingDeviceName || 'device'} sensors...`} />
       )}
@@ -50,7 +52,7 @@ function App() {
 
       <div className="flex-1 flex min-h-0">
         {/* Left Sidebar - Device Panel with Controls */}
-        <aside className="w-80 flex-shrink-0 bg-rs-dark border-r border-gray-700 overflow-y-auto">
+        <aside className="w-80 flex-shrink-0 bg-rs-dark border-r border-rs-border overflow-y-auto">
           <DevicePanel />
         </aside>
 
@@ -70,7 +72,7 @@ function App() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-rs-dim">
               <div className="text-center">
                 <svg className="w-24 h-24 mx-auto mb-4 opacity-50" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2"/>
@@ -86,12 +88,16 @@ function App() {
         </main>
       </div>
 
-      {/* Connection Status */}
-      <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-sm ${
-        isConnected ? 'bg-green-600' : 'bg-red-600'
-      }`}>
-        {isConnected ? '● Connected' : '○ Disconnected'}
-      </div>
+      {/* Connection Status (hidden until the first connect) */}
+      {connection !== 'starting' && (
+        <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${
+          connection === 'connected'
+            ? 'border-rs-ok/30 bg-rs-ok/10 text-rs-ok'
+            : 'border-rs-warn/30 bg-rs-warn/10 text-rs-warn'
+        }`}>
+          {connection === 'connected' ? '● Connected' : '◌ Reconnecting…'}
+        </div>
+      )}
 
       {/* API Diagnostics (shows when there's a connection error) */}
       <ApiDiagnostics />

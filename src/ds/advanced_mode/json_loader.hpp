@@ -11,6 +11,7 @@
 #include <map>
 #include <string>
 #include <iomanip>
+#include <locale>
 
 #include <rsutils/json.h>
 #include <librealsense2/h/rs_advanced_mode_command.h>
@@ -24,6 +25,20 @@
 namespace librealsense
 {
     using json = rsutils::json;
+
+    // Advanced-mode JSON files always store numbers with a '.' decimal separator,
+    // but ::atof() follows the process C locale: under comma-decimal locales
+    // (e.g. de-DE, da-DK) it stops at the '.', so "0.482143" loads as 0 and
+    // "1.8125" loads as 1 (see issue #15746). Parse with the classic locale
+    // instead, so the value survives on any system locale.
+    inline double parse_json_float( const std::string & str )
+    {
+        std::istringstream ss( str );
+        ss.imbue( std::locale::classic() );
+        double value = 0.0;
+        ss >> value;
+        return value;
+    }
 
     template<class T>
     struct param_group
@@ -137,7 +152,7 @@ namespace librealsense
 
         void load(const std::string& str) override
         {
-            float value = static_cast<float>(::atof(str.c_str()));
+            float value = static_cast<float>(parse_json_float(str));
             if (std::is_integral<S>::value) //in order to convert float to int correctly we add 0.5 and then use the floor function
                 value = std::floor(scale * value + 0.5f);
             else
@@ -149,6 +164,10 @@ namespace librealsense
         std::string save() const override
         {
             std::stringstream ss;
+            // Always write with a '.' decimal separator, whatever locale the
+            // hosting application has installed (the load side parses with the
+            // classic locale; see parse_json_float above)
+            ss.imbue( std::locale::classic() );
             ss << strct->vals[0].*field / scale;
             return ss.str();
         }
@@ -207,7 +226,7 @@ namespace librealsense
 
         void load(const std::string& str) override
         {
-            auto value = ::atof(str.c_str());
+            auto value = parse_json_float(str);
             (strct->vals[0].*field) = (value > 0) ? 0 : 1;
             strct->update = true;
         }
@@ -639,6 +658,7 @@ namespace librealsense
                     {
                         float val = value;
                         std::stringstream ss;
+                        ss.imbue( std::locale::classic() );
                         ss << val;
                         kvp->second->load(ss.str());
                     }

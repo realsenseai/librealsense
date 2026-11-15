@@ -255,17 +255,9 @@ manual build steps, dev mode and troubleshooting, see
    npm run bundle
    ```
 
-2. This copies the build to `../rest-api/static/`
+2. This copies the build to `../rest-api/static/`, which the server serves when present
 
-3. Add static file serving to `main.py`:
-   ```python
-   from fastapi.staticfiles import StaticFiles
-   
-   # Add at the end, after all API routes
-   app.mount("/", StaticFiles(directory="static", html=True), name="static")
-   ```
-
-4. Run FastAPI server - it will serve both API and UI:
+3. Run FastAPI server - it will serve both API and UI:
    ```bash
    python main.py
    ```

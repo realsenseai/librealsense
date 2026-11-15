@@ -401,6 +401,9 @@ int run_viewer( int argc, const char ** argv,
         refresh_devices(m, ctx, devices_connection_changes, connected_devs,
             device_names, *device_models, viewer_model, error_message);
 
+        // Before anything below lays out from panel_width or reads the mouse
+        viewer_model.handle_panel_resize(window);
+
         auto output_height = viewer_model.get_output_height();
 
         rect viewer_rect = { viewer_model.panel_width,
@@ -431,8 +434,15 @@ int run_viewer( int argc, const char ** argv,
                                           << "  Add Source (" << (device_names.size() - device_models->size()) 
                                           << " available)\t\t\t\t\t\t\t\t\t\t\t";
 
+        // The label is centered; on a wider pane, align it so it stays where it is at the default width
+        const float label_w = ImGui::CalcTextSize(add_source_button_text.c_str()).x;
+        const float button_pad = 2 * ImGui::GetStyle().FramePadding.x;
+        const float default_room = std::max(0.f, viewer_model.default_panel_width - 1 - button_pad - label_w);
+        const float room = viewer_model.panel_width - 1 - button_pad - label_w;
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(room > 0 ? 0.5f * default_room / room : 0.5f, 0.5f));
         if (ImGui::Button(add_source_button_text.c_str(), { viewer_model.panel_width - 1, viewer_model.panel_y }))
             ImGui::OpenPopup("select");
+        ImGui::PopStyleVar();
 
         auto new_devices_count = device_names.size() + 1;
 
@@ -551,15 +561,22 @@ int run_viewer( int argc, const char ** argv,
         viewer_model.not_model->output.draw(window, output_rect, *device_models);
 
         // Set window position and size
+        // The pane is a few pixels wider than the top bar so its thin scrollbar grab lands right under the top bar's
+        // dividing line; the black track and border past it blend into the stream area
+        const float scrollbar_size = 4.f;
         ImGui::SetNextWindowPos({ 0, viewer_model.panel_y });
-        ImGui::SetNextWindowSize({ viewer_model.panel_width, window.height() - viewer_model.panel_y });
+        ImGui::SetNextWindowSize({ viewer_model.panel_width + viewer_model.panel_scrollbar_overhang, window.height() - viewer_model.panel_y });
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::PushStyleColor(ImGuiCol_WindowBg, sensor_bg);
 
         // *********************
         // Creating window menus
         // *********************
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, scrollbar_size);
+        ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, black);
         ImGui::Begin("Control Panel", nullptr, flags | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
 
         if (device_models->size() > 0)
         {

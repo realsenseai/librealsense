@@ -3,6 +3,8 @@
 
 import pytest
 import pyrealsense2 as rs
+import json
+import locale
 import logging
 log = logging.getLogger(__name__)
 
@@ -321,6 +323,38 @@ def test_get_all_controls_matches_individual_getters(test_device_wrapped):
             except RuntimeError:  # FW has no min/max for this group, so the value is expected
                 expected = am_dev[group]
             assert repr(per_mode[mode]) == repr(expected), f"{group} mode {mode}"
+
+
+@pytest.fixture
+def comma_decimal_locale():
+    # Linux shares the C locale with librealsense; on Windows the library follows the user's region instead
+    previous = locale.setlocale(locale.LC_NUMERIC)
+    for name in ('de_DE.UTF-8', 'de_DE.utf8', 'da_DK.UTF-8'):
+        try:
+            log.info(f"LC_NUMERIC set to {locale.setlocale(locale.LC_NUMERIC, name)}")
+            break
+        except locale.Error:
+            continue
+    yield
+    locale.setlocale(locale.LC_NUMERIC, previous)
+
+
+def test_json_round_trip_keeps_fractions(test_device_wrapped, comma_decimal_locale):
+    """Fractional JSON values must survive load_json() under a comma-decimal locale"""
+    if not _module_state.get('am_ok'):
+        pytest.skip("prerequisite test_advanced_mode_support failed")
+    dev, ctx = test_device_wrapped
+    am_dev = get_am_dev(dev)
+    rsm = am_dev.get_rsm()
+    rsm.diffThresh = 1.8125
+    rsm.removeThresh = 81  # saved as 81/168 = 0.482143
+    am_dev.set_rsm(rsm)
+    params = json.loads(am_dev.serialize_json())['parameters']
+    fractions = {k: v for k, v in params.items() if '.' in str(v)}
+    assert fractions
+    am_dev.load_json(am_dev.serialize_json())
+    params = json.loads(am_dev.serialize_json())['parameters']
+    assert {k: params[k] for k in fractions} == fractions
 
 
 def test_return_to_default_visual_preset(test_device_wrapped):

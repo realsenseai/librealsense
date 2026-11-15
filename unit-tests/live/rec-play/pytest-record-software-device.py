@@ -2,6 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import numpy as np
+import pytest
 import pyrealsense2 as rs
 from pytest_check import check
 
@@ -45,6 +46,13 @@ def prepare_motion_stream():
     motion_stream.intrinsics = motion_intrinsics
 
     return motion_stream
+
+
+def prepare_extrinsics():
+    extrinsics = rs.extrinsics()
+    extrinsics.rotation = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+    extrinsics.translation = [0.1, 0.2, 0.3]
+    return extrinsics
 
 
 def prepare_depth_frame(video_frame, pixels, width, bpp, depth_stream_profile):
@@ -101,7 +109,19 @@ def compare_frames(recorded_depth, recorded_accel, pixels, video_frame, motion_f
     check.equal(motion_frame.timestamp, recorded_accel.get_timestamp())
 
 
-def play_frames(filename, pixels, video_frame, motion_frame, motion_frame_data):
+def compare_extrinsics(sensor, extrinsics):
+    profiles = sensor.get_stream_profiles()
+    depth_profile = next((p for p in profiles if p.stream_type() == rs.stream.depth), None)
+    accel_profile = next((p for p in profiles if p.stream_type() == rs.stream.accel), None)
+    assert depth_profile, "depth profile missing from playback sensor"
+    assert accel_profile, "accel profile missing from playback sensor"
+
+    recorded = depth_profile.get_extrinsics_to(accel_profile)
+    check.equal(list(recorded.rotation), pytest.approx(list(extrinsics.rotation), abs=1e-5))
+    check.equal(list(recorded.translation), pytest.approx(list(extrinsics.translation), abs=1e-5))
+
+
+def play_frames(filename, pixels, video_frame, motion_frame, motion_frame_data, extrinsics):
     ctx = rs.context()
     player_dev = ctx.load_device(filename)
     player_dev.set_real_time(False)
@@ -123,6 +143,7 @@ def play_frames(filename, pixels, video_frame, motion_frame, motion_frame_data):
         success, fset = player_sync.try_wait_for_frames()
 
     compare_frames(recorded_depth, recorded_accel, pixels, video_frame, motion_frame, motion_frame_data)
+    compare_extrinsics(s, extrinsics)
 
     s.stop()
     s.close()
@@ -154,6 +175,9 @@ def test_record_software_device(tmp_path):
     motion_stream = prepare_motion_stream()
     motion_stream_profile = sensor.add_motion_stream(motion_stream)
 
+    extrinsics = prepare_extrinsics()
+    depth_stream_profile.register_extrinsics_to(motion_stream_profile, extrinsics)
+
     sync = rs.syncer()
     stream_profiles = [depth_stream_profile, motion_stream_profile]
 
@@ -161,5 +185,5 @@ def test_record_software_device(tmp_path):
     motion_frame = prepare_motion_frame(motion_frame, motion_frame_data, motion_stream_profile)
 
     record_frames(filename, sd, sync, video_frame, motion_frame, sensor, stream_profiles)
-    play_frames(filename, pixels, video_frame, motion_frame, motion_frame_data)
+    play_frames(filename, pixels, video_frame, motion_frame, motion_frame_data, extrinsics)
 ################################################################################################

@@ -46,27 +46,9 @@ namespace librealsense
                 emitter_enabled,
                 std::vector<float>{0.f, 2.f}, 1.f);
 
-            if (auto hdr_enabled_option = _depth_ep.get_option_handler(RS2_OPTION_HDR_ENABLED))
-            {
-                std::vector<std::pair<std::shared_ptr<option>, std::string>> emitter_options_and_reasons = { std::make_pair(hdr_enabled_option,
-                    "Emitter status cannot be set while HDR is enabled") };
-                _depth_ep.register_option(RS2_OPTION_EMITTER_ENABLED,
-                    std::make_shared<gated_option>(
-                        emitter_enabled,
-                        emitter_options_and_reasons));
-
-                std::vector<std::pair<std::shared_ptr<option>, std::string>> laser_options_and_reasons = { std::make_pair(hdr_enabled_option,
-                    "Laser Power status cannot be set while HDR is enabled") };
-                _depth_ep.register_option(RS2_OPTION_LASER_POWER,
-                    std::make_shared<gated_option>(
-                        laser_power_auto_disabling,
-                        laser_options_and_reasons));
-            }
-            else
-            {
-                _depth_ep.register_option(RS2_OPTION_EMITTER_ENABLED, emitter_enabled);
-                _depth_ep.register_option(RS2_OPTION_LASER_POWER, laser_power_auto_disabling);
-            }
+            // Not gated by HDR: the HDR sub-preset locks only exposure and gain, FW applies laser controls during HDR
+            _depth_ep.register_option(RS2_OPTION_EMITTER_ENABLED, emitter_enabled);
+            _depth_ep.register_option(RS2_OPTION_LASER_POWER, laser_power_auto_disabling);
         }
         else
         {

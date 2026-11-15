@@ -276,7 +276,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // payload with its own headers, so width*height*bpp is not its length.
                     const bool is_depth_mapping
                         = ( extension == RS2_EXTENSION_LABELED_POINTS )
-                       || ( req_profile_base->get_stream_type() == RS2_STREAM_OCCUPANCY );
+                       || ( req_profile_base->get_stream_type() == RS2_STREAM_OCCUPANCY )
+                       || ( req_profile_base->get_stream_type() == RS2_STREAM_POINT_CLOUD );
 
                     if( ! msp )
                         expected_size = compute_frame_expected_size( width, height, bpp );
@@ -284,9 +285,12 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // Compressed and perception streams carry variable-length payloads; copy the data as received.
                     if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } )
                         || is_perception || is_depth_mapping )
+                    {
                         expected_size = f.frame_size;
+                        fr->additional_data.raw_size = static_cast< uint32_t >( f.frame_size );
+                    }
 
-                    // D401 GMSL raw color (pBAA) is packed MIPI RAW10 but sized at 16 bpp
+                    // D401 raw color (GMSL pBAA, USB pRAA) is packed MIPI RAW10 but sized at 16 bpp
                     // (unpacked) here; copy the packed payload verbatim, the rggb converter
                     // unpacks it downstream. Applies to any raw color frame (e.g. Depth + Color 1,
                     // a single color stream), not only the multi-color path.

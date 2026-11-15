@@ -17,8 +17,9 @@ namespace librealsense
 
     uvc_pu_auto_exposure_option::uvc_pu_auto_exposure_option(
         const std::weak_ptr< uvc_sensor > & ep,
-        const std::weak_ptr< option > & exposure_option )
-        : uvc_pu_option( ep, RS2_OPTION_ENABLE_AUTO_EXPOSURE )
+        const std::weak_ptr< option > & exposure_option,
+        platform::processing_unit pu )
+        : uvc_pu_option( ep, RS2_OPTION_ENABLE_AUTO_EXPOSURE, pu )
         , _exposure_option( exposure_option )
     {
     }

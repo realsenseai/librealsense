@@ -5,6 +5,9 @@ import subprocess, os, tempfile
 import logging
 import pyrealsense2 as rs
 from rspy import repo
+import pytest
+
+pytestmark = pytest.mark.infra  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
 
 log = logging.getLogger(__name__)
 

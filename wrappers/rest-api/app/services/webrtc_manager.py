@@ -9,7 +9,6 @@ import threading
 import time
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
-import cv2
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, RTCConfiguration, RTCIceServer
 from aiortc.mediastreams import MediaStreamError, VideoStreamTrack, VIDEO_CLOCK_RATE, VIDEO_TIME_BASE
 from av import VideoFrame
@@ -61,8 +60,8 @@ class RealSenseVideoTrack(VideoStreamTrack):
         self._last_pts = pts
         return pts
 
-    def _to_video_frame(self, img) -> VideoFrame:
-        video_frame = VideoFrame.from_ndarray(img, format="rgb24")
+    def _to_video_frame(self, img, fmt="rgb24") -> VideoFrame:
+        video_frame = VideoFrame.from_ndarray(img, format=fmt)
         video_frame.pts = self._next_pts()
         video_frame.time_base = VIDEO_TIME_BASE
         return video_frame
@@ -89,7 +88,7 @@ class RealSenseVideoTrack(VideoStreamTrack):
                 if self._last_img is None:
                     # Stream up but first frame not here yet — black keepalive.
                     return self._to_video_frame(np.zeros((480, 640, 3), dtype=np.uint8))
-                return self._to_video_frame(self._last_img)
+                return self._to_video_frame(*self._last_img)
 
             # Handle different data types and normalize to uint8
             if frame_data.dtype == np.uint16:
@@ -101,23 +100,18 @@ class RealSenseVideoTrack(VideoStreamTrack):
                 # Convert other dtypes to uint8
                 frame_data = frame_data.astype(np.uint8)
 
-            # Convert to RGB format if necessary
-            if len(frame_data.shape) == 3 and frame_data.shape[2] == 3:
-                # Already has 3 channels - RealSense colorizer outputs RGB format
-                # Use directly without conversion to preserve color scheme (blue=near, red=far)
-                img = frame_data
-            elif len(frame_data.shape) == 3 and frame_data.shape[2] == 4:
-                # RGBA/BGRA - convert to RGB
-                img = cv2.cvtColor(frame_data, cv2.COLOR_BGRA2RGB)
+            # The encoder converts any pixel format to yuv420p, so hand av the native layout
+            if len(frame_data.shape) == 3 and frame_data.shape[2] == 4:
+                fmt = "bgra"
             elif len(frame_data.shape) == 2:
-                # Grayscale (e.g., infrared Y8/Y16) - convert to RGB
-                img = cv2.cvtColor(frame_data, cv2.COLOR_GRAY2RGB)
+                # Grayscale (e.g., infrared Y8/Y16)
+                fmt = "gray"
             else:
-                # Unknown format, try to use as-is
-                img = frame_data
+                # RealSense colorizer outputs RGB; use as-is to preserve color scheme (blue=near, red=far)
+                fmt = "rgb24"
 
-            self._last_img = img
-            return self._to_video_frame(img)
+            self._last_img = (frame_data, fmt)
+            return self._to_video_frame(frame_data, fmt)
         except MediaStreamError:
             # End-of-track: aiortc's sender loop stops on this exception, but
             # the peer connection would stay "connected" — close the session

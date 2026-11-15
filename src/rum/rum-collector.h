@@ -2,6 +2,8 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 #pragma once
 
+#include <rsutils/json-fwd.h>
+
 #include <string>
 #include <mutex>
 #include <map>
@@ -56,8 +58,10 @@ public:
     // Write the current report to the local file. No network.
     void flush();
 
-    // The current in-memory report as JSON. flush() writes this to the on-disk report file.
-    std::string get_report() const;
+    // The current in-memory report, rendered readable for the on-disk file flush() writes. The
+    // uploader sends the same report compacted. Drops recorded data if the report is over the size
+    // limit, so what is measured here is what gets written.
+    std::string get_report();
 
 private:
     rum_collector();
@@ -65,6 +69,13 @@ private:
     // Fold a not-yet-uploaded report already on disk into the in-memory tallies, so data
     // accumulates across sessions until a successful upload resets the file. Called from flush().
     void merge_saved_report();
+
+    // The report as it stands, with no size limit applied.
+    rsutils::json build_report() const;
+
+    // Drop recorded data until the report's compact form fits the size limit, rebuilding it as it
+    // goes. Call with _mutex held.
+    void trim_to_limit( rsutils::json & report );
 
     struct stream_stat
     {

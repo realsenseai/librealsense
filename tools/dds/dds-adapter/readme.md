@@ -16,7 +16,7 @@ If the tool detects a device dis/connection, it will notify the client using the
 | Flag | Description | Default|
 |---|---|---|
 |-h/--help|Show command line help menu||
-|-d/--domain < ID >|Publish devices on domain < ID >|0|
+|`--domain-id <0-232>`|Publish devices on the given domain ID|0|
 
 ## Expected Output
 Assuming a running `librealsense` is found on the client side and network connection is stable, we expect to see prints like:

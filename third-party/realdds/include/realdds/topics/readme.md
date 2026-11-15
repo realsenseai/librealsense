@@ -5,7 +5,7 @@ The various topics are arranged hierarchically:
 
 * `realsense/`
     * `device-info` — [device discovery](../../../doc/discovery.md) ([flexible](flexible/))
-    * `<model>_<serial-number>/` — topic root per device in [device-info](../../doc/discovery.md) (all in [flexible](flexible/) format)
+    * `<model>_<serial-number>/` — topic root per device in [device-info](../../../doc/discovery.md) (all in [flexible](flexible/) format)
         * `notification` — [server notifications, responses, etc.](../../../doc/notifications.md)
         * `control` — [client requests to server](../../../doc/control.md)
         * `metadata` — [optional stream information](../../../doc/metadata.md)

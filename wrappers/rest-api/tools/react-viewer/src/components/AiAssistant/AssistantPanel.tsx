@@ -4,11 +4,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { PlusCircle, Sparkles, Wrench, Maximize2, Minimize2, X } from 'lucide-react'
 import { useAppStore } from '../../store'
+import { loadPersisted, persist } from '../../store/assistantSlice'
 import { getActiveProviderName } from '../../api/chat'
 import { AssistantContent } from './AssistantContent'
 import { ChatBotContent } from './ChatBotContent'
+import { AssistantDisclaimer } from './AssistantDisclaimer'
 
 type PanelMode = 'assistant' | 'chatbot'
+
+const DISCLAIMER_STORAGE_KEY = 'rsai_disclaimer_accepted'
 
 /**
  * Slide-out panel for the RealSense AI Assistant. Always mounted (not conditionally
@@ -33,6 +37,19 @@ export function AssistantPanel() {
   const [mode, setMode] = useState<PanelMode>('assistant')
   const isChatbotMode = mode === 'chatbot'
   const providerName = getActiveProviderName()
+
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => loadPersisted(DISCLAIMER_STORAGE_KEY) === 'true')
+  const acceptDisclaimer = () => {
+    persist(DISCLAIMER_STORAGE_KEY, 'true')
+    setDisclaimerAccepted(true)
+  }
+  const showDisclaimer = !disclaimerAccepted
+
+  // Keeps Tab from reaching the chat input behind the disclaimer overlay.
+  const contentRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.inert = showDisclaimer
+  }, [showDisclaimer])
 
   const wasOpenRef = useRef(isAssistantOpen)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -187,7 +204,12 @@ export function AssistantPanel() {
         </div>
       </div>
 
-      {isChatbotMode ? <ChatBotContent /> : <AssistantContent />}
+      <div className="relative flex-1 flex flex-col min-h-0">
+        <div ref={contentRef} className="flex-1 flex flex-col min-h-0">
+          {isChatbotMode ? <ChatBotContent /> : <AssistantContent />}
+        </div>
+        {showDisclaimer && <AssistantDisclaimer onAccept={acceptDisclaimer} />}
+      </div>
     </div>
   )
 }

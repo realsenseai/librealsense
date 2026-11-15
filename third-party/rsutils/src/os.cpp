@@ -3,6 +3,12 @@
 
 #include <rsutils/os/os.h>
 
+#if defined( _M_X64 ) || defined( _M_IX86 )
+#include <intrin.h>
+#elif defined( __x86_64__ ) || defined( __i386__ )
+#include <cpuid.h>
+#endif
+
 namespace rsutils
 {
     namespace os 
@@ -36,6 +42,37 @@ namespace rsutils
             return "arm";
             #else
             return "unknown";
+            #endif
+        }
+
+        bool cpu_supports_avx2()
+        {
+            // AVX2 needs CPUID.7:EBX[5], plus AVX (CPUID.1:ECX[28]) with OS-saved YMM state (OSXSAVE, XCR0[2:1])
+            #if defined( _M_X64 ) || defined( _M_IX86 )
+            int info[4];
+            __cpuid( info, 0 );
+            if( info[0] < 7 )
+                return false;
+            __cpuid( info, 1 );
+            if( ( info[2] & ( 3 << 27 ) ) != ( 3 << 27 ) || ( _xgetbv( 0 ) & 6 ) != 6 )
+                return false;
+            __cpuidex( info, 7, 0 );
+            return ( info[1] & ( 1 << 5 ) ) != 0;
+            #elif defined( __x86_64__ ) || defined( __i386__ )
+            unsigned int eax, ebx, ecx, edx;
+            if( __get_cpuid_max( 0, nullptr ) < 7 )
+                return false;
+            __cpuid( 1, eax, ebx, ecx, edx );
+            if( ( ecx & ( 3u << 27 ) ) != ( 3u << 27 ) )
+                return false;
+            unsigned int xcr0, xcr0_hi;
+            __asm__ volatile( "xgetbv" : "=a"( xcr0 ), "=d"( xcr0_hi ) : "c"( 0 ) );  // _xgetbv needs -mxsave on GCC
+            if( ( xcr0 & 6 ) != 6 )
+                return false;
+            __cpuid_count( 7, 0, eax, ebx, ecx, edx );
+            return ( ebx & ( 1u << 5 ) ) != 0;
+            #else
+            return false;
             #endif
         }
 

@@ -40,12 +40,14 @@ void init_frame(py::module &m) {
     auto get_frame_data = [](const rs2::frame& self) ->  BufData
     {
         if (auto vf = self.as<rs2::video_frame>()) {
-            // Framed payloads (e.g. the depth-mapping streams) carry headers on top of the
-            // image geometry, so height*stride is smaller than the frame. Hand those back flat
-            // and whole instead of silently truncating to the geometry.
-            if (static_cast<size_t>(self.get_data_size())
-                > static_cast<size_t>(vf.get_height()) * static_cast<size_t>(vf.get_stride_in_bytes()))
-                return BufData(const_cast<void*>(self.get_data()), 1, std::string("@B"), self.get_data_size());
+            // Compressed (MJPEG, H264) and framed (e.g. depth-mapping) payloads don't follow height*stride.
+            // Hand those back flat and whole instead of truncating or over-reading.
+            // Software-device frames report size 0 (unknown); shape those from width/height/stride.
+            auto size = static_cast<size_t>(self.get_data_size());
+            auto format = vf.get_profile().format();
+            if (size && (format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264
+                         || size != static_cast<size_t>(vf.get_height()) * static_cast<size_t>(vf.get_stride_in_bytes())))
+                return BufData(const_cast<void*>(self.get_data()), 1, std::string("@B"), size);
 
             std::map<size_t, std::string> bytes_per_pixel_to_format = { { 1, std::string("@B") },{ 2, std::string("@H") },{ 3, std::string("@I") },{ 4, std::string("@I") } };
             switch (vf.get_profile().format()) {
@@ -301,17 +303,19 @@ void init_frame(py::module &m) {
                 throw std::domain_error("dims arg only supports values of 1, 2 or 3");
             }
         }, "Retrieve the vertices of the point cloud", py::keep_alive<0, 1>(), "dims"_a=1)
-        .def("get_texture_coordinates", [](rs2::points& self, int dims) {
+        .def("get_texture_coordinates", [](rs2::points& self, int dims) -> py::object {
             auto tex = const_cast<rs2::texture_coordinate*>(self.get_texture_coordinates());
+            if (!tex)
+                return py::none();  // device point cloud (RS2_STREAM_POINT_CLOUD): no texture coordinates
             auto profile = self.get_profile().as<rs2::video_stream_profile>();
             size_t h = profile.height(), w = profile.width();
             switch (dims) {
             case 1:
-                return BufData(tex, sizeof(rs2::texture_coordinate), "@ff", self.size());
+                return py::cast(BufData(tex, sizeof(rs2::texture_coordinate), "@ff", self.size()));
             case 2:
-                return BufData(tex, sizeof(float), "@f", 2, self.size());
+                return py::cast(BufData(tex, sizeof(float), "@f", 2, self.size()));
             case 3:
-                return BufData(tex, sizeof(float), "@f", 2, { h, w, 2 }, { w*2*sizeof(float), 2*sizeof(float), sizeof(float) });
+                return py::cast(BufData(tex, sizeof(float), "@f", 2, { h, w, 2 }, { w*2*sizeof(float), 2*sizeof(float), sizeof(float) }));
             default:
                 throw std::domain_error("dims arg only supports values of 1, 2 or 3");
             }

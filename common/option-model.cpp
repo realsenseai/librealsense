@@ -30,8 +30,7 @@ namespace rs2
         option.opt = opt->id;
         option.endpoint = options;
         option.label = rsutils::string::from() << option_name << "##" << option.id;
-        auto const title = alternative_option_title( opt->id );
-        option.name = title ? title : option_name;   // the search matches what the control is titled
+        option.name = option_name;   // the search matches what the control is titled
         option.invalidate_flag = options_invalidated;
         option.dev = model;
         option.value = opt;
@@ -55,24 +54,12 @@ std::string option_model::adjust_description(const std::string& str_in, const st
 
 bool option_model::draw( std::string & error_message,
                          notifications_model & model,
-                         bool new_line,
-                         bool use_option_name )
+                         bool new_line )
 {
     auto res = false;
     if( endpoint->supports( opt ) )
     {
         std::string desc_str( endpoint->get_option_description( opt ) );
-
-        // The option's rendering model supports an alternative option title derived from its
-        // description rather than name. This is applied to the Holes Filling as its display must
-        // conform with the names used by a 3rd-party tools for consistency.
-        if (auto title = alternative_option_title(opt))
-        {
-            use_option_name = false;
-            // Below change is instead of the long description provided with DDS
-            // which is useful when user does not know what are the options' possible values
-            desc_str = title;
-        }
 
         // Device D405 is for short range, therefore, its units are in cm - for better UX
         bool use_cm_units = false;
@@ -94,7 +81,7 @@ bool option_model::draw( std::string & error_message,
 
         if( is_enum() )
         {
-            res = draw_combobox( model, error_message, desc, new_line, use_option_name );
+            res = draw_combobox( model, error_message, desc, new_line );
         }
         else
         {
@@ -299,12 +286,10 @@ std::vector< const char * > option_model::get_combo_labels( int * p_selected, st
 bool option_model::draw_combobox( notifications_model & model,
                                   std::string & error_message,
                                   const char * description,
-                                  bool new_line,
-                                  bool use_option_name )
+                                  bool new_line )
 {
     bool item_clicked = false;
-    std::string txt = rsutils::string::from()
-                   << ( use_option_name ? endpoint->get_option_name( opt ) : description ) << ":";
+    std::string txt = rsutils::string::from() << endpoint->get_option_name( opt ) << ":";
 
     float text_length = ImGui::CalcTextSize( txt.c_str() ).x;
     float combo_position_x = ImGui::GetCursorPosX() + text_length + 5;
@@ -419,7 +404,9 @@ bool option_model::draw_slider( notifications_model & model,
     ImGui::Text( "%s", txt.c_str() );
 
     ImGui::SameLine();
-    ImGui::SetCursorPosX( read_only ? 280.f : 257.f );
+    // Option rows were laid out for the default pane width; this much more lets them follow a wider pane
+    const float extra_width = dev ? dev->panel_extra_width() : 0.f;
+    ImGui::SetCursorPosX( ( read_only ? 280.f : 257.f ) + extra_width );
     ImGui::PushStyleColor( ImGuiCol_Text, grey );
     ImGui::PushStyleColor( ImGuiCol_TextSelectedBg, grey );
     ImGui::PushStyleColor( ImGuiCol_ButtonActive, { 1.f, 1.f, 1.f, 0.f } );
@@ -435,7 +422,7 @@ bool option_model::draw_slider( notifications_model & model,
     if( ! read_only )
     {
         ImGui::SameLine();
-        ImGui::SetCursorPosX( 280 );
+        ImGui::SetCursorPosX( 280 + extra_width );
         if( ! edit_mode )
         {
             std::string edit_id = rsutils::string::from() << textual_icons::edit << "##" << id;
@@ -472,7 +459,8 @@ bool option_model::draw_slider( notifications_model & model,
             ImGui::PopStyleColor( 4 );
         }
     }
-    float customWidth = 295 - ImGui::GetCursorPosX(); //set slider width from the current Xpos to the right border at 295 (the edit button pos)
+    flush_arrow_nudge( error_message );
+    float customWidth = 295 + extra_width - ImGui::GetCursorPosX(); //set slider width from the current Xpos to the right border at 295 (the edit button pos)
     ImGui::PushItemWidth(customWidth);
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, black);
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, black);
@@ -586,6 +574,9 @@ bool option_model::draw_slider( notifications_model & model,
             else
             {
                 slider_clicked = slider_unselected( opt, static_cast< float >( int_value ), error_message, model );
+                float nudged = static_cast< float >( int_value );
+                if( RsImGui::SliderArrowNudge( &nudged, range.min, range.max, range.step ) )
+                    queue_arrow_nudge( nudged );
             }
         }
         else
@@ -644,6 +635,8 @@ bool option_model::draw_slider( notifications_model & model,
             else
             {
                 slider_clicked = slider_unselected( opt, tmp_value, error_message, model );
+                if( RsImGui::SliderArrowNudge( &tmp_value, range.min, range.max, range.step ) )
+                    queue_arrow_nudge( tmp_value );
             }
         }
     }
@@ -701,6 +694,7 @@ bool option_model::slider_selected( rs2_option opt,
                                     notifications_model & /*model*/ )
 {
     check_opt( opt, __func__ );
+    _arrow_nudge_pending = false;  // a drag supersedes a queued arrow nudge
     // Async (FW) path: dispatch every UI tick — the dispatcher action coalesces (per-option
     // _latest_pending_value) and its try_sleep enforces the FW-write floor, so per-tick calls
     // are cheap; invalidate + add_log fire later from draw_option once a write completes.
@@ -708,6 +702,27 @@ bool option_model::slider_selected( rs2_option opt,
     // this fires a handful of times per drag, each an instant in-process write with readback.
     write_value( value, error_message );
     return true;
+}
+
+void option_model::queue_arrow_nudge( float value )
+{
+    _arrow_nudge_value = value;
+    _arrow_nudge_pending = true;
+    _arrow_nudge_stopwatch.reset();
+    _user_request_value = value;
+    _user_request_stopwatch.reset();
+    _has_user_request->store( true );
+    last_slider_hold_stopwatch.reset();  // keep the periodic readback from overwriting the nudged value
+}
+
+void option_model::flush_arrow_nudge( std::string & error_message )
+{
+    constexpr long long quiet_ms = 300;  // longer than the key-repeat interval, so a held key is one write
+    if( ! _arrow_nudge_pending || _arrow_nudge_stopwatch.get_elapsed_ms() < quiet_ms )
+        return;
+    _arrow_nudge_pending = false;
+    write_value( _arrow_nudge_value, error_message );
+    RsImGui::ClearItemFocus();
 }
 
 bool option_model::slider_unselected( rs2_option opt,

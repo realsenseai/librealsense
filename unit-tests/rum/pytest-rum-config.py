@@ -2,10 +2,21 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import os
+import sys
 import json
+import subprocess
 import pytest
 import pyrealsense2 as rs
 from rspy import config_file
+
+
+MAX_REPORT_BYTES = 64 * 1024   # the size rule the server enforces; mirrors max_report_bytes in the SDK
+
+
+def compact_size( path ):
+    """Bytes the uploader would send: the report is stored indented and compacted on the wire."""
+    with open( path, encoding="utf-8" ) as f:
+        return len( json.dumps( json.load( f ), separators=( ",", ":" ) ) )
 
 
 def test_rum_submodule_is_exposed():
@@ -63,6 +74,29 @@ def test_source_id_is_stable_across_calls( rum_report ):
     first = rum_report().get( "source_id" )
     again = rum_report().get( "source_id" )
     assert first == again
+
+
+def test_oversized_report_is_capped( rum_report ):
+    # The saved report is folded in once per process, so the capping flush has to happen in a fresh one.
+    rum_report()
+    path = rs.rum.get_report_path()
+    with open( path, encoding="utf-8" ) as f:
+        report = json.load( f )
+    report["devices"]["Oversized-USB"] = {
+        "connection": "USB", "fw_version": "0.0.0.0", "mipi_driver_version": "", "count": 1,
+        "streams": { f"Depth-Z16-{width}x480@30": { "count": 1, "duration_seconds": 1.0 }
+                     for width in range( 2000 ) },
+        "options_changed": {}, "filters": {} }
+    with open( path, "w", encoding="utf-8" ) as f:
+        json.dump( report, f )
+    assert compact_size( path ) > MAX_REPORT_BYTES
+
+    # Hand the child the very module this process loaded: an inherited PYTHONPATH may name another
+    # build of pyrealsense2, and conftest appends the fresh one behind it.
+    env = dict( os.environ, PYTHONPATH=os.path.dirname( rs.__file__ ) + os.pathsep + os.environ.get( "PYTHONPATH", "" ) )
+    subprocess.run( [ sys.executable, "-c", "import pyrealsense2 as rs; c = rs.context(); del c" ],
+                    check=True, env=env )
+    assert compact_size( path ) <= MAX_REPORT_BYTES
 
 
 def test_processing_block_option_excluded_from_options_changed( rum_report ):

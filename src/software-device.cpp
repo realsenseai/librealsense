@@ -33,11 +33,13 @@ namespace librealsense
 
     void software_device::register_extrinsic(const stream_interface& stream)
     {
+        // Called per frame; a stream's group is decided once and never changes
+        if (_extrinsics.count(stream.get_unique_id()))
+            return;
+
         uint32_t max_idx = 0;
-        std::set<uint32_t> bad_groups;
         for (auto & pair : _extrinsics) {
             if (pair.second.first > max_idx) max_idx = pair.second.first;
-            if (bad_groups.count(pair.second.first)) continue; // already tried the group
             rs2_extrinsics ext;
             if (environment::get_instance().get_extrinsics_graph().try_fetch_extrinsics(stream, *pair.second.second, &ext)) {
                 register_stream_to_extrinsic_group(stream, pair.second.first);

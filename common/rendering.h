@@ -52,6 +52,12 @@
 
 namespace rs2
 {
+    // Stream name shown in the viewer: the SDK name, shortened where the UI needs it
+    inline std::string viewer_stream_name( const std::string & sdk_name )
+    {
+        return sdk_name == "Labeled Point Cloud" ? "Labeled PCL" : sdk_name;
+    }
+
     class fps_calc
     {
     public:
@@ -390,11 +396,13 @@ namespace rs2
         rs2::frame_queue last_queue[2];
         mutable rs2::frame last[2];
         std::vector< uint8_t > raw16_preview;
+        std::vector< uint8_t > blank_preview;  // never written, stays zeroed
     public:
         std::shared_ptr<colorizer> colorize;
         std::shared_ptr<yuy_decoder> yuy2rgb;
         std::shared_ptr<m420_decoder> m420_to_rgb;
         std::shared_ptr<nv12_decoder> nv12_to_rgb;
+        std::shared_ptr<mjpeg_decoder> mjpeg_to_rgb;
         std::shared_ptr<y411_decoder> y411;
         bool zoom_preview = false;
         rect curr_preview_rect{};
@@ -467,6 +475,20 @@ namespace rs2
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
             glBindTexture(GL_TEXTURE_2D, 0);
+        }
+
+        // Decode to RGB and upload; GPU decoders already render into the texture
+        void upload_decoded(const filter& decoder, const rs2::frame& frame, rs2::frame& rendered_frame)
+        {
+            if (auto decoded = decoder.process(frame).as<video_frame>())
+            {
+                if (!decoded.is<gl::gpu_frame>())
+                {
+                    glBindTexture(GL_TEXTURE_2D, texture);
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, decoded.get_width(), decoded.get_height(), 0, GL_RGB, GL_UNSIGNED_BYTE, decoded.get_data());
+                }
+                rendered_frame = decoded;
+            }
         }
 
         void upload(rs2::frame frame, rs2_format prefered_format = RS2_FORMAT_ANY)
@@ -569,23 +591,7 @@ namespace rs2
                     break;
                 case RS2_FORMAT_YUYV:
                     if (yuy2rgb)
-                    {
-                        if (auto colorized_frame = yuy2rgb->process(frame).as<video_frame>())
-                        {
-                            if (!colorized_frame.is<gl::gpu_frame>())
-                            {
-                                glBindTexture(GL_TEXTURE_2D, texture);
-                                data = colorized_frame.get_data();
-
-                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                                    colorized_frame.get_width(),
-                                    colorized_frame.get_height(),
-                                    0, GL_RGB, GL_UNSIGNED_BYTE,
-                                    colorized_frame.get_data());
-                            }
-                            rendered_frame = colorized_frame;
-                        }
-                    }
+                        upload_decoded(*yuy2rgb, frame, rendered_frame);
                     else
                     {
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, data);
@@ -593,63 +599,19 @@ namespace rs2
                     break;
                 case RS2_FORMAT_M420:
                     if (m420_to_rgb)
-                    {
-                        if (auto colorized_frame = m420_to_rgb->process(frame).as<video_frame>())
-                        {
-                            if (!colorized_frame.is<gl::gpu_frame>())
-                            {
-                                glBindTexture(GL_TEXTURE_2D, texture);
-                                data = colorized_frame.get_data();
-
-                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                                    colorized_frame.get_width(),
-                                    colorized_frame.get_height(),
-                                    0, GL_RGB, GL_UNSIGNED_BYTE,
-                                    colorized_frame.get_data());
-                            }
-                            rendered_frame = colorized_frame;
-                        }
-                    }
+                        upload_decoded(*m420_to_rgb, frame, rendered_frame);
                     break;
                 case RS2_FORMAT_NV12:
                     if (nv12_to_rgb)
-                    {
-                        if (auto colorized_frame = nv12_to_rgb->process(frame).as<video_frame>())
-                        {
-                            if (!colorized_frame.is<gl::gpu_frame>())
-                            {
-                                glBindTexture(GL_TEXTURE_2D, texture);
-                                data = colorized_frame.get_data();
-
-                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                                    colorized_frame.get_width(),
-                                    colorized_frame.get_height(),
-                                    0, GL_RGB, GL_UNSIGNED_BYTE,
-                                    colorized_frame.get_data());
-                            }
-                            rendered_frame = colorized_frame;
-                        }
-                    }
+                        upload_decoded(*nv12_to_rgb, frame, rendered_frame);
+                    break;
+                case RS2_FORMAT_MJPEG:
+                    if (mjpeg_to_rgb)
+                        upload_decoded(*mjpeg_to_rgb, frame, rendered_frame);
                     break;
                 case RS2_FORMAT_Y411:
                     if (y411)
-                    {
-                        if (auto colorized_frame = y411->process(frame).as<video_frame>())
-                        {
-                            if (!colorized_frame.is<gl::gpu_frame>())
-                            {
-                                glBindTexture(GL_TEXTURE_2D, texture);
-                                data = colorized_frame.get_data();
-
-                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                                    colorized_frame.get_width(),
-                                    colorized_frame.get_height(),
-                                    0, GL_RGB, GL_UNSIGNED_BYTE,
-                                    colorized_frame.get_data());
-                            }
-                            rendered_frame = colorized_frame;
-                        }
-                    }
+                        upload_decoded(*y411, frame, rendered_frame);
                     else
                     {
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, data);
@@ -770,8 +732,9 @@ namespace rs2
                 //break;
                 default:
                 {
-                    memset((void*)data, 0, height*width);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
+                    // Blank texture from a local buffer: the frame may be smaller than width*height (e.g. MJPEG)
+                    blank_preview.resize( width * height );
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, blank_preview.data());
                 }
                 }
 
@@ -792,6 +755,10 @@ namespace rs2
             {
                 // Points can be uploaded as two different
                 // formats: XYZ for verteces and UV for texture coordinates
+                // A device point cloud has no texture coordinates; its 2D tile gets the colorized image the
+                // Viewer uploads right after, so skip uploading the raw vertices there
+                if (prefered_format != RS2_FORMAT_XYZ32F && ! pc.get_texture_coordinates())
+                    return;
                 if (prefered_format == RS2_FORMAT_XYZ32F)
                 {
                     // Upload vertices
@@ -819,20 +786,7 @@ namespace rs2
         void upload_labeled_points(const labeled_points& lpc, int width, int height)
         {
             if (!lpc.is<gl::gpu_frame>())
-            {
-                // Upload vertices
-                auto data = lpc.get_vertices();
-                auto lpc_width = lpc.get_width();
-                auto lpc_height = lpc.get_height();
-
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, lpc_width, lpc_height, 0, GL_RGB, GL_FLOAT, (const void*)data);
-
-                // TODO: use of labels 
-                auto labels = lpc.get_labels();
-
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            }
+                upload_label_colors(lpc);
             else
             {
                 texture_id = 1;
@@ -840,6 +794,8 @@ namespace rs2
         }
 
         void upload_occupancy_frame(const rs2::frame &frame, const void *data);
+        // Labeled point cloud tile: each point drawn in its label color, as in the 3D view
+        void upload_label_colors(const labeled_points& lpc);
 
         static void  draw_axes(float axis_size = 1.f, float axisWidth = 4.f)
         {

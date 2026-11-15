@@ -8,7 +8,6 @@ python-multipart==0.0.29; platform_machine != "aarch64" # Used internally by Fas
 --only-binary=av
 aiortc==1.15.0;          platform_machine != "aarch64"
 
-opencv-python==4.11.0.86; platform_machine != "aarch64"
 # numpy dropped 3.10 in 2.3.0, and its first 3.14 wheel is 2.3.2 - no single version covers both
 numpy==2.2.4;            platform_machine != "aarch64" and python_version < "3.11"
 numpy==2.3.5;            platform_machine != "aarch64" and python_version >= "3.11"

@@ -3,6 +3,10 @@ import type { MutableRefObject, ReactElement } from 'react'
 import { useAppStore } from '../store'
 import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
 import { SECTIONS, firmwareStatus, optionLabel } from '../api/types'
+import {
+  applyFormat, applyFps, applyResolution, applyToggle, withStream,
+  formatOptions, fpsOptions, resolutionOptions, sharedFps, type Selection,
+} from '../utils/streamSelection'
 import { RefreshCcw, Search, X } from 'lucide-react'
 import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType, type ToastAction } from './Toast'
@@ -148,10 +152,6 @@ export function DevicePanel() {
   const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
   const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchDevices(true)
-  }, [fetchDevices])
-
   // Counter, not just Date.now(): several cameras can raise a firmware proposal in the
   // same tick, and duplicate keys would make React drop all but one toast.
   const toastSeqRef = useRef(0)
@@ -262,7 +262,7 @@ export function DevicePanel() {
           disabled={isLoadingDevices}
           aria-label={isLoadingDevices ? 'Refreshing devices…' : 'Refresh devices'}
           aria-busy={isLoadingDevices}
-          className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 text-rs-muted hover:text-rs-text hover:bg-rs-inset rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={isLoadingDevices ? 'Refreshing…' : 'Refresh devices'}
         >
           <RefreshCcw className={`w-5 h-5 ${isLoadingDevices ? 'animate-spin' : ''}`} />
@@ -271,10 +271,10 @@ export function DevicePanel() {
 
       {/* Error Display */}
       {error && (
-        <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-sm">
+        <div className="mb-4 p-3 bg-rs-err/10 border border-rs-err/40 rounded-lg text-sm text-rs-err">
           <div className="flex justify-between items-start">
             <span>{error}</span>
-            <button onClick={clearError} className="text-red-400 hover:text-red-300">
+            <button onClick={clearError} className="text-rs-err hover:text-rs-text">
               ×
             </button>
           </div>
@@ -283,7 +283,7 @@ export function DevicePanel() {
 
       {/* Device List */}
       {devices.length === 0 ? (
-        <div className="text-gray-500 text-center py-8">
+        <div className="text-rs-dim text-center py-8">
           {isLoadingDevices ? (
             <div className="flex flex-col items-center">
               <div className="w-8 h-8 border-2 border-rs-blue border-t-transparent rounded-full animate-spin mb-2" />
@@ -411,8 +411,8 @@ function DeviceCard({
     <div
       className={`device-card rounded-lg transition-all ${
         isActive
-          ? 'bg-rs-blue/10 border border-rs-blue'
-          : 'bg-gray-800 border border-gray-700 hover:border-gray-600 cursor-pointer'
+          ? 'bg-rs-blue/[0.07] border border-rs-blue/70 shadow-[0_0_0_1px_rgba(0,113,197,0.15)]'
+          : 'bg-rs-inset border border-rs-border hover:border-rs-dim cursor-pointer'
       }`}
       data-testid="device-card"
       onClick={!isActive && !isLoading ? onToggle : undefined}
@@ -425,12 +425,12 @@ function DeviceCard({
       <div className="p-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white truncate">{device.name}</h3>
-            <p className="text-sm text-gray-400 truncate">S/N: {device.serial_number}</p>
+            <h3 className="font-semibold text-rs-text truncate">{device.name}</h3>
+            <p className="text-sm text-rs-muted truncate nums">S/N: {device.serial_number}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
             {isStreaming && (
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Streaming" />
+              <span className="w-2 h-2 bg-rs-ok rounded-full animate-pulse" title="Streaming" />
             )}
             {isLoading && (
               <div className="w-4 h-4 border-2 border-rs-blue border-t-transparent rounded-full animate-spin" title="Loading..." />
@@ -440,7 +440,7 @@ function DeviceCard({
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                className="p-1 text-rs-muted hover:text-rs-text hover:bg-rs-border/60 rounded transition-colors"
                 title="Device actions"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -454,13 +454,13 @@ function DeviceCard({
                     className="fixed inset-0 z-10" 
                     onClick={() => setShowMenu(false)}
                   />
-                  <div className="absolute right-0 mt-1 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1">
+                  <div className="absolute right-0 mt-1 w-48 bg-rs-inset border border-rs-border rounded-lg shadow-xl z-20 py-1">
                     <button
                       onClick={() => {
                         setShowMenu(false)
                         onShowToast('info', 'Calibration feature coming soon')
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-sm text-rs-text hover:bg-rs-border/60 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -472,20 +472,20 @@ function DeviceCard({
                         setShowMenu(false)
                         onShowToast('info', 'Tare calibration feature coming soon')
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-sm text-rs-text hover:bg-rs-border/60 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                       </svg>
                       Tare Calibration
                     </button>
-                    <div className="border-t border-gray-600 my-1" />
+                    <div className="border-t border-rs-border my-1" />
                     <button
                       onClick={() => {
                         setShowMenu(false)
                         handleCheckFirmwareUpdates()
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-sm text-rs-text hover:bg-rs-border/60 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -504,8 +504,8 @@ function DeviceCard({
                         title={isStreaming ? 'Disabled while streaming' : undefined}
                         className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
                           isStreaming
-                            ? 'text-gray-500 cursor-not-allowed'
-                            : 'hover:bg-gray-700'
+                            ? 'text-rs-dim cursor-not-allowed'
+                            : 'text-rs-text hover:bg-rs-border/60'
                         }`}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -525,8 +525,8 @@ function DeviceCard({
                       disabled={isStreaming}
                       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
                         isStreaming
-                          ? 'text-gray-500 cursor-not-allowed'
-                          : 'hover:bg-gray-700'
+                          ? 'text-rs-dim cursor-not-allowed'
+                          : 'text-rs-text hover:bg-rs-border/60'
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -534,7 +534,7 @@ function DeviceCard({
                       </svg>
                       Update FW from File
                     </button>
-                    <div className="border-t border-gray-600 my-1" />
+                    <div className="border-t border-rs-border my-1" />
                     <button
                       onClick={() => {
                         setShowMenu(false)
@@ -542,7 +542,7 @@ function DeviceCard({
                       }}
                       disabled={isStreaming}
                       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
-                        isStreaming ? 'text-gray-500 cursor-not-allowed' : 'text-red-400 hover:bg-gray-700'
+                        isStreaming ? 'text-rs-dim cursor-not-allowed' : 'text-rs-err hover:bg-rs-err/10'
                       }`}
                     >
                       <RefreshCcw className="w-4 h-4" />
@@ -558,7 +558,7 @@ function DeviceCard({
               onClick={(e) => { e.stopPropagation(); onToggle(); }}
               disabled={isLoading || isStreaming}
               className={`relative w-10 h-5 rounded-full transition-colors ${
-                isActive ? 'bg-rs-blue' : 'bg-gray-600'
+                isActive ? 'bg-rs-blue' : 'bg-rs-border'
               } ${isLoading || isStreaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
               title={isActive ? 'Deactivate device' : 'Activate device'}
             >
@@ -572,7 +572,7 @@ function DeviceCard({
         </div>
 
         {/* Device Details */}
-        <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-500">
+        <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-rs-muted nums">
           {device.firmware_version && (
             <span>FW: {device.firmware_version}</span>
           )}
@@ -585,7 +585,7 @@ function DeviceCard({
             {device.sensors.map((sensor) => (
               <span
                 key={sensor}
-                className="px-2 py-0.5 bg-gray-700 rounded text-xs text-gray-300"
+                className="px-2 py-0.5 bg-rs-border/50 border border-rs-border rounded text-xs text-rs-muted"
               >
                 {sensor}
               </span>
@@ -596,7 +596,7 @@ function DeviceCard({
 
       {/* Device Controls - shown when active */}
       {isActive && !isLoading && (
-        <div className="border-t border-gray-700 p-3 space-y-1.5">
+        <div className="border-t border-rs-border p-3 space-y-1.5">
           {sensors.map((sensor) => (
             <SensorPanel
               key={sensor.sensor_id}
@@ -666,87 +666,63 @@ function SensorPanel({
 
   const modifiedCount = groups.flatMap(([, g]) => g.options).filter(isModified).length
 
-  const computeCommonOptions = () => {
-          const profiles = sensor.supported_stream_profiles
-          if (profiles.length === 0) return { resolutions: [], fps: [] }
-
-          let commonResolutions = new Set(profiles[0].resolutions.map(([w, h]) => `${w}x${h}`))
-          let commonFps = new Set(profiles[0].fps)
-
-          for (let i = 1; i < profiles.length; i++) {
-            const profileRes = new Set(profiles[i].resolutions.map(([w, h]) => `${w}x${h}`))
-            const profileFps = new Set(profiles[i].fps)
-            commonResolutions = new Set([...commonResolutions].filter(r => profileRes.has(r)))
-            commonFps = new Set([...commonFps].filter(f => profileFps.has(f)))
-          }
-
-          const resolutions: [number, number][] = [...commonResolutions].map(r => {
-            const [w, h] = r.split('x').map(Number)
-            return [w, h] as [number, number]
-          })
-          const fps = [...commonFps].sort((a, b) => a - b)
-          return { resolutions, fps }
-        }
-
-  const { resolutions: availableResolutions, fps: availableFps } = computeCommonOptions()
+  // Every change goes through streamSelection, which keeps the pick and moves the rest onto real SDK profiles
+  const profiles = sensor.supported_stream_profiles
+  const sel: Selection | undefined = sensorConfig && { ...sensorConfig, streams }
+  const shared = sharedFps(profiles)
+  const commit = (next: Selection) => {
+    next.streams.forEach(onUpdateStreamConfig)
+    onUpdateSensorConfig(sensor.sensor_id, { resolution: next.resolution, framerate: next.framerate })
+  }
 
   return (
     <Collapsible
       variant="sensor"
+      testId="sensor-module"
       label={
         <>
-          <span className="text-sm font-medium text-gray-300 truncate">{sensor.name}</span>
+          <span className="text-sm font-semibold text-rs-text truncate">{sensor.name}</span>
           {isSensorStreaming && (
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 bg-rs-ok rounded-full animate-pulse shrink-0" />
           )}
           {modifiedCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-rs-blue/20 text-rs-blue rounded text-[10px] shrink-0">
+            <span className="px-1.5 py-0.5 bg-rs-blue/15 border border-rs-blue/30 text-rs-accent rounded text-[11px] shrink-0">
               {modifiedCount} modified
             </span>
           )}
         </>
       }
       aside={
-        <button
-          onClick={() => isSensorStreaming ? onStopStreaming() : onStartStreaming()}
+        <ToggleSwitch
+          enabled={isSensorStreaming}
           disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
-          data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
-          title={isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
-          className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-            isSensorPending
-              ? 'bg-yellow-600 text-white cursor-wait'
-              : isSensorStreaming
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : canStartSensor
-                  ? 'bg-green-600/80 hover:bg-green-600 text-white'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          <span className="sr-only">{isSensorStreaming ? 'Stop' : 'Start'}</span>
-          {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
-        </button>
+          onClick={() => (isSensorStreaming ? onStopStreaming() : onStartStreaming())}
+          title={isSensorStreaming ? 'Stop' : 'Start'}
+          data-testid={isSensorStreaming ? 'stop-streaming' : 'start-streaming'}
+        />
       }
       belowHeader={sensorError && (
-        <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
+        <div className="mb-2 text-xs text-rs-err bg-rs-err/10 border border-rs-err/30 rounded px-2 py-1">
           {sensorError}
         </div>
       )}
     >
       <div className="mt-2 space-y-1">
-            {sensorConfig && !sensorConfig.isMotionSensor && (
+            {sel && shared && (
               <div className="mb-2 flex items-center gap-2 text-xs">
                 <div className="flex items-center gap-1">
-                  <label className="text-gray-500">Res:</label>
+                  <label className="text-rs-muted font-semibold uppercase tracking-wide text-xs">Res</label>
                   <select
-                    value={`${sensorConfig.resolution.width}x${sensorConfig.resolution.height}`}
+                    value={`${sel.resolution.width}x${sel.resolution.height}`}
                     onChange={(e) => {
                       const [width, height] = e.target.value.split('x').map(Number)
-                      onUpdateSensorConfig(sensor.sensor_id, { resolution: { width, height } })
+                      commit(applyResolution(profiles, sel, { width, height }))
                     }}
                     disabled={isSensorStreaming}
-                    className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                    data-testid="sensor-resolution"
+                    className="select-rs text-xs py-0.5"
                   >
-                    {availableResolutions.map(([w, h]) => (
+                    {resolutionOptions(profiles).map(({ width: w, height: h }) => (
                       <option key={`${w}x${h}`} value={`${w}x${h}`}>
                         {w}×{h}
                       </option>
@@ -754,14 +730,15 @@ function SensorPanel({
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="text-gray-500">FPS:</label>
+                  <label className="text-rs-muted font-semibold uppercase tracking-wide text-xs">FPS</label>
                   <select
-                    value={sensorConfig.framerate}
-                    onChange={(e) => onUpdateSensorConfig(sensor.sensor_id, { framerate: Number(e.target.value) })}
+                    value={sel.framerate}
+                    onChange={(e) => commit(applyFps(profiles, sel, Number(e.target.value)))}
                     disabled={isSensorStreaming}
-                    className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                    data-testid="sensor-fps"
+                    className="select-rs text-xs py-0.5"
                   >
-                    {availableFps.map((fps) => (
+                    {fpsOptions(profiles).map((fps) => (
                       <option key={fps} value={fps}>
                         {fps}
                       </option>
@@ -772,14 +749,17 @@ function SensorPanel({
             )}
 
             <div className="space-y-1">
-              {streams.map((config) => (
+              {sel && streams.map((config) => (
                 <StreamConfigItem
                   key={`${config.sensor_id}-${config.stream_type}`}
                   config={config}
-                  sensor={sensor}
-                  onUpdate={onUpdateStreamConfig}
+                  formats={formatOptions(profiles, config.stream_type)}
+                  fpsChoices={fpsOptions(profiles, config.stream_type)}
+                  onToggle={(enable) => commit(applyToggle(profiles, sel, config.stream_type, enable))}
+                  onFormat={(format) => commit(applyFormat(profiles, sel, config.stream_type, format))}
+                  onFps={(framerate) => commit(withStream(sel, config.stream_type, { framerate }))}
                   disabled={isSensorStreaming}
-                  isMotionSensor={sensorConfig?.isMotionSensor ?? false}
+                  perStreamFps={!shared}
                 />
               ))}
             </div>
@@ -789,7 +769,7 @@ function SensorPanel({
         {modifiedCount > 0 && (
           <button
             onClick={() => restore(groups)}
-            className="w-full flex items-center justify-center gap-1 p-1 bg-gray-700/50 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors"
+            className="w-full flex items-center justify-center gap-1 p-1 bg-rs-border/40 border border-rs-border hover:border-rs-dim hover:text-rs-text rounded text-xs text-rs-muted transition-colors"
           >
             <RefreshCcw className="w-3 h-3" />
             Restore All Defaults
@@ -818,7 +798,7 @@ function SensorPanel({
         })}
 
         {nothingMatches && (
-          <p className="text-gray-500 text-xs py-1">
+          <p className="text-rs-dim text-xs py-1">
             No controls match “{searchQuery.trim()}”.
           </p>
         )}
@@ -829,47 +809,29 @@ function SensorPanel({
 
 interface StreamConfigItemProps {
   config: StreamConfig
-  sensor: SensorInfo
-  onUpdate: (config: StreamConfig) => void
+  formats: string[] // every format the stream has; picking one moves the rest to fit
+  fpsChoices: number[] // motion streams set their own fps
+  onToggle: (enable: boolean) => void
+  onFormat: (format: string) => void
+  onFps: (fps: number) => void
   disabled: boolean
-  isMotionSensor: boolean
+  perStreamFps: boolean
 }
 
-function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }: StreamConfigItemProps) {
-  const profile = sensor.supported_stream_profiles.find((p) =>
-    p.stream_type.toLowerCase() === config.stream_type.toLowerCase()
-  )
-
-  // Don't render if no matching profile found (sensor doesn't support this stream)
-  if (!profile) return null
-
-  const getStreamColor = (type: string) => {
-    const colors: Record<string, string> = {
-      depth: 'text-blue-400',
-      color: 'text-green-400',
-      infrared: 'text-purple-400',
-      fisheye: 'text-yellow-400',
-      gyro: 'text-red-400',
-      accel: 'text-orange-400',
-    }
-    return colors[type.toLowerCase()] || 'text-gray-400'
-  }
-
-  // Available FPS options for this stream profile
-  const availableFps = [...profile.fps].sort((a, b) => a - b)
-
+function StreamConfigItem({ config, formats, fpsChoices, onToggle, onFormat, onFps, disabled, perStreamFps }: StreamConfigItemProps) {
   return (
     <div className="flex items-center gap-2 py-0.5 flex-wrap">
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
           checked={config.enable}
-          onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
+          onChange={(e) => onToggle(e.target.checked)}
           disabled={disabled}
           className="control-checkbox w-3 h-3 flex-shrink-0"
           data-testid={`toggle-stream-${config.stream_type.toLowerCase()}`}
         />
-        <span className={`text-xs font-semibold min-w-[50px] ${getStreamColor(config.stream_type)}`}>
+        {/* Same color whether or not the stream is selected; the checkbox carries that state. */}
+        <span className="text-xs font-semibold min-w-[50px] text-rs-muted">
           {config.stream_type.toUpperCase()}
         </span>
       </label>
@@ -877,11 +839,11 @@ function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }
       {config.enable && (
         <select
           value={config.format}
-          onChange={(e) => onUpdate({ ...config, format: e.target.value })}
+          onChange={(e) => onFormat(e.target.value)}
           disabled={disabled}
-          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs max-w-[100px]"
+          className="select-rs text-xs py-0.5 max-w-[100px]"
         >
-          {profile.formats.map((format) => (
+          {formats.map((format) => (
             <option key={format} value={format}>
               {format}
             </option>
@@ -889,14 +851,14 @@ function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }
         </select>
       )}
       {/* Per-stream FPS selector for motion sensors */}
-      {config.enable && isMotionSensor && (
+      {config.enable && perStreamFps && (
         <select
           value={config.framerate}
-          onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}
+          onChange={(e) => onFps(Number(e.target.value))}
           disabled={disabled}
-          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs w-[70px]"
+          className="select-rs text-xs py-0.5 w-[70px]"
         >
-          {availableFps.map((fps) => (
+          {fpsChoices.map((fps) => (
             <option key={fps} value={fps}>
               {fps}Hz
             </option>
@@ -915,18 +877,18 @@ interface ControlsSearchBoxProps {
 function ControlsSearchBox({ value, onChange }: ControlsSearchBoxProps) {
   return (
     <div className="relative mb-2">
-      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-rs-dim pointer-events-none" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search controls…"
-        className="w-full pl-7 pr-7 py-1.5 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-rs-blue text-xs"
+        className="w-full pl-7 pr-7 py-1.5 bg-rs-darker/70 border border-rs-border rounded-lg text-rs-text placeholder-rs-dim shadow-inner focus:outline-none focus:border-rs-accent focus:ring-1 focus:ring-rs-accent/40 transition-colors text-xs"
       />
       {value && (
         <button
           onClick={() => onChange('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-rs-dim hover:text-rs-text transition-colors"
           title="Clear search"
         >
           <X className="w-3.5 h-3.5" />
@@ -975,13 +937,13 @@ function ControlSection({
     <Collapsible
       variant="section"
       forcedOpen={searching}
-      label={<span className="text-xs font-medium text-gray-300">{title}</span>}
+      label={<span className="text-xs font-semibold text-rs-text">{title}</span>}
       aside={
         <>
           {modified && (
             <button
               onClick={(e) => { e.stopPropagation(); onRestoreDefaults(); }}
-              className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-blue hover:text-blue-400"
+              className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-muted hover:text-rs-accent transition-colors"
               title={`Restore ${title} to defaults`}
             >
               <RefreshCcw className="w-3 h-3" />
@@ -989,13 +951,13 @@ function ControlSection({
           )}
           {sectionSwitch && (
             <span className="pr-1">
-              <ToggleSwitch enabled={sectionSwitch.enabled} onToggle={sectionSwitch.onToggle} />
+              <ToggleSwitch enabled={sectionSwitch.enabled} onClick={sectionSwitch.onToggle} />
             </span>
           )}
         </>
       }
     >
-      <div className="p-1.5 space-y-1 bg-gray-800/30">
+      <div className="p-1.5 space-y-1 bg-rs-darker/40">
         {matching.map(({ key, group, options }) => {
           const controls = options.map(option => (
             <OptionControl
@@ -1008,16 +970,16 @@ function ControlSection({
             <Collapsible
               key={key}
               variant="group"
-              label={<span className="text-xs font-medium text-gray-200">{optionLabel(group.name)}</span>}
+              label={<span className="text-xs font-medium text-rs-text">{optionLabel(group.name)}</span>}
               forcedOpen={searching}
               aside={group.enabled !== undefined && (
                 <ToggleSwitch
                   enabled={group.enabled}
-                  onToggle={() => onToggleGroup(key, !group.enabled)}
+                  onClick={() => onToggleGroup(key, !group.enabled)}
                 />
               )}
             >
-              <div className="p-1.5 space-y-1 bg-gray-800/50">{controls}</div>
+              <div className="p-1.5 space-y-1 bg-rs-darker/50">{controls}</div>
             </Collapsible>
           )
         })}
@@ -1079,17 +1041,17 @@ function OptionControl({ option, onSet }: OptionControlProps) {
   }
 
   return (
-    <div className="bg-gray-800/30 rounded p-1.5 text-xs">
+    <div className="bg-rs-inset/50 border border-rs-border/50 rounded p-1.5 text-xs" data-testid={`option-${option.option_id}`}>
       <div className="flex items-center justify-between mb-0.5">
-        <label className="font-medium truncate text-gray-300 flex-1" title={option.description}>
+        <label className="font-medium truncate text-rs-text flex-1" title={option.description}>
           {optionLabel(option.option_id)}
         </label>
         <div className="flex items-center gap-1">
-          {option.units && <span className="text-gray-500">{option.units}</span>}
+          {option.units && <span className="text-rs-muted">{option.units}</span>}
           {!option.read_only && isModified && (
             <button
               onClick={handleRestoreDefault}
-              className="text-gray-500 hover:text-rs-blue transition-colors"
+              className="text-rs-dim hover:text-rs-accent transition-colors"
               title={`Restore default (${getDefaultDisplay()})`}
             >
               <RefreshCcw className="w-3 h-3" />
@@ -1099,12 +1061,12 @@ function OptionControl({ option, onSet }: OptionControlProps) {
       </div>
 
       {option.read_only ? (
-        <div className="text-gray-400">{String(localValue)}</div>
+        <div className="text-rs-text nums">{String(localValue)}</div>
       ) : isEnum ? (
         <select
           value={String(Math.round(Number(localValue)))}
           onChange={(e) => handleChange(Number(e.target.value))}
-          className="w-full bg-gray-700 text-white rounded px-1 py-0.5 border border-gray-600 focus:border-rs-blue focus:outline-none"
+          className="select-rs w-full py-0.5"
         >
           {Object.entries(option.value_descriptions!).map(([val, desc]) => (
             <option key={val} value={val}>
@@ -1120,7 +1082,7 @@ function OptionControl({ option, onSet }: OptionControlProps) {
             onChange={(e) => handleChange(e.target.checked)}
             className="w-3 h-3"
           />
-          <span className="text-gray-400">{localValue ? 'On' : 'Off'}</span>
+          <span className="text-rs-text">{localValue ? 'On' : 'Off'}</span>
         </label>
       ) : isSlider ? (
         <div className="flex items-center gap-1">
@@ -1135,7 +1097,7 @@ function OptionControl({ option, onSet }: OptionControlProps) {
             onTouchEnd={() => handleChange(Number(localValue))}
             className="flex-1 h-1"
           />
-          <span className="text-gray-400 w-10 text-right">
+          <span className="text-rs-text w-10 text-right nums">
             {typeof localValue === 'number'
               ? localValue.toFixed((option.step ?? 0) >= 1 ? 0 : 2)
               : localValue}
@@ -1147,7 +1109,7 @@ function OptionControl({ option, onSet }: OptionControlProps) {
           value={String(localValue)}
           onChange={(e) => setLocalValue(e.target.value)}
           onBlur={() => handleChange(localValue)}
-          className="w-full bg-gray-700 text-white rounded px-1 py-0.5"
+          className="w-full bg-rs-darker/70 text-rs-text border border-rs-border rounded px-1 py-0.5 shadow-inner focus:border-rs-accent focus:outline-none"
         />
       )}
     </div>

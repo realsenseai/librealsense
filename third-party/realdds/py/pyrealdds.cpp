@@ -1113,7 +1113,11 @@ PYBIND11_MODULE(NAME, m) {
         .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a )
         .def( "set_gyro_intrinsics", &dds_motion_stream_server::set_gyro_intrinsics )
         .def( "set_accel_intrinsics", &dds_motion_stream_server::set_accel_intrinsics )
-        .def( "start_streaming", &dds_motion_stream_server::start_streaming );
+        .def( "start_streaming", &dds_motion_stream_server::start_streaming )
+        .def( "publish_motion",
+              []( dds_motion_stream_server & self, imu_msg & imu ) { self.publish_motion( std::move( imu ) ); },
+              py::call_guard< py::gil_scoped_release >(),
+              "imu"_a );
 
     using realdds::dds_perception_stream_server;
     py::class_< dds_perception_stream_server, std::shared_ptr< dds_perception_stream_server > >

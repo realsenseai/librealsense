@@ -11,6 +11,7 @@ set(PYRS_CPP
     pyrs_eth_config.cpp
     pyrs_export.cpp
     pyrs_frame.cpp
+    pyrs_nn.cpp
     pyrs_internal.cpp
     pyrs_options.cpp
     pyrs_pipeline.cpp
@@ -73,10 +74,8 @@ if(WIN32)
 endif()
 
 if(${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)
-    list(APPEND RAW_RS
-        ../../src/linux/backend-v4l2.cpp
-        ../../src/linux/backend-hid.cpp
-    )
+    # LRS_V4L2_SOURCES is set by src/linux/CMakeLists.txt, which the root CMakeLists includes first.
+    list(APPEND RAW_RS ${LRS_V4L2_SOURCES})
 endif()
 
 if(${BACKEND} STREQUAL RS2_USE_WMF_BACKEND)
@@ -98,12 +97,6 @@ if(${FORCE_RSUSB_BACKEND})
         ../../src/hid/hid-device.cpp
         ../../src/hid/hid-device.h
     )
-    if(APPLE)
-        list(APPEND RAW_RS
-            ../../third-party/hidapi/hidapi.cpp
-            ../../third-party/hidapi/hidapi.h
-        )
-    endif()
 endif()
 
 if(${BUILD_EASYLOGGINGPP})
@@ -134,6 +127,10 @@ if( BUILD_LEGACY_PYBACKEND )
         add_dependencies(pybackend2 libusb)
     endif()
     target_link_libraries(pybackend2 PRIVATE rsutils usb ${CMAKE_THREAD_LIBS_INIT})
+    if(${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)
+        target_link_libraries(pybackend2 PRIVATE ${LRS_V4L2_LINK_LIBS})
+        target_include_directories(pybackend2 PRIVATE ${LRS_V4L2_INCLUDE_DIRS})
+    endif()
     set_target_properties(pybackend2 PROPERTIES
                             VERSION     ${REALSENSE_VERSION_STRING}
                             SOVERSION   ${REALSENSE_VERSION_MAJOR})
@@ -142,12 +139,6 @@ if( BUILD_LEGACY_PYBACKEND )
             FOLDER Library/Python
         )
     target_include_directories(pybackend2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
-
-    if(${FORCE_RSUSB_BACKEND})
-        if(APPLE)
-            target_include_directories(pybackend2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/hidapi/)
-        endif()
-    endif()
 
     if(${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)
         if(UDEV_FOUND)

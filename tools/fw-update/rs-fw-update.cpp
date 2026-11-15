@@ -32,14 +32,20 @@
 
 using rsutils::json;
 
-std::condition_variable cv;
-std::mutex mutex;
 std::string selected_serial_number;
 
-rs2::device new_device;
-rs2::update_device new_fw_update_device;
-
-bool done = false;
+// Device discovery state shared with the devices-changed callbacks. It lives in main() rather than at
+// file scope so the devices it holds - and with them the context and its device-watcher thread - are
+// released before static destruction; as globals they outlived the logger, and a udev event for the
+// freshly updated camera arriving at that moment crashed the tool on exit.
+struct device_discovery
+{
+    std::condition_variable cv;
+    std::mutex mutex;
+    rs2::device new_device;
+    rs2::update_device new_fw_update_device;
+    bool done = false;
+};
 
 std::vector<uint8_t> read_fw_file(std::string file_path)
 {
@@ -148,15 +154,15 @@ void list_devices(rs2::context ctx)
 }
 
 
-void waiting_for_device_to_reconnect(rs2::context& ctx, rs2::cli::value<std::string>& serial_number_arg)
+void waiting_for_device_to_reconnect(rs2::context& ctx, rs2::cli::value<std::string>& serial_number_arg, device_discovery& dd)
 {
     std::cout << std::endl << "Waiting for device to reconnect..." << std::endl;
     {
-        std::unique_lock<std::mutex> lk(mutex);
-        cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&] { return !done || new_device; });
+        std::unique_lock<std::mutex> lk(dd.mutex);
+        dd.cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&] { return !dd.done || dd.new_device; });
     }
 
-    if (done)
+    if (dd.done)
     {
         auto devs = ctx.query_devices();
         for (auto&& d : devs)
@@ -183,7 +189,7 @@ bool is_fw_compatible(const rs2::device& dev, const std::vector< uint8_t >& fw_i
     return true;
 }
 
-int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file_arg)
+int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file_arg, device_discovery& dd)
 {
     std::vector<uint8_t> fw_image = read_firmware_data(file_arg.isSet(), file_arg.getValue());
 
@@ -224,10 +230,10 @@ int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file
                 if (recovery_sn == update_serial_number)
                 {
                     {
-                        std::lock_guard< std::mutex > lk(mutex);
+                        std::lock_guard< std::mutex > lk(dd.mutex);
                         recovery_device_found = true;
                     }
-                    cv.notify_one();
+                    dd.cv.notify_one();
                     break;
                 }
             }
@@ -245,9 +251,9 @@ int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file
         std::cout << "Waiting for new device..." << std::endl;
         if (!d457_recovery_device)
         {
-            std::unique_lock< std::mutex > lk(mutex);
+            std::unique_lock< std::mutex > lk(dd.mutex);
             if (!recovery_device_found
-                && !cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&]() {
+                && !dd.cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&]() {
                     return recovery_device_found;
                     }))
             {
@@ -308,7 +314,7 @@ void backup_flash(rs2::device& d, rs2::cli::value<std::string>& backup_arg)
     }
 }
 
-void update_unsigned_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
+void update_unsigned_fw(rs2::device& d, const std::vector<uint8_t>& fw_image, device_discovery& dd)
 {
     std::cout << std::endl << "Unsigned Firmware update started. Please don't disconnect device!" << std::endl << std::endl;
 
@@ -324,10 +330,10 @@ void update_unsigned_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
         d.as<rs2::updatable>().update_unsigned(fw_image, [&](const float progress) {});
 
     std::cout << std::endl << std::endl << "Unsigned Firmware update done" << std::endl;
-    done = true;
+    dd.done = true;
 }
 
-int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
+int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image, device_discovery& dd)
 {
     if (!is_fw_compatible(d, fw_image))
         return EXIT_FAILURE;
@@ -342,22 +348,22 @@ int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
     // this if statement is also relevant for mipi devices
     if (d.is< rs2::update_device >())
     {
-        new_fw_update_device = d;
+        dd.new_fw_update_device = d;
     }
     else
     {
-        std::unique_lock<std::mutex> lk(mutex);
-        if (!cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&] { return new_fw_update_device; }))
+        std::unique_lock<std::mutex> lk(dd.mutex);
+        if (!dd.cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&] { return dd.new_fw_update_device; }))
         {
             std::cout << std::endl << "Failed to locate a device in FW update mode" << std::endl;
             return EXIT_FAILURE;
         }
     }
 
-    new_device = rs2::device();  // otherwise the wait will exit right away
-    update(new_fw_update_device, fw_image);
+    dd.new_device = rs2::device();  // otherwise the wait will exit right away
+    update(dd.new_fw_update_device, fw_image);
 
-    done = true;
+    dd.done = true;
     return EXIT_SUCCESS;
 }
 
@@ -383,6 +389,7 @@ try
     cmd.add(backup_arg);
 
     auto settings = cmd.process(argc, argv);
+    device_discovery dd;  // declared before ctx so it is destroyed after it, still inside main()
     rs2::context ctx(settings.dump());
 
     if (!list_devices_arg.isSet() && !recover_arg.isSet() && !unsigned_arg.isSet() &&
@@ -416,7 +423,7 @@ try
 
     // Recovery
     if (recover_arg.isSet())
-        return update_recovery_device(ctx, file_arg);
+        return update_recovery_device(ctx, file_arg, dd);
 
     // Update device
     ctx.set_devices_changed_callback([&](rs2::event_information& info)
@@ -428,14 +435,14 @@ try
 
             for (auto&& d : info.get_new_devices())
             {
-                std::lock_guard<std::mutex> lk(mutex);
+                std::lock_guard<std::mutex> lk(dd.mutex);
                 if (d.is_in_recovery_mode() && (d.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID) == update_serial_number))
-                    new_fw_update_device = d;
+                    dd.new_fw_update_device = d;
                 else
-                    new_device = d;
+                    dd.new_device = d;
             }
-            if (new_fw_update_device || new_device)
-                cv.notify_one();
+            if (dd.new_fw_update_device || dd.new_device)
+                dd.cv.notify_one();
         });
 
     auto devs = ctx.query_devices();
@@ -510,11 +517,11 @@ try
 
             if (unsigned_arg.isSet())
             {
-                update_unsigned_fw(d, fw_image);
+                update_unsigned_fw(d, fw_image, dd);
             }
             else
             {
-                int result = update_signed_fw(d, fw_image);
+                int result = update_signed_fw(d, fw_image, dd);
                 if (result != EXIT_SUCCESS)
                     return result;
             }
@@ -532,7 +539,7 @@ try
         return EXIT_FAILURE;
     }
 
-    waiting_for_device_to_reconnect(ctx, serial_number_arg);
+    waiting_for_device_to_reconnect(ctx, serial_number_arg, dd);
 
 
     return EXIT_SUCCESS;

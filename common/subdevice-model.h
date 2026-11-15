@@ -48,6 +48,9 @@ namespace rs2
     // True for D500 devices with a wired-up depth-mapping sensor (occupancy grid / labeled point cloud).
     bool device_has_depth_mapping(const device& dev);
 
+    // Perception streams that are still maturing and get a BETA badge in the UI
+    bool is_beta_stream(rs2_stream type);
+
     class frame_queues
     {
     public:
@@ -80,6 +83,11 @@ namespace rs2
         std::map<int, int> selected_fps_id;
         std::map<int, int> selected_format_id;
     };
+    // True when a sensor exposes color streams - a dedicated RGB sensor, or a stereo module that carries
+    // them too (D500 dual-RGB, D405). Object-detection overlays and their sensor_is_on flag hang off it.
+    bool sensor_has_color_stream( const std::vector< stream_profile > & profiles );
+    // True when a sensor exposes depth streams. Some sensors carries both, so this cannot be inferred from the absence of color.
+    bool sensor_has_depth_stream( const std::vector< stream_profile > & profiles );
 
     class subdevice_model
     {
@@ -119,6 +127,7 @@ namespace rs2
         void pause();
         void resume();
         void wait_for_stop();
+        bool is_stopping();
 
         void update_ui(std::vector<stream_profile> profiles_vec);
         void get_sorted_profiles(std::vector<stream_profile>& profiles);
@@ -128,7 +137,12 @@ namespace rs2
             std::vector<stream_profile>& results, V key, int num_streams, stream_profile& def_p);
 
         void restore_ui_selection() { ui = last_valid_ui; }
-        void store_ui_selection() { last_valid_ui = ui; }
+        // Mark current selection as valid, baseline for detecting user changes in get_supported_profiles
+        void store_ui_selection()
+        {
+            last_valid_ui = ui;
+            prev_stream_enabled = stream_enabled;
+        }
 
         template<typename T>
         bool get_default_selection_index(const std::vector<T>& values, const T& def, int* index)
@@ -155,6 +169,9 @@ namespace rs2
         bool is_depth_calibration_profile() const;
 
         void repopulate_options();
+
+        // How much wider than the default the control pane is; option rows widen by this much
+        float panel_extra_width() const;
 
         viewer_model& viewer;
         std::function<void()> on_frame = [] {};
@@ -222,6 +239,7 @@ namespace rs2
         std::shared_ptr<rs2::yuy_decoder> yuy2rgb;
         std::shared_ptr<rs2::m420_decoder> m420_to_rgb;
         std::shared_ptr<rs2::nv12_decoder> nv12_to_rgb;
+        std::shared_ptr<rs2::mjpeg_decoder> mjpeg_to_rgb;
         std::shared_ptr<rs2::y411_decoder> y411;
 
         std::vector<std::shared_ptr<processing_block_model>> post_processing;
@@ -271,8 +289,16 @@ namespace rs2
         bool draw_formats_combo_box_multiple_resolutions(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1,
             rs2_stream stream_type);
         bool is_multiple_resolutions_supported() const;
+        bool is_d585s() const;
+        bool has_color_streams() const;
+        bool ir_shares_depth_resolution() const;
+        void sync_ir_to_depth_resolution();
+        // In the split resolution UI: whether the profile has the resolution selected for its stream
+        bool is_selected_resolution( const video_stream_profile & profile ) const;
+        bool is_decimation_enabled() const;
         void refresh_multiple_resolutions_state();
         void apply_decimation_resolution_defaults();
+        bool decimation_restricts_stream(rs2_stream stream) const;
         int get_res_id_in_resolutions_array(const std::vector<const char*>& res_chars, const std::pair<int, int>& res) const;
         std::pair<int, int> get_resolution_from_res_chars_id(const std::vector<const char*>& res_chars, int id_in_res_chars) const;
         std::pair<int, int> get_max_resolution(rs2_stream stream) const;

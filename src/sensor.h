@@ -251,6 +251,7 @@ namespace librealsense
             std::function<std::shared_ptr<processing_block>(void)> generate_func);
         void register_processing_block(const processing_block_factory& pbf);
         void register_processing_block(const std::vector<processing_block_factory>& pbfs);
+        void set_frame_stream_resolver( rs2_stream stream, formats_converter::frame_stream_resolver resolver );
 
         std::shared_ptr< raw_sensor_base > const & get_raw_sensor() const { return _raw_sensor; }
         rs2_frame_callback_sptr get_frames_callback() const override;
