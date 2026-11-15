@@ -49,6 +49,8 @@ export function openFrameStream(
     const created = { worker, state: 'connecting' as FrameStreamState, listeners: new Set<Listener>() }
     worker.onmessage = ({ data }) => {
       if ('state' in data) created.state = data.state
+      // A closed socket is done: its listeners keep it, but the next open makes a new one
+      if (data.state === 'closed' && sockets.get(url) === created) sockets.delete(url)
       created.listeners.forEach(l => ('state' in data ? l.onState(data.state) : l.onFrame(data)))
     }
     worker.postMessage({ url })
@@ -62,6 +64,6 @@ export function openFrameStream(
     socket.listeners.delete(listener)
     if (socket.listeners.size) return
     socket.worker.terminate()
-    sockets.delete(url)
+    if (sockets.get(url) === socket) sockets.delete(url)
   }
 }
