@@ -155,7 +155,7 @@ def main():
                 set_mode( serial, '3c', hub )
             except Exception as e:
                 log.e( f'FAILED to restore {serial} to 3C: {e}' )
-                os._exit( 1 )
+                sys.exit( 1 )
     except RuntimeError as e:
         log.e( e )
         return 1
