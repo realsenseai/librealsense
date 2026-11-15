@@ -8,8 +8,8 @@ Switch a LibCI D585 between its two sensor configurations:
     2c   dual RGB                 (sensors_config_mode = 1)
 
 Usage:
-    d585-config-mode.py set 2c [--serial SN] [--device-map FILE]
-    d585-config-mode.py run 2c [--serial SN] [--device-map FILE] -- <command...>
+    infra/d585-config-mode.py set 2c [--serial SN] [--device-map FILE]
+    infra/d585-config-mode.py run 2c [--serial SN] [--device-map FILE] -- <command...>
 
 The D585 (not D585S) is taken from --serial, else from this machine's entry in the device map
 (default: the LibCI home's device-map.yaml), else it is the one that enumerates. Like a test session,
@@ -25,7 +25,7 @@ import subprocess
 import sys
 import time
 
-sys.path.insert( 1, os.path.join( os.path.dirname( os.path.abspath( __file__ ) ), 'py' ))
+sys.path.insert( 1, os.path.join( os.path.dirname( os.path.dirname( os.path.abspath( __file__ ) )), 'py' ))
 from rspy import log, devices, device_map
 
 rs = devices.rs
