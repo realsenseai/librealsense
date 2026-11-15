@@ -92,7 +92,7 @@ namespace librealsense
         std::map<uint32_t, std::shared_ptr<playback_sensor>> m_active_sensors;
         std::atomic<double> m_sample_rate;
         std::atomic_bool m_real_time;
-        device_serializer::nanoseconds m_prev_timestamp;
+        std::atomic< device_serializer::nanoseconds > m_prev_timestamp;
         std::vector< std::shared_ptr< rsutils::lazy< rs2_extrinsics > > > m_extrinsics_fetchers;
         std::map<int, std::pair<uint32_t, rs2_extrinsics>> m_extrinsics_map;
         device_serializer::nanoseconds m_last_published_timestamp;
