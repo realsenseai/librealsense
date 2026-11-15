@@ -196,9 +196,11 @@ def mapping(device, request):
         pytest.skip( "These admission checks exercise the USB/GMSL SDK, not the DDS proxy" )
     stream, segmented = request.param
     sensor, profile = perception( device, getattr( rs.stream, stream ) )
-    if not sensor.supports( rs.option.lpcl_segmentation ):
+    if sensor.supports( rs.option.lpcl_segmentation ):
+        sensor.set_option( rs.option.lpcl_segmentation, segmented )
+    elif stream == 'labeled_point_cloud' or segmented:
         pytest.skip( "No Mapping segmentation control" )
-    sensor.set_option( rs.option.lpcl_segmentation, segmented )
+    # Basic Occupancy coverage must also run on devices without segmentation control.
     return sensor, profile
 
 
