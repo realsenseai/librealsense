@@ -73,7 +73,10 @@ def get_color_sensor( device ):
     """
     try:
         return device.first_color_sensor()
-    except RuntimeError:
+    except RuntimeError as e:
+        # Fall back only when there is no color sensor; any other device error propagates
+        if 'Could not find requested sensor type' not in str( e ):
+            raise
         ds = device.first_depth_sensor()
         if any( p.stream_type() == rs.stream.color for p in ds.profiles ):
             return ds
