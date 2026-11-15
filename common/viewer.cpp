@@ -800,6 +800,7 @@ namespace rs2
             {
                 // Debian packages before the D555 IMU fix installed the rules under this name
                 udev_rules_deb = "/lib/udev/rules.d/60-librealsense2-udev-rules.rules";
+                f_deb.clear();
                 f_deb.open(udev_rules_deb);
             }
 
