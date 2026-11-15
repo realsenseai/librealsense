@@ -226,7 +226,9 @@ def test_enable_while_streaming(filters, mode):
     assert enabled == (mode in LIVE_ENABLE), f"{mode} {_describe(supported[0])}: filter {'not ' if not enabled else ''}enabled"
 
 
-def test_downscale_x4_with_decimation_rejected(filters):
+@pytest.mark.context("nightly")
+@pytest.mark.parametrize("temporal_enabled", (0, 1))
+def test_downscale_x4_with_decimation_streams(filters, temporal_enabled):
     sensor, icr, decimation = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
@@ -234,5 +236,22 @@ def test_downscale_x4_with_decimation_rejected(filters):
 
     _set_decimation(decimation, 1)
     _set_icr(icr, "downscale_x4", 1)
-    with pytest.raises(RuntimeError, match="cannot be combined with the embedded Decimation filter"):
-        sensor.open(profile)
+    temporal_id = rs.composite_option_id.temporal_filter_dpp
+    temporal = _find_filter(sensor, temporal_id)
+    assert temporal is not None
+    cfg = temporal.get_temporal_filter_dpp_config(temporal_id)
+    cfg.enabled = temporal_enabled
+    temporal.set_temporal_filter_dpp_config(temporal_id, cfg)
+    queue = rs.frame_queue(10)
+    try:
+        with _streaming(sensor, profile, queue.enqueue):
+            samples = []
+            for _ in range(30):
+                frame = queue.wait_for_frame(5000)
+                video = frame.as_video_frame()
+                assert (video.width(), video.height(), frame.get_data_size()) == (640, 360, 460800)
+                samples.append((frame.get_frame_number(), frame.get_timestamp()))
+            assert all(b[0] > a[0] and b[1] > a[1] for a, b in zip(samples, samples[1:]))
+    finally:
+        cfg.enabled = 0
+        temporal.set_temporal_filter_dpp_config(temporal_id, cfg)

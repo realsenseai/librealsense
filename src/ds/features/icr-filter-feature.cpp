@@ -14,7 +14,6 @@
 
 #include <librealsense2/h/rs_composite_option.h>
 #include <librealsense2/h/rs_icr_control.h>
-#include <librealsense2/h/rs_decimation_filter_dpp.h>
 
 #include <cstddef>
 #include <algorithm>
@@ -51,40 +50,11 @@ static std::shared_ptr< video_stream_profile_interface > find_depth_profile( con
     return nullptr;
 }
 
-static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
-{
-    for( auto & filter : depth_sensor.get_supported_embedded_filters() )
-        if( filter->supports_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) )
-        {
-            rs2_decimation_filter_dpp_config cfg;
-            std::vector< uint8_t > raw;
-            try
-            {
-                raw = filter->get_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ).get_raw();
-            }
-            catch( const std::exception & e )
-            {
-                LOG_WARNING( "Decimation state unavailable, treating it as disabled: " << e.what() );
-                return false;
-            }
-            if( raw.size() != sizeof( cfg ) )
-                return false;
-            std::memcpy( &cfg, raw.data(), sizeof( cfg ) );
-            return cfg.enabled != 0;
-        }
-        // DDS exposes Decimation as scalar options
-        else if( filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_DECIMATION )
-            return filter->supports_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED )
-                && filter->get_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED ).query() != 0;
-    return false;
-}
-
 // FW rejects unsupported ICR profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
 // needs a replug) - so the SDK checks the ICR profile limits first: the explicit profile exclusions, FPS up to 30,
 // and integral Secondary dimensions of at least 128 pixels wide for Downscale (480x270 x4 is out as 270 is not
 // divisible by 4, 424x240 x4 as its Secondary is 106 wide).
-static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
-                                  const sensor_interface & depth_sensor )
+static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth )
 {
     if( ! icr_control || size != sizeof( rs2_icr_control ) )
         return;
@@ -106,9 +76,8 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
     if( cfg.mode != RS2_ICR_MODE_DOWNSCALE_HDR )
         return;
     uint32_t const ratio = cfg.downscale_ratio == 2 ? 4 : 2;
-    if( ratio == 4 && embedded_decimation_enabled( depth_sensor ) )
-        throw invalid_value_exception(
-            "Improved Close Range Depth Downscale x4 cannot be combined with the embedded Decimation filter" );
+    // ICR merges the producer frames before embedded Decimation. Its x4 mode
+    // is compatible with the negotiated 640x360 decimated Depth output.
     if( w % ratio != 0 || h % ratio != 0 )
         throw invalid_value_exception( rsutils::string::from()
             << "Improved Close Range Depth Downscale x" << ratio << " requires Depth dimensions divisible by " << ratio
@@ -143,7 +112,7 @@ public:
         std::memcpy( &cfg, data, sizeof( cfg ) );
         range_check_or_throw( cfg );
         if( auto depth = find_depth_profile( _depth_sensor.get_active_streams() ) )
-            icr_allowed_or_throw( &cfg, sizeof( cfg ), *depth, _depth_sensor );
+            icr_allowed_or_throw( &cfg, sizeof( cfg ), *depth );
 
         _xu->set_raw( &cfg, sizeof( cfg ) );  // FW ignores the read-only min depth fields
     }
@@ -231,7 +200,7 @@ icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface &
 
     // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened
     owner.add_stream_combination_validator(
-        [option, &depth_sensor]( const stream_profiles & requests )
+        [option]( const stream_profiles & requests )
         {
             auto depth = find_depth_profile( requests );
             if( ! depth )
@@ -246,7 +215,7 @@ icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface &
                 LOG_WARNING( "Improved Close Range state unavailable, skipping profile check: " << e.what() );
                 return;
             }
-            icr_allowed_or_throw( raw.data(), raw.size(), *depth, depth_sensor );
+            icr_allowed_or_throw( raw.data(), raw.size(), *depth );
         } );
 }
 
