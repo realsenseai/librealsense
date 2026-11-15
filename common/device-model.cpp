@@ -3276,6 +3276,7 @@ namespace rs2
                 {
                     ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
 
+                    pb->sync_composite_changes( error_message );
                     const bool pb_available = pb->is_available();
                     auto ef_type = pb->get_filter()->get_type();
                     // Decimation is FW-side read-only while depth streams - lock both directions.

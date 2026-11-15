@@ -31,7 +31,7 @@ class Watched:
 
     def toggle(self):
         cfg = self._get(self.id)
-        setattr(cfg, self.field, 1 - getattr(cfg, self.field))
+        setattr(cfg, self.field, 0 if getattr(cfg, self.field) else 1)
         self._set(self.id, cfg)
 
     def restore(self):

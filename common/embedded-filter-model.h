@@ -90,6 +90,9 @@ namespace rs2
 
         void embedded_filter_enable_disable(bool actual, std::string * error_message = nullptr);
 
+        // UI thread: applies composite changes flagged by the options-changed callback to the header toggle
+        void sync_composite_changes( std::string & error_message );
+
     private:
         // The "what to draw" half of each editor - returns whether the user is actively interacting
         // with any field this frame, which the editor's debounce countdown needs.
@@ -116,6 +119,7 @@ namespace rs2
         viewer_model& _viewer;
         subdevice_model * _owner;  // holds this model in its embedded_filters, so it always outlives it
         std::atomic<bool> _destructing;
+        std::atomic<bool> _composite_changed{ false };
         bool _enabled = true;
         std::shared_ptr<rs2::embedded_filter> _embedded_filter;
         std::map< rs2_option, option_model > _options_id_to_model;

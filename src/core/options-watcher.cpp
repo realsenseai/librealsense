@@ -136,14 +136,18 @@ void options_watcher::start()
         return;
     }
 
-    if( _running ) // Already started
+    if( _running.exchange( true ) ) // Already started; the exchange lets only one of concurrent calls spawn the thread
         return;
 
     if( _updater.joinable() ) // A previous thread exited after the last unsubscribe
         _updater.join();
 
-    _running = true;
     _updater = std::thread( [this]() {
+        {
+            // The baseline poll must not touch the device while paused (reset, FW update)
+            std::unique_lock< std::mutex > lock( _mutex );
+            _stopping.wait( lock, [this] { return should_stop() || ! _paused.load(); } );
+        }
         update_options();
         update_composite_options();
         thread_loop();

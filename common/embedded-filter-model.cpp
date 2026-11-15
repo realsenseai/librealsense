@@ -457,8 +457,8 @@ namespace rs2
         // Composite-only embedded filters register no RS2_OPTION_EMBEDDED_FILTER_ENABLED scalar
         // option - route the toggle through the composite option's own `enable` field instead,
         // read-modify-write so the other fields go back as last reported, not zero-initialized.
-        // Only re-read if we don't already have a live-tracked value - once we do, it already
-        // mirrors every write made, so a fresh GET is a needless second XU transaction. The
+        // Only re-read if we don't already have a live-tracked value (or an external change made it stale) - once we
+        // do, it already mirrors every write made, so a fresh GET is a needless second XU transaction. The
         // device itself also rejects this SET while Depth/IR is streaming for Decimation - that
         // rejection surfaces via the caught exception below like any other, no special-casing
         // needed here.
@@ -466,14 +466,11 @@ namespace rs2
         {
             try
             {
-                if( ! _decimation_filter_dpp_editor.initialized )
-                {
-                    _decimation_filter_dpp_editor.value = _embedded_filter->get_composite_option_as< rs2_decimation_filter_dpp_config >(
-                        RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP );
-                    sanitize_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
-                    print_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
-                    _decimation_filter_dpp_editor.initialized = true;
-                }
+                std::string read_error;
+                if( ! _decimation_filter_dpp_editor.ensure_initialized(
+                        _embedded_filter, RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP, read_error, print_decimation_filter_dpp_config ) )
+                    throw std::runtime_error( read_error );
+                sanitize_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
                 _decimation_filter_dpp_editor.value.enabled = actual ? 1 : 0;
                 _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP, _decimation_filter_dpp_editor.value );
                 _enabled = actual;
@@ -494,14 +491,11 @@ namespace rs2
         {
             try
             {
-                if( ! _temporal_filter_dpp_editor.initialized )
-                {
-                    _temporal_filter_dpp_editor.value = _embedded_filter->get_composite_option_as< rs2_temporal_filter_dpp_config >(
-                        RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP );
-                    sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
-                    print_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
-                    _temporal_filter_dpp_editor.initialized = true;
-                }
+                std::string read_error;
+                if( ! _temporal_filter_dpp_editor.ensure_initialized(
+                        _embedded_filter, RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP, read_error, print_temporal_filter_dpp_config ) )
+                    throw std::runtime_error( read_error );
+                sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
                 _temporal_filter_dpp_editor.value.enabled = actual ? 1 : 0;
                 _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP, _temporal_filter_dpp_editor.value );
                 _enabled = actual;
@@ -519,14 +513,11 @@ namespace rs2
         {
             try
             {
-                if( ! _icr_editor.initialized )
-                {
-                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_control >(
-                        RS2_COMPOSITE_OPTION_ICR_CONTROL );
-                    sanitize_icr( _icr_editor.value );
-                    print_icr_control( _icr_editor.value );
-                    _icr_editor.initialized = true;
-                }
+                std::string read_error;
+                if( ! _icr_editor.ensure_initialized(
+                        _embedded_filter, RS2_COMPOSITE_OPTION_ICR_CONTROL, read_error, print_icr_control ) )
+                    throw std::runtime_error( read_error );
+                sanitize_icr( _icr_editor.value );
                 if( ! actual )
                     _icr_editor.value.mode = RS2_ICR_MODE_OFF;
                 else if( _icr_editor.value.mode == RS2_ICR_MODE_OFF )
@@ -626,44 +617,31 @@ namespace rs2
         }
     }
 
+    void embedded_filter_model::sync_composite_changes( std::string & error_message )
+    {
+        if( _composite_changed.exchange( false ) )
+            populate_composite_options( error_message );
+    }
+
     void embedded_filter_model::register_options_changed_callback()
     {
         try
         {
             _embedded_filter->on_options_changed([this](const options_list& list)
                 {
+                    // No device read here: this runs on the sensor's watcher thread and could outlive the model.
+                    // The editors re-read on their next draw, the header toggle via sync_composite_changes().
                     for (auto id : list.get_changed_composite_options())
                     {
-                        if (_destructing)
-                            break;
-                        // The header toggle follows too while the editor is collapsed (not drawn, so not re-reading).
-                        // A failed read must not skip the remaining updates; the editor shows its own error when drawn.
-                        try
-                        {
-                            bool enabled;
-                            if (id == RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP)
-                            {
-                                _decimation_filter_dpp_editor.mark_stale();
-                                enabled = _embedded_filter->get_composite_option_as< rs2_decimation_filter_dpp_config >( id ).enabled != 0;
-                            }
-                            else if (id == RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP)
-                            {
-                                _temporal_filter_dpp_editor.mark_stale();
-                                enabled = _embedded_filter->get_composite_option_as< rs2_temporal_filter_dpp_config >( id ).enabled != 0;
-                            }
-                            else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
-                            {
-                                _icr_editor.mark_stale();
-                                enabled = _embedded_filter->get_composite_option_as< rs2_icr_control >( id ).mode != RS2_ICR_MODE_OFF;
-                            }
-                            else
-                                continue;
-                            // The read blocks, so re-check that the model still exists. Same fallback rule as the draw path:
-                            // a filter with the scalar enable option keeps that as the source of _enabled.
-                            if (!_destructing && !_embedded_filter->supports(RS2_OPTION_EMBEDDED_FILTER_ENABLED))
-                                _enabled = enabled;
-                        }
-                        catch (const std::exception&) {}
+                        if (id == RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP)
+                            _decimation_filter_dpp_editor.mark_stale();
+                        else if (id == RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP)
+                            _temporal_filter_dpp_editor.mark_stale();
+                        else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
+                            _icr_editor.mark_stale();
+                        else
+                            continue;
+                        _composite_changed = true;
                     }
                     for (auto changed_option : list)
                     {
