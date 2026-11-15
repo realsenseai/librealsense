@@ -231,7 +231,7 @@ jobs:
       EXPECTED_CMAKE_MINOR_VER: 10
       # First release of the minimal version line (the real floor), used for the fast path only
       EXPECTED_CMAKE_PATCH_VER: 0
-      # SHA-256 of cmake-<ver>-Linux-x86_64.tar.gz from Kitware/CMake's matching GitHub release
+      # SHA-256 of cmake-<ver>-Linux-x86_64.tar.gz, from https://cmake.org/files/v<major>.<minor>/cmake-<ver>-SHA-256.txt
       EXPECTED_CMAKE_SHA256: 6b5ea290042fac96023fd5387cd65cc69fdf4f48bad91177eb8697ba37e3deb3
     steps:
       - name: Checkout
@@ -246,7 +246,7 @@ jobs:
       - name: "Download minimal CMake"
         run: |
           ver="${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}.${EXPECTED_CMAKE_PATCH_VER}"
-          url="https://github.com/Kitware/CMake/releases/download/v${ver}/cmake-${ver}-Linux-x86_64.tar.gz"
+          url="https://cmake.org/files/v${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}/cmake-${ver}-Linux-x86_64.tar.gz"
           echo "Downloading $url"
           mkdir -p "$RUNNER_TEMP/cmake-min"
           curl -fsSL "$url" -o "$RUNNER_TEMP/cmake-min.tar.gz"

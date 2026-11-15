@@ -17,7 +17,8 @@ log = logging.getLogger(__name__)
 
 
 pytestmark = [
-    pytest.mark.device_each( "D585" ),
+    pytest.mark.device_each( "D555", "D585" ),
+    pytest.mark.device_type_exclude( "DDS" ),   # SDK admission rules are USB/GMSL-only
     pytest.mark.device_exclude( "D585S" ),   # the safety SKU has no perception sensor
     pytest.mark.context( "nightly" ),
 ]
@@ -37,6 +38,10 @@ MD = rs.frame_metadata_value
 def device(test_device):
     dev, _ = test_device
     yield dev
+    close_sensors( dev )
+
+
+def close_sensors(dev):
     for s in dev.query_sensors():        # never hand the next test an open sensor
         for close in ( s.stop, s.close ):
             try:
@@ -153,6 +158,8 @@ def rejected(sensor, profiles, frames, match=None):
 @pytest.mark.parametrize( 'stream', ['object_detection', 'occupancy', 'labeled_point_cloud', 'point_cloud'] )
 def test_standalone_lifecycle(device, stream):
     """Runs with no other capture, resumes after stop, and a second session starts after the first one closed."""
+    if "D555" in device.get_info( rs.camera_info.name ):
+        pytest.skip( "Perception lifecycle metadata checks are D585-only" )
     if stream == 'point_cloud':  # older FW publishes the profiles but delivers no frames
         require_min_fw_version( device, rsutils.version( "7.61.47150" ), "device point cloud" )
     stream_type = getattr( rs.stream, stream )
@@ -171,6 +178,8 @@ def test_standalone_lifecycle(device, stream):
 
 
 def test_pd_and_occ_standalone(device):
+    if "D555" in device.get_info( rs.camera_info.name ):
+        pytest.skip( "Concurrent PD/Occupancy lifecycle checks are D585-only" )
     pd, pd_profile = perception( device, rs.stream.object_detection )
     occ, occ_profile = perception( device, rs.stream.occupancy )
     frames = Collector()
@@ -192,19 +201,23 @@ DEPTH_SOURCES = [( 640, 360, 30 ), ( 1280, 720, 30 ), ( 848, 480, 30 ),
                 ids=['occupancy-seg-off', 'occupancy-seg-on', 'lpcl-seg-off', 'lpcl-seg-on'])
 def mapping(device, request):
     require_min_fw_version( device, rsutils.version("7.61.47181"), "Mapping graph rebuild" )
-    if device.get_info( rs.camera_info.connection_type ) == 'DDS':
-        pytest.skip( "These admission checks exercise the USB/GMSL SDK, not the DDS proxy" )
     stream, segmented = request.param
     sensor, profile = perception( device, getattr( rs.stream, stream ) )
-    if sensor.supports( rs.option.lpcl_segmentation ):
-        sensor.set_option( rs.option.lpcl_segmentation, segmented )
-    elif stream == 'labeled_point_cloud' or segmented:
+    option = rs.option.occupancy_grid_segmentation if stream == 'occupancy' else rs.option.lpcl_segmentation
+    original = sensor.get_option( option ) if sensor.supports( option ) else None
+    if original is None and (stream == 'labeled_point_cloud' or segmented):
         pytest.skip( "No Mapping segmentation control" )
-    # Basic Occupancy coverage must also run on devices without segmentation control.
-    return sensor, profile
+    try:
+        if original is not None:
+            sensor.set_option( option, segmented )
+        yield sensor, profile
+    finally:
+        # These controls are writable only before streaming, including after a failed test.
+        close_sensors( device )
+        if original is not None:
+            sensor.set_option( option, original )
 
 
-@pytest.mark.device_each( "D555" )   # Also exercise USB admission on D555; lifecycle metadata checks remain D585-only.
 @pytest.mark.parametrize( 'source, allowed', [(source, True) for source in DEPTH_SOURCES] + [
     ( ( 640, 360, 15 ), False ),
 ], ids=[f"{w}x{h}" for w, h, _ in DEPTH_SOURCES] + ['rate-mismatch'] )
@@ -225,7 +238,6 @@ def test_occ_after_depth(device, mapping, source, allowed):
     stop( stereo )
 
 
-@pytest.mark.device_each( "D555" )
 @pytest.mark.parametrize( 'source, with_ir, allowed', [(source, False, True) for source in DEPTH_SOURCES] + [
     ( ( 640, 360, 15 ), False, False ),
     ( ( 640, 360, 30 ), True, False ),
