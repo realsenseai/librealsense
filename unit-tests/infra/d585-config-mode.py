@@ -66,11 +66,15 @@ def _wait( serial, timeout, mode = None ):
     return None
 
 
-def _mode( dev ):
+def _option():
     opt = getattr( rs.option, 'sensors_config_mode', None )
     if opt is None:
         raise RuntimeError( 'this pyrealsense2 has no sensors_config_mode option' )
-    return int( dev.first_depth_sensor().get_option( opt ))
+    return opt
+
+
+def _mode( dev ):
+    return int( dev.first_depth_sensor().get_option( _option() ))
 
 
 def inventory_serial( path ):
@@ -101,7 +105,7 @@ def set_mode( serial, key, hub ):
     log.i( f'{serial}: current = {MODE_NAMES.get( cur, cur )}' )
     if cur == target:
         return serial
-    dev.first_depth_sensor().set_option( rs.option.sensors_config_mode, target )
+    dev.first_depth_sensor().set_option( _option(), target )
     log.i( f'{serial}: set to {MODE_NAMES[target]}, resetting...' )
     dev.hardware_reset()
     time.sleep( 3 )
@@ -180,7 +184,7 @@ def main():
             except Exception as e:
                 log.e( f'FAILED to restore {serial} to 3C: {e}' )
                 sys.exit( 1 )
-    except RuntimeError as e:
+    except (RuntimeError, OSError) as e:
         log.e( e )
         return 1
     finally:
