@@ -268,7 +268,7 @@ void formats_converter::prepare_to_convert( stream_profiles from_profiles )
             const auto & matching_profiles_predicate = [&profile]( const std::shared_ptr<stream_profile_interface> & sp ) {
                 return to_profile( profile.get() ) == to_profile( sp.get() );
             };
-            from_profiles.erase( std::remove_if( begin( from_profiles ), end( from_profiles ), matching_profiles_predicate ) );
+            from_profiles.erase( std::remove_if( begin( from_profiles ), end( from_profiles ), matching_profiles_predicate ), end( from_profiles ) );
         }
 
         // Retrieve source profile from cached map and generate the relevant processing block.

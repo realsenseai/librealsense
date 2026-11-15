@@ -1234,8 +1234,8 @@ namespace librealsense
                     hwm_devices.push_back(hwm);
                 }
 
-                auto info = std::make_shared<d400_info>( ctx, std::move( devices ), std::move( hwm_devices ), std::move( hids ) );
                 chosen.insert(chosen.end(), devices.begin(), devices.end());
+                auto info = std::make_shared<d400_info>( ctx, std::move( devices ), std::move( hwm_devices ), std::move( hids ) );
                 results.push_back(info);
 
             }
