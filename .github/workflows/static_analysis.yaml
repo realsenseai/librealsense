@@ -184,6 +184,64 @@ jobs:
             else
                 echo "No ASAN output file found. No errors detected."
             fi
+#---------------------------------------------------------------------------------------------------#
+  # ThreadSanitizer over the camera-free tests; fails on any report not suppressed in tsan.supp
+  TSanCheck:
+    name: TSan Race Check
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04
+    env:
+      LRS_RUN_CONFIG: RelWithDebInfo
+      TSAN_OPTIONS: suppressions=${{ github.workspace }}/.github/workflows/tsan.supp:history_size=4:log_path=${{ github.workspace }}/tsan/log
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - uses: ./.github/actions/install-linux-deps
+
+    - uses: ./.github/actions/linux-build
+      with:
+        cmake-options: >-
+          -DBUILD_EXAMPLES=false
+          -DBUILD_GRAPHICAL_EXAMPLES=false
+          -DBUILD_UNIT_TESTS=true
+          -DBUILD_PYTHON_BINDINGS=true
+          -DCHECK_FOR_UPDATES=false
+          -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
+          -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread
+          -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread
+          -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
+
+    # setarch -R disables ASLR: gcc-13 TSan dies with "unexpected memory mapping" under high-entropy ASLR
+    - name: C++ unit-tests
+      id: cpp
+      continue-on-error: true
+      run: |
+        mkdir -p tsan
+        setarch $(uname -m) -R python3 unit-tests/run-unit-tests.py --no-color --stdout --not-live --context "linux"
+
+    # Python isn't instrumented, so libtsan is preloaded; after setarch, or setarch itself loads it and dies
+    - name: pytest
+      id: pytest
+      continue-on-error: true
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        setarch $(uname -m) -R env LD_PRELOAD=$(gcc -print-file-name=libtsan.so) python3 -m pytest unit-tests/ --color=no -s --not-live --context "linux"
+
+    - name: Upload TSan logs
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      with:
+        name: tsan-logs
+        path: tsan/
+
+    - name: Check TSan results
+      run: |
+        cat tsan/log.* 2>/dev/null || true
+        echo "### TSan: $(cat tsan/log.* 2>/dev/null | grep -c '^WARNING: ThreadSanitizer') reports" >> $GITHUB_STEP_SUMMARY
+        cat tsan/log.* 2>/dev/null | grep '^SUMMARY: ThreadSanitizer' | sort | uniq -c | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY || true
+        cat $GITHUB_STEP_SUMMARY
+        test "${{ steps.cpp.outcome }}" = success -a "${{ steps.pytest.outcome }}" = success -a -z "$(ls tsan)"
   # We verify the minimal CMake version we support is preserved when building with default CMake flags.
   # Fast path: download only the declared minimal CMake version and try to configure with it.
   #            If that works, we are done (a minimal version lower than declared is fine too).

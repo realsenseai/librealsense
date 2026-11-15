@@ -1,0 +1,7 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
+# False positive: the reverse (registry -> logger) order only happens on a logger no other thread can see yet
+deadlock:reconfigure_locked
+# Races inside the OpenCV wheel's own threads, no SDK frames
+race:cv2.abi3.so
