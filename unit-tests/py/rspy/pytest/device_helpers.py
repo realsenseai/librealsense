@@ -64,7 +64,7 @@ def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
     required_types, excluded_types = _build_type_sets(markers)
 
     def passes(sn):
-        if sn in excluded_sns:
+        if sn in excluded_sns or devices.real_serial(sn) in excluded_sns:   # a config variant follows its camera
             return False
         if included_sns is not None and sn not in included_sns:
             return False

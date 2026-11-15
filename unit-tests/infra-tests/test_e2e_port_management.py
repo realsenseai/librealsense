@@ -110,3 +110,13 @@ class TestDevicePortManagement:
         skips."""
         rc, out, *_ = run_e2e("pytest-each.py", "-k", "test_d999_no_match")
         assert_outcomes(out, skipped=1)
+
+    def test_config_variant_switches_camera_and_restores(self):
+        """A 2C config variant powers the physical camera's port, switches it to 2C for the module,
+        yields the real serial, and switches back to 3C at teardown before disabling the port."""
+        rc, out, tracking = run_e2e("pytest-config-variant.py")
+        assert_outcomes(out, passed=1)
+        assert tracking["enable_only_calls"][0]['serials'] == ['111-2c']
+        assert tracking["ensure_calls"] == [['111', '2c'], ['111', '3c']]
+        assert tracking["disable_calls"][-1]['serials'] == ['111-2c']
+
