@@ -16,7 +16,7 @@ The D585 (not D585S) is taken from --serial, else from this machine's entry in t
 the tool powers all hub ports, so a camera that is currently off still comes up.
 
 'run' switches, runs the command, and ALWAYS switches back to 3c, also when the command fails or is
-interrupted. Exit code: the command's; 1 if a switch failed; 3 if this machine has no D585 (nothing ran).
+interrupted. Exit code: the command's; 1 if a switch failed; 100 if this machine has no D585 (nothing ran).
 """
 
 import argparse
@@ -26,14 +26,14 @@ import sys
 import time
 
 sys.path.insert( 1, os.path.join( os.path.dirname( os.path.dirname( os.path.abspath( __file__ ) )), 'py' ))
-from rspy import log, devices, device_map
+from rspy import log, devices, device_map, signals
 
 rs = devices.rs
 
 MODES = { '3c': 0, '2c': 1 }
 MODE_NAMES = { 0: 'Dedicated Color Sensor (3C)', 1: 'Dual RGB (2C)' }
 TIMEOUT = 60       # [sec] to wait for the camera to (re)enumerate
-EXIT_NO_D585 = 3
+EXIT_NO_D585 = 100   # not 3: that is pytest's own 'internal error'
 
 
 def _is_d585( name ):
@@ -117,6 +117,11 @@ def set_mode( serial, key, hub ):
 
 
 def main():
+    argv = sys.argv[1:]
+    command = []
+    if '--' in argv:   # argparse.REMAINDER would swallow the options that precede '--'
+        i = argv.index( '--' )
+        argv, command = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser( description = __doc__, formatter_class = argparse.RawDescriptionHelpFormatter )
     sub = ap.add_subparsers( dest = 'cmd', required = True )
     for name in ('set', 'run'):
@@ -124,9 +129,9 @@ def main():
         p.add_argument( 'mode', choices = MODES )
         p.add_argument( '--serial' )
         p.add_argument( '--device-map' )
-        if name == 'run':
-            p.add_argument( 'command', nargs = argparse.REMAINDER )
-    args = ap.parse_args()
+    args = ap.parse_args( argv )
+    if args.cmd == 'run' and not command:
+        ap.error( 'run: no command given (after --)' )
 
     serial = args.serial
     if not serial:
@@ -139,20 +144,39 @@ def main():
     hub = devices.hub
     if hub and not hub.is_connected():
         hub.connect()
+    proc = None
+    def restore():
+        if proc and proc.poll() is None:   # aborted while the command is running
+            proc.terminate()
+            try:
+                proc.wait( 30 )
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        if hub and not hub.is_connected():
+            hub.connect()
+        log.i( f'{serial or ""}: restoring 3C' )
+        set_mode( serial, '3c', hub )
+
     try:
         if args.cmd == 'set':
             set_mode( serial, args.mode, hub )
             return 0
-        command = args.command[1:] if args.command[:1] == ['--'] else args.command
-        if not command:
-            sys.exit( '-F- run: no command given' )
-        serial = set_mode( serial, args.mode, hub )
+        if not serial:   # no inventory entry for this machine: go by what enumerates
+            if hub:
+                hub.enable_ports()
+            if _wait( None, TIMEOUT ) is None:
+                log.i( 'no D585 enumerated; nothing to do' )
+                return EXIT_NO_D585
+        signals.register_signal_handlers( restore )   # a Jenkins abort must restore 3C too
         try:
-            return subprocess.call( command )
+            serial = set_mode( serial, args.mode, hub )
+            if hub:
+                hub.disconnect()   # the command's own session needs the hub
+            proc = subprocess.Popen( command )
+            return proc.wait()
         finally:
-            log.i( f'{serial}: restoring 3C' )
             try:
-                set_mode( serial, '3c', hub )
+                restore()
             except Exception as e:
                 log.e( f'FAILED to restore {serial} to 3C: {e}' )
                 sys.exit( 1 )
