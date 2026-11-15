@@ -31,8 +31,6 @@ _REQUIRED_MODULES = {
     "uvicorn": "uvicorn",
     "pydantic": "pydantic",
     "multipart": "python-multipart",  # FastAPI File/UploadFile route registration
-    "aiortc": "aiortc",
-    "numpy": "numpy",
     "httpx": "httpx",  # FastAPI TestClient
 }
 
