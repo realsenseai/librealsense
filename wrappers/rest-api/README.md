@@ -9,6 +9,8 @@ It simplifies remote control and data streaming from RealSense devices by handli
 2.  **WebSocket frames:** Each stream's frames as the SDK gives them, one WebSocket per stream.
 3.  **WebSocket events:** `/api/v1/events` tells every client what changed (devices, streaming, firmware updates).
 
+Frames are sent raw (720p depth + color is about 1 Gbit/s), so a slower link drops the FPS; compression for remote viewing is planned (RSDEV-16485).
+
 ## Support Features
 
 *   **Device Management:**

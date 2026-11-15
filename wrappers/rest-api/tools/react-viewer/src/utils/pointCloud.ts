@@ -74,6 +74,8 @@ export const MESH = 2
  * table's, as the 2D view paints it. Returns the number of points.
  */
 export function buildCloud(depth: Frame, rays: Float32Array, positions: Float32Array, colors: Float32Array, valid: Float32Array, texture?: Texture): number {
+  // Only Z16 is depth: with Depth to Disparity on alone, the stream is float disparity
+  if (depth.header.format !== 'z16') return valid.fill(NO_POINT), 0
   const { width = 0, height = 0, stride = 0, bpp = 1, units = 0.001 } = depth.header
   const d = new Uint16Array(depth.pixels)
   const table = depth.colorTable

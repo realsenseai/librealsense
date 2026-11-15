@@ -146,7 +146,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, profile, s
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
 
-  const { state: connectionState, fps, header } = useFrameStream(deviceId, profile, showMetadata, (frame) => {
+  const { state: connectionState, fps, hardwareFps, header } = useFrameStream(deviceId, profile, showMetadata, (frame) => {
     renderer.current ??= new FrameRenderer(canvasRef.current!)
     setUnsupportedFormat(renderer.current.draw(frame) ? null : frame.header.format)
     latestFrame.current = frame
@@ -167,7 +167,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, profile, s
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const frame = latestFrame.current
-      if (!isDepthStream || showMetadata || !containerRef.current || !frame) return
+      if (!isDepthStream || showMetadata || !containerRef.current || frame?.header.format !== 'z16') return
       const { width = 0, height = 0, stride = 0, bpp = 1, units } = frame.header
 
       const rect = containerRef.current.getBoundingClientRect()
@@ -239,6 +239,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, profile, s
         profile={profile}
         streamType={streamType}
         fps={fps}
+        hardwareFps={hardwareFps}
         show={showMetadata}
         onToggle={setShowMetadata}
         buttonClassName={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 py-1`}
@@ -282,7 +283,7 @@ function IMUStreamTile({ deviceId, streamType, profile, showDeviceName, deviceNa
   const [points, setPoints] = useState<IMUChartPoint[]>([])
   const [showGraph, setShowGraph] = useState(false)
   const [showMetadata, setShowMetadata] = useState(false)
-  const { fps, header } = useFrameStream(deviceId, profile, showMetadata, (frame) => {
+  const { fps, hardwareFps, header } = useFrameStream(deviceId, profile, showMetadata, (frame) => {
     const [x, y, z] = new Float32Array(frame.pixels) // a motion frame's data starts with float32 x, y, z
     setPoints((prev) => appendIMUPoint(prev, { x, y, z }, Date.now()))
   })
@@ -322,6 +323,7 @@ function IMUStreamTile({ deviceId, streamType, profile, showDeviceName, deviceNa
             profile={profile}
             streamType={streamType}
             fps={fps}
+            hardwareFps={hardwareFps}
             show={showMetadata}
             onToggle={setShowMetadata}
           />
@@ -352,9 +354,10 @@ interface MetadataOverlayProps {
   header: FrameHeader
   profile: SupportedStreamProfile
   fps: number
+  hardwareFps: number
 }
 
-export function MetadataOverlay({ streamType, header, profile, fps }: MetadataOverlayProps) {
+export function MetadataOverlay({ streamType, header, profile, fps, hardwareFps }: MetadataOverlayProps) {
   const isVideo = header.width !== undefined
   // Mirrors C++ viewer (common/stream-model.cpp): when SDK falls back to system_time,
   // per-frame metadata is unavailable from the kernel UVC driver.
@@ -373,7 +376,7 @@ export function MetadataOverlay({ streamType, header, profile, fps }: MetadataOv
           <MetadataItem label="Pixel Format" value={header.format.toUpperCase()} />
           <MetadataItem label="Hardware Size" value={isVideo ? `${profile.width}×${profile.height}` : undefined} />
           <MetadataItem label="Display Size" value={isVideo ? `${header.width}×${header.height}` : undefined} />
-          <MetadataItem label="Hardware FPS" value={profile.fps} />
+          <MetadataItem label="Hardware FPS" value={hardwareFps} />
           <MetadataItem label="Viewer FPS" value={fps} />
         </div>
       </div>
@@ -400,12 +403,13 @@ interface MetadataPanelProps {
   profile: SupportedStreamProfile
   streamType: string
   fps: number
+  hardwareFps: number
   show: boolean
   onToggle: (show: boolean) => void
   buttonClassName?: string
 }
 
-export function MetadataPanel({ header, profile, streamType, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
+export function MetadataPanel({ header, profile, streamType, fps, hardwareFps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
   if (!header) return null
   return (
     <>
@@ -418,7 +422,7 @@ export function MetadataPanel({ header, profile, streamType, fps, show, onToggle
       >
         {show ? '✕' : 'Metadata'}
       </button>
-      {show && <MetadataOverlay streamType={streamType} header={header} profile={profile} fps={fps} />}
+      {show && <MetadataOverlay streamType={streamType} header={header} profile={profile} fps={fps} hardwareFps={hardwareFps} />}
     </>
   )
 }

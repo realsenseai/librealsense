@@ -4,7 +4,8 @@ import type { SupportedStreamProfile } from './types'
 
 /**
  * Hands a view its stream's newest frame once per animation frame while it shows it. Also gives
- * the rate frames arrive at, and the newest header for the metadata panel: once, then per animation
+ * the rate frames arrive at, the rate the device made them (from frame numbers and timestamps, as
+ * the legacy viewer's fps_calc: frames dropped on the way still count), and the newest header for the metadata panel: once, then per animation
  * frame while `watchHeader`.
  */
 export function useFrameStream(
@@ -15,12 +16,14 @@ export function useFrameStream(
 ) {
   const [state, setState] = useState<FrameStreamState | null>(null)
   const [fps, setFps] = useState(0)
+  const [hardwareFps, setHardwareFps] = useState(0)
   const [header, setHeader] = useState<FrameHeader | null>(null)
   const handlers = useRef({ onFrame, watchHeader })
   handlers.current = { onFrame, watchHeader }
   useEffect(() => {
     let count = 0
     let since = Date.now()
+    let first: FrameHeader | null = null // the window's first frame
     let newest: Frame | null = null
     let shown: FrameHeader | null = null
     let animation = 0
@@ -31,10 +34,14 @@ export function useFrameStream(
         handlers.current.onFrame(newest!)
         if (!shown || handlers.current.watchHeader) setHeader(shown = newest!.header)
       })
+      first ??= frame.header
       count++
       const now = Date.now()
       if (now - since >= 1000) {
         setFps(+(count * 1000 / (now - since)).toFixed(2))
+        const { frame_number: n, timestamp: t } = frame.header
+        if (t > first.timestamp) setHardwareFps(+((n - first.frame_number) * 1000 / (t - first.timestamp)).toFixed(2))
+        first = frame.header
         count = 0
         since = now
       }
@@ -45,5 +52,5 @@ export function useFrameStream(
       setState(null)
     }
   }, [deviceId, profile]) // the status's profile object lives as long as the sensor streams
-  return { state, fps, header }
+  return { state, fps, hardwareFps, header }
 }
