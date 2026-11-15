@@ -4,6 +4,8 @@
 
 #include <librealsense2/hpp/rs_frame.hpp>
 
+#include <map>
+
 
 namespace librealsense
 {
@@ -18,7 +20,8 @@ namespace librealsense
         bool changed( const rs2::frame & f );
 
     private:
-        calibration_change_device const * _device = nullptr;  // Identity only, never dereferenced
-        unsigned _count = 0;
+        // Per device, so frames alternating between devices still see each one's changes. Keys are identity only,
+        // never dereferenced: a new device reusing a freed one's address costs at most one extra re-read.
+        std::map< calibration_change_device const *, unsigned > _counts;
     };
 }

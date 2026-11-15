@@ -317,6 +317,12 @@ namespace librealsense
         if (auto composite = f.as<rs2::frameset>())
         {
             auto texture = composite.first(_stream_filter.stream);
+            for( auto && candidate : composite )  // The mapped one by index too, as below
+                if( _stream_filter.match( candidate ) )
+                {
+                    texture = candidate;
+                    break;
+                }
             inspect_other_frame(texture);
 
             auto depth = composite.first(RS2_STREAM_DEPTH, RS2_FORMAT_Z16);

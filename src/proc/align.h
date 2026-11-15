@@ -3,6 +3,7 @@
 #pragma once
 
 #include "synthetic-stream.h"
+#include "calibration-change-tracker.h"
 
 #include <src/basics.h>
 #include <map>
@@ -46,6 +47,7 @@ namespace librealsense
 
         rs2_stream _to_stream_type;
         std::map<std::pair<stream_profile_interface*, stream_profile_interface*>, std::shared_ptr<rs2::video_stream_profile>> _align_stream_unique_ids;
+        calibration_change_tracker _calibration;
         rs2::stream_profile _source_stream_profile;
         float _depth_scale;
 

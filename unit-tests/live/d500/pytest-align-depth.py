@@ -192,10 +192,16 @@ def test_mode_change_is_published_as_calibration_change(test_device, depth_senso
     if color is None:
         pytest.skip("device has no dedicated color sensor")
 
+    # There is no unregister, so the callback outlives the test; it records only while the test runs
     heard = []
+    listening = [True]
     rs.calibration_change_device(dev).register_calibration_change_callback(
-        lambda status: heard.append((status, profile.get_intrinsics().fx, profile.get_extrinsics_to(color).translation)))
-    set_align_depth(depth_sensor, 1)
+        lambda status: listening[0] and heard.append(
+            (status, profile.get_intrinsics().fx, profile.get_extrinsics_to(color).translation)))
+    try:
+        set_align_depth(depth_sensor, 1)
+    finally:
+        listening[0] = False
 
     assert len(heard) == 1
     status, fx, translation = heard[0]

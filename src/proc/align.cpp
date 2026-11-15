@@ -284,6 +284,10 @@ namespace librealsense
         std::vector<rs2::frame> output_frames;
         std::vector<rs2::frame> other_frames;
 
+        // Aligned profiles carry a snapshot of the target's intrinsics
+        if( _calibration.changed( f ) )
+            _align_stream_unique_ids.clear();
+
         auto frames = f.as<rs2::frameset>();
         auto depth = frames.first_or_default(RS2_STREAM_DEPTH, RS2_FORMAT_Z16).as<rs2::depth_frame>();
 

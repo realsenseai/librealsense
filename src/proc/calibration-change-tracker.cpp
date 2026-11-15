@@ -18,9 +18,14 @@ namespace librealsense
             return false;
 
         unsigned const count = dev->get_calibration_change_count();
-        bool const changed = dev == _device && count != _count;
-        _device = dev;
-        _count = count;
+        auto it = _counts.find( dev );
+        if( it == _counts.end() )
+        {
+            _counts.emplace( dev, count );
+            return false;
+        }
+        bool const changed = count != it->second;
+        it->second = count;
         return changed;
     }
 }
