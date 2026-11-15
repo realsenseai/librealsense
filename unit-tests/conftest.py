@@ -53,7 +53,7 @@ _debug_requested = '--debug' in sys.argv
 from rspy import python_path
 python_path.block_user_site_for({'pyrealsense2', 'pyrealdds', 'pyrsutils'})
 
-from rspy import devices, repo
+from rspy import devices, repo, d585_config
 from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
@@ -401,6 +401,7 @@ def pytest_configure(config):
             enable_dds = 'dds' in context_list
             devices.query(hub_reset=hub_reset, disable_dds=not enable_dds)
             devices.map_unknown_ports()
+            devices.add_config_variants()
         except Exception as e:
             log.warning(f"Failed to query devices during configuration: {e}")
         try:
@@ -789,6 +790,13 @@ def module_log(request, _test_device_serial):
         _create_log_aliases(request.config, str(request.node.fspath), device_id)
 
 
+def _restore_3c(serial):
+    try:
+        d585_config.ensure(serial, '3c')
+    except Exception as e:
+        log.warning(f"Failed to switch {serial} back to 3C: {e}")
+
+
 @pytest.fixture(scope="module", autouse=True)
 def module_device_setup(request, _test_device_serial, __pytest_repeat_step_number, module_log):
     """Power the target device(s) on for the module and off again at teardown — once per
@@ -920,7 +928,20 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
             log.warning(f"Cleanup after failed enable raised: {cleanup_err}")
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
 
-    yield serial_number
+    # A config variant (e.g. a D585 in 2C) is the same camera: switch it for this module and back at teardown
+    real_serial = devices.real_serial(serial_number)
+    if real_serial != serial_number:
+        try:
+            d585_config.ensure(real_serial, '2c')
+        except Exception as e:
+            _emit_test_header(item_id)
+            _restore_3c(real_serial)
+            devices.disable([serial_number])
+            pytest.fail(f"Failed to switch {real_serial} to 2C: {e}")
+
+    yield real_serial
+    if real_serial != serial_number:
+        _restore_3c(real_serial)
     _teardown([serial_number])
 
 

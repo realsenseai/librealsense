@@ -398,7 +398,7 @@ def all():
     :return: A set of all device serial-numbers at the time of query()
     """
     global _device_by_sn
-    return _device_by_sn.keys()
+    return { sn for sn, device in _device_by_sn.items() if not hasattr( device, 'base' ) }   # not the config variants
 
 
 def enabled():
@@ -418,6 +418,8 @@ def by_product_line( product_line, ignored_products ):
     global _device_by_sn
     result = set()
     for device in _device_by_sn.values():
+        if hasattr( device, 'base' ):
+            continue   # config variants are only reachable by their name
         if device.product_line.upper() == product_line.upper():
             for ignored_product in ignored_products:
                 if ignored_product.upper() in device.name.upper():
@@ -437,8 +439,12 @@ def by_name( name, ignored_products ):
     result = set()
     ignored_list_as_str = " ".join(ignored_products)
     if name.upper() not in ignored_list_as_str.upper():
+        from rspy import d585_config
         for device in _device_by_sn.values():
-            if device.name and device.name.upper().find( name.upper() ) >= 0:
+            if hasattr( device, 'base' ):
+                if d585_config.name_matches( name, device ):
+                    result.add(device.serial_number)
+            elif device.name and device.name.upper().find( name.upper() ) >= 0:
                 result.add(device.serial_number)
     return result
 
@@ -586,6 +592,22 @@ def get( sn ):
     return _device_by_sn.get(sn)
 
 
+def real_serial( sn ):
+    """:return: the serial of the physical camera behind sn (differs from sn for a config variant)"""
+    device = get( sn )
+    return device.real_serial if hasattr( device, 'base' ) else sn
+
+
+def add_config_variants():
+    """Expose the 2C variant of every D585 that can switch to it (see rspy.d585_config). Call after map_unknown_ports()"""
+    from rspy import d585_config
+    for device in list( _device_by_sn.values() ):
+        if not hasattr( device, 'base' ) and d585_config.can_toggle( device ):
+            variant = d585_config.Variant( device )
+            _device_by_sn[variant.serial_number] = variant
+            log.d( f'...{variant.serial_number}: {variant.name}' )
+
+
 def get_by_port( port ):
     """
     Return the Device at the given port number. Note that the device may not be enabled!
@@ -605,7 +627,7 @@ def recovery():
     :return: A set of all device serial-numbers that are in recovery mode
     """
     global _device_by_sn
-    return { device.serial_number for device in _device_by_sn.values() if device.handle.is_in_recovery_mode() }
+    return { device.serial_number for device in _device_by_sn.values() if not hasattr( device, 'base' ) and device.handle.is_in_recovery_mode() }
 
 
 def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME, disable_other_ports = False ):
