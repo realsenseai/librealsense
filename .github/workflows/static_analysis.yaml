@@ -193,6 +193,8 @@ jobs:
     env:
       LRS_RUN_CONFIG: RelWithDebInfo
       TSAN_OPTIONS: suppressions=${{ github.workspace }}/.github/workflows/tsan.supp:history_size=4:log_path=${{ github.workspace }}/tsan/log
+      # The OpenCV wheel's uninstrumented worker threads race inside OpenCV itself
+      OPENCV_FOR_THREADS_NUM: 1
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
