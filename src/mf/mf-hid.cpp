@@ -11,6 +11,7 @@
 
 #include "../types.h"
 #include "mf-hid.h"
+#include "hid-startup.h"
 #include "win/win-helpers.h"
 #include "metadata.h"
 
@@ -24,6 +25,7 @@
 #include <propkeydef.h>
 #include <comutil.h>
 #include <rsutils/string/from.h>
+
 
 #pragma comment(lib, "Sensorsapi.lib")
 #pragma comment(lib, "PortableDeviceGuids.lib")
@@ -41,7 +43,16 @@ namespace librealsense
         public:
             virtual ~sensor_events() = default;
 
-            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0, double accel_scale_factor = 1000.0) : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor), _accel_scale_factor(accel_scale_factor) {}
+            explicit sensor_events( const std::vector<std::string> & names, uint64_t started_at,
+                                    hid_callback callback, double gyro_scale_factor, double accel_scale_factor )
+                : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor),
+                  _accel_scale_factor(accel_scale_factor), _startup(names, started_at) {}
+
+            void wait_for_first_samples()
+            {
+                // SetEventSink success does not prove that power-on succeeded.
+                _startup.wait_for( std::chrono::seconds(5) );
+            }
 
             STDMETHODIMP QueryInterface(REFIID iid, void** ppv)
             {
@@ -109,7 +120,8 @@ namespace librealsense
                 BSTR        fName{};
                 SYSTEMTIME  sys_time;
                 FILETIME    file_time;
-                report->GetTimestamp(&sys_time);
+                const HRESULT timestamp_status = report->GetTimestamp(&sys_time);
+                if( FAILED(timestamp_status) ) return timestamp_status;
 
                 PROPVARIANT var = {};
                 // Custom timestamp low
@@ -212,12 +224,15 @@ namespace librealsense
                 d.fo.metadata_size = metadata_hid_raw_size;
                 d.fo.frame_size = sizeof(data);
                 d.fo.backend_time = 0;
-                if (SystemTimeToFileTime(&sys_time, &file_time))
-                {
-                    auto ll_now = (LONGLONG)file_time.dwLowDateTime + ((LONGLONG)(file_time.dwHighDateTime) << 32LL) - WIN_FILETIME_2_UNIX_SYSTIME;
-                    d.fo.backend_time = ll_now * 0.0001; //100 nano-sec to millisec
-                }
+                if( ! SystemTimeToFileTime(&sys_time, &file_time) )
+                    return HRESULT_FROM_WIN32( GetLastError() );
+                const uint64_t report_time = ( uint64_t( file_time.dwHighDateTime ) << 32 ) | file_time.dwLowDateTime;
+                d.fo.backend_time = ( report_time - WIN_FILETIME_2_UNIX_SYSTIME ) * 0.0001;
 
+                // The caller holds its configure lock until start returns.
+                // Forwarding a warm-up callback could block the other sensor.
+                if( ! _startup.on_report( d.sensor.name, report_time ) )
+                    return S_OK;
                 _callback(d);
 
                 return S_OK;
@@ -266,134 +281,115 @@ namespace librealsense
             hid_callback _callback;
             double _gyro_scale_factor = 10.0;
             double _accel_scale_factor = 1000.0;
+            hid_startup _startup;
         };
+
+        // SetProperties uses S_FALSE for per-property failures, which CHECK_HR
+        // alone does not reject. Both supported calls set exactly one property.
+        static void set_sensor_property( ISensor * sensor, IPortableDeviceValues * values, REFPROPERTYKEY key )
+        {
+            CComPtr<IPortableDeviceValues> results;
+            HRESULT hr = sensor->SetProperties( values, &results );
+            CHECK_HR(hr);
+            if( hr == S_FALSE )
+            {
+                HRESULT property_error;
+                CHECK_HR(results->GetErrorValue( key, &property_error ));
+                CHECK_HR(property_error);
+            }
+        }
 
         void wmf_hid_device::open(const std::vector<hid_profile>&iio_profiles)
         {
             try
             {
-                for (auto& profile_to_open : iio_profiles)
+                for( auto const & profile : iio_profiles )
                 {
-                    for (auto& connected_sensor : _connected_sensors)
+                    for( auto const & sensor : _connected_sensors )
                     {
-                        if (profile_to_open.sensor_name == connected_sensor->get_sensor_name())
+                        if( profile.sensor_name != sensor->get_sensor_name() )
+                            continue;
+                        CComPtr<IPortableDeviceValues> interval;
+                        CHECK_HR(interval.CoCreateInstance( CLSID_PortableDeviceValues ));
+                        CHECK_HR(interval->SetUnsignedIntegerValue( SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL,
+                                                                  profile.frequency ));
+                        set_sensor_property( sensor->get_sensor(), interval, SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL );
+
+                        const bool is_gyro = profile.sensor_name == "HID Sensor Class Device: Gyroscope";
+                        const bool is_accel = profile.apply_sensitivity_to_accel
+                            && profile.sensor_name == "HID Sensor Class Device: Accelerometer";
+                        if( is_gyro || is_accel )
                         {
-                            /* Set SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL sensor property to profile */
-                            HRESULT hr = S_OK;
-                            IPortableDeviceValues* pPropsToSet = NULL; // Input
-                            IPortableDeviceValues* pPropsReturn = NULL; // Output
-
-                            /* Create the input object */
-                            CHECK_HR(CoCreateInstance(__uuidof(PortableDeviceValues), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pPropsToSet)));
-
-                            /* Add the current report interval property */
-                            hr = pPropsToSet->SetUnsignedIntegerValue(SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL, profile_to_open.frequency);
-                            if (SUCCEEDED(hr))
-                            {
-                                // Setting a single property
-                                hr = connected_sensor->get_sensor()->SetProperties(pPropsToSet, &pPropsReturn);
-                                if (SUCCEEDED(hr))
-                                {
-                                    _opened_sensors.push_back(connected_sensor);
-                                    pPropsReturn->Release();
-                                }
-                            }
-
-                            pPropsToSet->Release();
-
-                            //implemented for Gyro sensitivity, and for Accel when a level was explicitly set
-                            const bool is_gyro = profile_to_open.sensor_name == "HID Sensor Class Device: Gyroscope";
-                            const bool is_accel = profile_to_open.apply_sensitivity_to_accel
-                                               && profile_to_open.sensor_name == "HID Sensor Class Device: Accelerometer";
-                            if( is_gyro || is_accel )
-                            {
-                                // creating IPortableDeviceValues container for <Data Field, Sensitivity> tuples
-                                IPortableDeviceValues * pInSensitivityValues;
-                                CHECK_HR( CoCreateInstance( CLSID_PortableDeviceValues,
-                                                         NULL,
-                                                         CLSCTX_INPROC_SERVER,
-                                                         IID_PPV_ARGS( &pInSensitivityValues ) ));
-
-                                PROPVARIANT pv;
-                                PropVariantInit( &pv );
-                                // COM type for double
-                                pv.vt = VT_R8;  
-                                pv.dblVal = (double)profile_to_open.sensitivity;
-                                pInSensitivityValues->SetValue(
-                                    is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_X_DEGREES_PER_SECOND
-                                            : SENSOR_DATA_TYPE_ACCELERATION_X_G,
-                                    &pv );
-                                pInSensitivityValues->SetValue(
-                                    is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_Y_DEGREES_PER_SECOND
-                                            : SENSOR_DATA_TYPE_ACCELERATION_Y_G,
-                                    &pv );
-                                pInSensitivityValues->SetValue(
-                                    is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_Z_DEGREES_PER_SECOND
-                                            : SENSOR_DATA_TYPE_ACCELERATION_Z_G,
-                                    &pv );
-                                // creating IPortableDeviceValues container holding <SENSOR_PROPERTY_CHANGE_SENSITIVITY,pInSensitivityValues> tuple
-                                IPortableDeviceValues * pInValues = NULL; //Input
-                                CHECK_HR(CoCreateInstance( CLSID_PortableDeviceValues,
-                                                            NULL,
-                                                            CLSCTX_INPROC_SERVER,
-                                                            IID_PPV_ARGS( &pInValues ) ));
-
-                                pInValues->SetIPortableDeviceValuesValue( SENSOR_PROPERTY_CHANGE_SENSITIVITY,
-                                                                            pInSensitivityValues );
-                                
-                                IPortableDeviceValues * pOutValues = NULL; //Output
-                                // set sensitivity
-                                hr = connected_sensor->get_sensor()->SetProperties( pInValues, &pOutValues );
-                                if( SUCCEEDED( hr ) )
-                                    PropVariantClear( &pv );
-
-                                pInValues->Release();
-
-                            }
-                            
+                            CComPtr<IPortableDeviceValues> axes, properties;
+                            CHECK_HR(axes.CoCreateInstance( CLSID_PortableDeviceValues ));
+                            CHECK_HR(properties.CoCreateInstance( CLSID_PortableDeviceValues ));
+                            PROPVARIANT value{};
+                            value.vt = VT_R8;
+                            value.dblVal = profile.sensitivity;
+                            CHECK_HR(axes->SetValue( is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_X_DEGREES_PER_SECOND
+                                                           : SENSOR_DATA_TYPE_ACCELERATION_X_G, &value ));
+                            CHECK_HR(axes->SetValue( is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_Y_DEGREES_PER_SECOND
+                                                           : SENSOR_DATA_TYPE_ACCELERATION_Y_G, &value ));
+                            CHECK_HR(axes->SetValue( is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_Z_DEGREES_PER_SECOND
+                                                           : SENSOR_DATA_TYPE_ACCELERATION_Z_G, &value ));
+                            CHECK_HR(properties->SetIPortableDeviceValuesValue( SENSOR_PROPERTY_CHANGE_SENSITIVITY, axes ));
+                            set_sensor_property( sensor->get_sensor(), properties, SENSOR_PROPERTY_CHANGE_SENSITIVITY );
                         }
+                        _opened_sensors.push_back(sensor);
                     }
                 }
             }
             catch (...)
             {
-                for (auto& connected_sensor : _connected_sensors)
-                {
-                    connected_sensor.reset();
-                }
-                _connected_sensors.clear();
-                LOG_ERROR("Hid device is busy!");
+                _opened_sensors.clear();
                 throw;
             }
         }
 
         void wmf_hid_device::close()
         {
-            for (auto& open_sensor : _opened_sensors)
-            {
-                open_sensor.reset();
-            }
+            // Also owns cleanup if a previous start failed partway through.
+            stop_capture();
             _opened_sensors.clear();
         }
 
         void wmf_hid_device::start_capture(hid_callback callback)
         {
-            // Hack, start default profile
-            _cb = new sensor_events(callback, _gyro_scale_factor, _accel_scale_factor);
-            ISensorEvents* sensorEvents = nullptr;
-            CHECK_HR(_cb->QueryInterface(IID_PPV_ARGS(&sensorEvents)));
-
-            for (auto& sensor : _opened_sensors)
+            if( ! _streaming_sensors.empty() )
+                throw std::runtime_error( "Previous Windows HID capture is still active" );
+            std::vector<std::string> names;
+            for( auto const & sensor : _opened_sensors )
+                names.push_back( sensor->get_sensor_name() );
+            FILETIME now;
+            GetSystemTimePreciseAsFileTime( &now );
+            const uint64_t started_at = ( uint64_t(now.dwHighDateTime) << 32 ) | now.dwLowDateTime;
+            CComPtr<sensor_events> events = new sensor_events( names, started_at, callback,
+                                                             _gyro_scale_factor, _accel_scale_factor );
+            _cb = events.p;
+            try
             {
-                CHECK_HR(sensor->start_capture(sensorEvents));
+                for( auto const & sensor : _opened_sensors )
+                {
+                    const HRESULT hr = sensor->start_capture(events);
+                    CHECK_HR(hr);
+                    _streaming_sensors.push_back(sensor);
+                }
+                events->wait_for_first_samples();
+            }
+            catch (...)
+            {
+                stop_capture();
+                throw;
             }
         }
 
         void wmf_hid_device::stop_capture()
         {
-            for (auto& sensor : _opened_sensors)
+            while( ! _streaming_sensors.empty() )
             {
-                sensor->stop_capture();
+                const HRESULT hr = _streaming_sensors.back()->stop_capture();
+                CHECK_HR(hr);
+                _streaming_sensors.pop_back();
             }
             _cb = nullptr;
         }
