@@ -25,6 +25,7 @@ rs__eth__config_8h_source.html
 rs__frame_8h_source.html
 rs__hdrd__control_8h_source.html
 rs__internal_8h_source.html
+rs__nn_8h_source.html
 rs__option_8h_source.html
 rs__pipeline_8h_source.html
 rs__processing_8h_source.html
@@ -40,6 +41,7 @@ rs__eth__config_8hpp_source.html
 rs__export_8hpp_source.html
 rs__frame_8hpp_source.html
 rs__internal_8hpp_source.html
+rs__nn_8hpp_source.html
 rs__options_8hpp_source.html
 rs__pipeline_8hpp_source.html
 rs__processing_8hpp_source.html
@@ -67,6 +69,7 @@ rs__eth__config_8h.html
 rs__frame_8h.html
 rs__hdrd__control_8h.html
 rs__internal_8h.html
+rs__nn_8h.html
 rs__option_8h.html
 rs__pipeline_8h.html
 rs__processing_8h.html
@@ -82,6 +85,7 @@ rs__eth__config_8hpp.html
 rs__export_8hpp.html
 rs__frame_8hpp.html
 rs__internal_8hpp.html
+rs__nn_8hpp.html
 rs__options_8hpp.html
 rs__pipeline_8hpp.html
 rs__processing_8hpp.html
@@ -316,12 +320,16 @@ classrs2_1_1m420__decoder.html
 classrs2_1_1m420__decoder-members.html
 classrs2_1_1max__usable__range__sensor.html
 classrs2_1_1max__usable__range__sensor-members.html
+classrs2_1_1mjpeg__decoder.html
+classrs2_1_1mjpeg__decoder-members.html
 classrs2_1_1motion__frame.html
 classrs2_1_1motion__frame-members.html
 classrs2_1_1motion__sensor.html
 classrs2_1_1motion__sensor-members.html
 classrs2_1_1motion__stream__profile.html
 classrs2_1_1motion__stream__profile-members.html
+classrs2_1_1nn__loader.html
+classrs2_1_1nn__loader-members.html
 classrs2_1_1notification.html
 classrs2_1_1notification-members.html
 classrs2_1_1notifications__callback.html
@@ -634,9 +642,11 @@ classrs2_1_1labeled__points.png
 classrs2_1_1log__callback.png
 classrs2_1_1m420__decoder.png
 classrs2_1_1max__usable__range__sensor.png
+classrs2_1_1mjpeg__decoder.png
 classrs2_1_1motion__frame.png
 classrs2_1_1motion__sensor.png
 classrs2_1_1motion__stream__profile.png
+classrs2_1_1nn__loader.png
 classrs2_1_1notifications__callback.png
 classrs2_1_1nv12__decoder.png
 classrs2_1_1object__detection__frame.png

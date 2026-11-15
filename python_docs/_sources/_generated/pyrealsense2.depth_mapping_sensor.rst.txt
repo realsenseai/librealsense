@@ -1,0 +1,100 @@
+pyrealsense2.depth_mapping_sensor
+=================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: depth_mapping_sensor
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~depth_mapping_sensor.__init__
+      ~depth_mapping_sensor.as_color_sensor
+      ~depth_mapping_sensor.as_debug_stream_sensor
+      ~depth_mapping_sensor.as_depth_mapping_sensor
+      ~depth_mapping_sensor.as_depth_sensor
+      ~depth_mapping_sensor.as_fisheye_sensor
+      ~depth_mapping_sensor.as_max_usable_range_sensor
+      ~depth_mapping_sensor.as_motion_sensor
+      ~depth_mapping_sensor.as_perception_sensor
+      ~depth_mapping_sensor.as_pose_sensor
+      ~depth_mapping_sensor.as_roi_sensor
+      ~depth_mapping_sensor.as_safety_sensor
+      ~depth_mapping_sensor.as_wheel_odometer
+      ~depth_mapping_sensor.close
+      ~depth_mapping_sensor.from_frame
+      ~depth_mapping_sensor.get_active_streams
+      ~depth_mapping_sensor.get_composite_option
+      ~depth_mapping_sensor.get_composite_option_description
+      ~depth_mapping_sensor.get_composite_option_range
+      ~depth_mapping_sensor.get_decimation_filter_dpp_config
+      ~depth_mapping_sensor.get_decimation_filter_dpp_range
+      ~depth_mapping_sensor.get_depth_mapping_params
+      ~depth_mapping_sensor.get_embedded_close_range_filter
+      ~depth_mapping_sensor.get_embedded_decimation_filter
+      ~depth_mapping_sensor.get_embedded_filter
+      ~depth_mapping_sensor.get_embedded_temporal_filter
+      ~depth_mapping_sensor.get_hdrd_control
+      ~depth_mapping_sensor.get_hdrd_control_range
+      ~depth_mapping_sensor.get_info
+      ~depth_mapping_sensor.get_option
+      ~depth_mapping_sensor.get_option_description
+      ~depth_mapping_sensor.get_option_range
+      ~depth_mapping_sensor.get_option_value
+      ~depth_mapping_sensor.get_option_value_description
+      ~depth_mapping_sensor.get_recommended_filters
+      ~depth_mapping_sensor.get_stream_profiles
+      ~depth_mapping_sensor.get_supported_composite_options
+      ~depth_mapping_sensor.get_supported_option_values
+      ~depth_mapping_sensor.get_supported_options
+      ~depth_mapping_sensor.get_temporal_filter_dpp_config
+      ~depth_mapping_sensor.get_temporal_filter_dpp_range
+      ~depth_mapping_sensor.is_color_sensor
+      ~depth_mapping_sensor.is_composite_option_read_only
+      ~depth_mapping_sensor.is_debug_stream_sensor
+      ~depth_mapping_sensor.is_depth_mapping_sensor
+      ~depth_mapping_sensor.is_depth_sensor
+      ~depth_mapping_sensor.is_fisheye_sensor
+      ~depth_mapping_sensor.is_max_usable_range_sensor
+      ~depth_mapping_sensor.is_motion_sensor
+      ~depth_mapping_sensor.is_option_read_only
+      ~depth_mapping_sensor.is_perception_sensor
+      ~depth_mapping_sensor.is_pose_sensor
+      ~depth_mapping_sensor.is_roi_sensor
+      ~depth_mapping_sensor.is_safety_sensor
+      ~depth_mapping_sensor.is_wheel_odometer
+      ~depth_mapping_sensor.on_options_changed
+      ~depth_mapping_sensor.open
+      ~depth_mapping_sensor.query_embedded_filters
+      ~depth_mapping_sensor.set_composite_option
+      ~depth_mapping_sensor.set_decimation_filter_dpp_config
+      ~depth_mapping_sensor.set_depth_mapping_params
+      ~depth_mapping_sensor.set_hdrd_control
+      ~depth_mapping_sensor.set_notifications_callback
+      ~depth_mapping_sensor.set_option
+      ~depth_mapping_sensor.set_option_value
+      ~depth_mapping_sensor.set_temporal_filter_dpp_config
+      ~depth_mapping_sensor.start
+      ~depth_mapping_sensor.stop
+      ~depth_mapping_sensor.supports
+      ~depth_mapping_sensor.supports_composite_option
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~depth_mapping_sensor.name
+      ~depth_mapping_sensor.profiles
+   
+   

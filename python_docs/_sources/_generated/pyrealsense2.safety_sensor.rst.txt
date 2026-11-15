@@ -18,6 +18,7 @@ pyrealsense2.safety_sensor
       ~safety_sensor.__init__
       ~safety_sensor.as_color_sensor
       ~safety_sensor.as_debug_stream_sensor
+      ~safety_sensor.as_depth_mapping_sensor
       ~safety_sensor.as_depth_sensor
       ~safety_sensor.as_fisheye_sensor
       ~safety_sensor.as_max_usable_range_sensor
@@ -60,6 +61,7 @@ pyrealsense2.safety_sensor
       ~safety_sensor.is_color_sensor
       ~safety_sensor.is_composite_option_read_only
       ~safety_sensor.is_debug_stream_sensor
+      ~safety_sensor.is_depth_mapping_sensor
       ~safety_sensor.is_depth_sensor
       ~safety_sensor.is_fisheye_sensor
       ~safety_sensor.is_max_usable_range_sensor

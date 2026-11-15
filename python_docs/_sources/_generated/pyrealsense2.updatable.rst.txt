@@ -21,6 +21,7 @@ pyrealsense2.updatable
       ~updatable.as_debug_protocol
       ~updatable.as_device_calibration
       ~updatable.as_firmware_logger
+      ~updatable.as_nn_loader
       ~updatable.as_playback
       ~updatable.as_recorder
       ~updatable.as_updatable
@@ -29,6 +30,7 @@ pyrealsense2.updatable
       ~updatable.create_flash_backup
       ~updatable.enter_update_state
       ~updatable.first_color_sensor
+      ~updatable.first_depth_mapping_sensor
       ~updatable.first_depth_sensor
       ~updatable.first_fisheye_sensor
       ~updatable.first_motion_sensor
@@ -48,6 +50,7 @@ pyrealsense2.updatable
       ~updatable.is_firmware_logger
       ~updatable.is_in_recovery_mode
       ~updatable.is_metadata_enabled
+      ~updatable.is_nn_loader
       ~updatable.is_playback
       ~updatable.is_recorder
       ~updatable.is_updatable

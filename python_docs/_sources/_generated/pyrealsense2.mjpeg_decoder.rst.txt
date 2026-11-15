@@ -1,0 +1,74 @@
+pyrealsense2.mjpeg_decoder
+==========================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: mjpeg_decoder
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~mjpeg_decoder.__init__
+      ~mjpeg_decoder.as_decimation_filter
+      ~mjpeg_decoder.as_disparity_transform
+      ~mjpeg_decoder.as_hdr_merge
+      ~mjpeg_decoder.as_hole_filling_filter
+      ~mjpeg_decoder.as_rotation_filter
+      ~mjpeg_decoder.as_sequence_id_filter
+      ~mjpeg_decoder.as_spatial_filter
+      ~mjpeg_decoder.as_temporal_filter
+      ~mjpeg_decoder.as_threshold_filter
+      ~mjpeg_decoder.get_composite_option
+      ~mjpeg_decoder.get_composite_option_description
+      ~mjpeg_decoder.get_composite_option_range
+      ~mjpeg_decoder.get_decimation_filter_dpp_config
+      ~mjpeg_decoder.get_decimation_filter_dpp_range
+      ~mjpeg_decoder.get_hdrd_control
+      ~mjpeg_decoder.get_hdrd_control_range
+      ~mjpeg_decoder.get_info
+      ~mjpeg_decoder.get_option
+      ~mjpeg_decoder.get_option_description
+      ~mjpeg_decoder.get_option_range
+      ~mjpeg_decoder.get_option_value
+      ~mjpeg_decoder.get_option_value_description
+      ~mjpeg_decoder.get_supported_composite_options
+      ~mjpeg_decoder.get_supported_option_values
+      ~mjpeg_decoder.get_supported_options
+      ~mjpeg_decoder.get_temporal_filter_dpp_config
+      ~mjpeg_decoder.get_temporal_filter_dpp_range
+      ~mjpeg_decoder.invoke
+      ~mjpeg_decoder.is_composite_option_read_only
+      ~mjpeg_decoder.is_decimation_filter
+      ~mjpeg_decoder.is_disparity_transform
+      ~mjpeg_decoder.is_hdr_merge
+      ~mjpeg_decoder.is_hole_filling_filter
+      ~mjpeg_decoder.is_option_read_only
+      ~mjpeg_decoder.is_rotation_filter
+      ~mjpeg_decoder.is_sequence_id_filter
+      ~mjpeg_decoder.is_spatial_filter
+      ~mjpeg_decoder.is_temporal_filter
+      ~mjpeg_decoder.is_threshold_filter
+      ~mjpeg_decoder.on_options_changed
+      ~mjpeg_decoder.process
+      ~mjpeg_decoder.set_composite_option
+      ~mjpeg_decoder.set_decimation_filter_dpp_config
+      ~mjpeg_decoder.set_hdrd_control
+      ~mjpeg_decoder.set_option
+      ~mjpeg_decoder.set_option_value
+      ~mjpeg_decoder.set_temporal_filter_dpp_config
+      ~mjpeg_decoder.start
+      ~mjpeg_decoder.supports
+      ~mjpeg_decoder.supports_composite_option
+   
+   
+   
+   
+   
+   

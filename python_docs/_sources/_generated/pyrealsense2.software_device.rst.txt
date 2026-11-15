@@ -23,12 +23,14 @@ pyrealsense2.software_device
       ~software_device.as_debug_protocol
       ~software_device.as_device_calibration
       ~software_device.as_firmware_logger
+      ~software_device.as_nn_loader
       ~software_device.as_playback
       ~software_device.as_recorder
       ~software_device.as_updatable
       ~software_device.as_update_device
       ~software_device.create_matcher
       ~software_device.first_color_sensor
+      ~software_device.first_depth_mapping_sensor
       ~software_device.first_depth_sensor
       ~software_device.first_fisheye_sensor
       ~software_device.first_motion_sensor
@@ -48,6 +50,7 @@ pyrealsense2.software_device
       ~software_device.is_firmware_logger
       ~software_device.is_in_recovery_mode
       ~software_device.is_metadata_enabled
+      ~software_device.is_nn_loader
       ~software_device.is_playback
       ~software_device.is_recorder
       ~software_device.is_updatable

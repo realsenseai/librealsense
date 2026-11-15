@@ -136,7 +136,9 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a053761b37e48dbd15de9c6800e7bac38">RS2_STREAM_OCCUPANCY</a>, 
 <a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a901a66592d2fb6b1caf5fc7af0e5c0fd">RS2_STREAM_LABELED_POINT_CLOUD</a>, 
 <a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93ab227c44ad4509acc8b88bd3d3d3b67bb">RS2_STREAM_OBJECT_DETECTION</a>, 
-<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93aa3017f2e78d17ce364cc13b84ee56d4d">RS2_STREAM_COUNT</a>
+<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a92600b0cf33cace0b59e3cee90b7361c">RS2_STREAM_POINT_CLOUD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93aa3017f2e78d17ce364cc13b84ee56d4d">RS2_STREAM_COUNT</a>
 <br />
  }</td></tr>
 <tr class="memdesc:a01b4027af33139de861408872dd11b93"><td class="mdescLeft">&#160;</td><td class="mdescRight">Streams are different types of data provided by RealSense devices.  <a href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93">More...</a><br /></td></tr>
@@ -335,6 +337,10 @@ Functions</h2></td></tr>
 <tr class="separator:ab08dcd1c1c51fd3e777f421f69791cdd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abad5635a518c7989ed9ee376f5917b31"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#abad5635a518c7989ed9ee376f5917b31">rs2_get_max_usable_depth_range</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> const *sensor, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:abad5635a518c7989ed9ee376f5917b31"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1d0e3dbab3981880a49ec02b591009a8"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="rs__types_8h.html#ab811c9b19a9d7c4608062eb12a6e3f2e">rs2_raw_data_buffer</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#a1d0e3dbab3981880a49ec02b591009a8">rs2_get_depth_mapping_params</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> const *sensor, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a1d0e3dbab3981880a49ec02b591009a8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2c5ddc17ef5b37d62eb1c4702f6ba5b0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#a2c5ddc17ef5b37d62eb1c4702f6ba5b0">rs2_set_depth_mapping_params</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> const *sensor, const char *params_json_str, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a2c5ddc17ef5b37d62eb1c4702f6ba5b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Exposes RealSense sensor functionality for C compilers. </p>
@@ -612,6 +618,8 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a901a66592d2fb6b1caf5fc7af0e5c0fd"></a>RS2_STREAM_LABELED_POINT_CLOUD&#160;</td><td class="fielddoc"><p>labeled point cloud stream </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93ab227c44ad4509acc8b88bd3d3d3b67bb"></a>RS2_STREAM_OBJECT_DETECTION&#160;</td><td class="fielddoc"><p>object detection stream </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a92600b0cf33cace0b59e3cee90b7361c"></a>RS2_STREAM_POINT_CLOUD&#160;</td><td class="fielddoc"><p>device-generated point cloud stream (D5xx EP12 Mapping) </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93aa3017f2e78d17ce364cc13b84ee56d4d"></a>RS2_STREAM_COUNT&#160;</td><td class="fielddoc"></td></tr>
 </table>
@@ -1188,6 +1196,42 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>list of debug stream profiles that given subdevice can provide, should be released by rs2_delete_profiles_list </dd></dl>
+
+</div>
+</div>
+<a id="a1d0e3dbab3981880a49ec02b591009a8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1d0e3dbab3981880a49ec02b591009a8">&#9670;&nbsp;</a></span>rs2_get_depth_mapping_params()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="rs__types_8h.html#ab811c9b19a9d7c4608062eb12a6e3f2e">rs2_raw_data_buffer</a>* rs2_get_depth_mapping_params </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> const *&#160;</td>
+          <td class="paramname"><em>sensor</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Get the occupancy grid and labeled point cloud params of a depth mapping sensor </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">sensor</td><td>depth mapping sensor </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>the params as a JSON string in a rs2_raw_data_buffer, which should be released by rs2_delete_raw_data </dd></dl>
 
 </div>
 </div>
@@ -2732,6 +2776,48 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>true on success </dd></dl>
+
+</div>
+</div>
+<a id="a2c5ddc17ef5b37d62eb1c4702f6ba5b0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2c5ddc17ef5b37d62eb1c4702f6ba5b0">&#9670;&nbsp;</a></span>rs2_set_depth_mapping_params()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rs2_set_depth_mapping_params </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> const *&#160;</td>
+          <td class="paramname"><em>sensor</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>params_json_str</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Set occupancy grid and labeled point cloud params of a depth mapping sensor. Only the named fields change. Blocks until the device has applied the params, and fails with the device's message if it rejects them. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">sensor</td><td>depth mapping sensor </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">params_json_str</td><td>partial params as a JSON string </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>

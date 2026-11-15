@@ -72,6 +72,8 @@ Functions</h2></td></tr>
 <tr class="separator:abca051972ea197c271d06135ff317483"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afdb571f57c8f4e2011694d9dfa8ed00a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing_8h.html#afdb571f57c8f4e2011694d9dfa8ed00a">rs2_create_nv12_decoder</a> (<a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:afdb571f57c8f4e2011694d9dfa8ed00a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4f38757e722df102d4da732c4be2ded6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing_8h.html#a4f38757e722df102d4da732c4be2ded6">rs2_create_mjpeg_decoder</a> (<a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a4f38757e722df102d4da732c4be2ded6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af4ba025afb9ee26a4571658ec5305382"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing_8h.html#af4ba025afb9ee26a4571658ec5305382">rs2_create_y411_decoder</a> (<a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:af4ba025afb9ee26a4571658ec5305382"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae99722c3ddfd5709c1aba710fec142dc"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing_8h.html#ae99722c3ddfd5709c1aba710fec142dc">rs2_create_threshold</a> (<a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -438,6 +440,30 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Creates M420 decoder processing block. This block accepts raw M420 frames and outputs frames of other formats. M420 is a standard format,see: <a href="https://www.kernel.org/doc/html/v4.10/media/uapi/v4l/pixfmt-m420.html">https://www.kernel.org/doc/html/v4.10/media/uapi/v4l/pixfmt-m420.html</a> Two lines (each of length equal to width of the current resolution) of luminance are followed by One line (of length width) of chrome values. The SDK will automatically try to use SSE2 and AVX instructions and CUDA where available to get best performance. Other implementations (using GLSL, OpenCL, Neon and NCS) should follow. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a4f38757e722df102d4da732c4be2ded6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4f38757e722df102d4da732c4be2ded6">&#9670;&nbsp;</a></span>rs2_create_mjpeg_decoder()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a>* rs2_create_mjpeg_decoder </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Creates MJPEG decoder processing block. This block accepts compressed MJPEG frames and outputs RGB8 frames. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
   </table>

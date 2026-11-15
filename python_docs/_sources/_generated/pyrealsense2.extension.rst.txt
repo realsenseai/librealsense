@@ -61,6 +61,7 @@ pyrealsense2.extension
       ~extension.motion_profile
       ~extension.motion_sensor
       ~extension.name
+      ~extension.nn_loader
       ~extension.object_detection_frame
       ~extension.options
       ~extension.perception_frame

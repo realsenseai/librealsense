@@ -1,0 +1,33 @@
+pyrealsense2.nn_target
+======================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: nn_target
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~nn_target.__init__
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~nn_target.ddr
+      ~nn_target.flash
+      ~nn_target.name
+      ~nn_target.value
+   
+   

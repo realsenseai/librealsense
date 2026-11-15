@@ -1,0 +1,59 @@
+pyrealsense2.embedded_close_range_filter
+========================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: embedded_close_range_filter
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~embedded_close_range_filter.__init__
+      ~embedded_close_range_filter.as_embedded_close_range_filter
+      ~embedded_close_range_filter.as_embedded_decimation_filter
+      ~embedded_close_range_filter.as_embedded_temporal_filter
+      ~embedded_close_range_filter.get_composite_option
+      ~embedded_close_range_filter.get_composite_option_description
+      ~embedded_close_range_filter.get_composite_option_range
+      ~embedded_close_range_filter.get_decimation_filter_dpp_config
+      ~embedded_close_range_filter.get_decimation_filter_dpp_range
+      ~embedded_close_range_filter.get_hdrd_control
+      ~embedded_close_range_filter.get_hdrd_control_range
+      ~embedded_close_range_filter.get_option
+      ~embedded_close_range_filter.get_option_description
+      ~embedded_close_range_filter.get_option_range
+      ~embedded_close_range_filter.get_option_value
+      ~embedded_close_range_filter.get_option_value_description
+      ~embedded_close_range_filter.get_supported_composite_options
+      ~embedded_close_range_filter.get_supported_option_values
+      ~embedded_close_range_filter.get_supported_options
+      ~embedded_close_range_filter.get_temporal_filter_dpp_config
+      ~embedded_close_range_filter.get_temporal_filter_dpp_range
+      ~embedded_close_range_filter.get_type
+      ~embedded_close_range_filter.is_composite_option_read_only
+      ~embedded_close_range_filter.is_embedded_close_range_filter
+      ~embedded_close_range_filter.is_embedded_decimation_filter
+      ~embedded_close_range_filter.is_embedded_temporal_filter
+      ~embedded_close_range_filter.is_option_read_only
+      ~embedded_close_range_filter.on_options_changed
+      ~embedded_close_range_filter.set_composite_option
+      ~embedded_close_range_filter.set_decimation_filter_dpp_config
+      ~embedded_close_range_filter.set_hdrd_control
+      ~embedded_close_range_filter.set_option
+      ~embedded_close_range_filter.set_option_value
+      ~embedded_close_range_filter.set_temporal_filter_dpp_config
+      ~embedded_close_range_filter.supports
+      ~embedded_close_range_filter.supports_composite_option
+   
+   
+   
+   
+   
+   

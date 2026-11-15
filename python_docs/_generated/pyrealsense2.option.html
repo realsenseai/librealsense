@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.option &#8212; pyrealsense2 2.59.1 documentation</title>
+    <title>pyrealsense2.option &#8212; pyrealsense2 2.59.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=c16f6a54"></script>
+    <script src="../_static/documentation_options.js?v=f697e03e"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.option</a></li> 
       </ul>
     </div>  
@@ -158,6 +158,13 @@
 <p>dual_rgb_rectification</p>
 <p>emitter_mode</p>
 <p>enable_aligned_depth</p>
+<p>passive_depth_mode</p>
+<p>dual_rgb_enable_auto_exposure</p>
+<p>dual_rgb_exposure</p>
+<p>dual_rgb_gain</p>
+<p>accel_sensitivity</p>
+<p>occupancy_grid_segmentation</p>
+<p>lpcl_segmentation</p>
 <p>unknown</p>
 <p>ambient_light</p>
 <p>lld_temperature</p>
@@ -178,76 +185,88 @@
 <p class="rubric">Attributes</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.accuracy" title="pyrealsense2.option.accuracy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">accuracy</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.accel_sensitivity" title="pyrealsense2.option.accel_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">accel_sensitivity</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.alternate_ir" title="pyrealsense2.option.alternate_ir"><code class="xref py py-obj docutils literal notranslate"><span class="pre">alternate_ir</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.accuracy" title="pyrealsense2.option.accuracy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">accuracy</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.ambient_light" title="pyrealsense2.option.ambient_light"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ambient_light</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.alternate_ir" title="pyrealsense2.option.alternate_ir"><code class="xref py py-obj docutils literal notranslate"><span class="pre">alternate_ir</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.apd_temperature" title="pyrealsense2.option.apd_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apd_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.ambient_light" title="pyrealsense2.option.ambient_light"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ambient_light</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.asic_temperature" title="pyrealsense2.option.asic_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">asic_temperature</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.apd_temperature" title="pyrealsense2.option.apd_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apd_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_converge_step" title="pyrealsense2.option.auto_exposure_converge_step"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_converge_step</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.asic_temperature" title="pyrealsense2.option.asic_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">asic_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_limit" title="pyrealsense2.option.auto_exposure_limit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_limit</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_converge_step" title="pyrealsense2.option.auto_exposure_converge_step"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_converge_step</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_limit_toggle" title="pyrealsense2.option.auto_exposure_limit_toggle"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_limit_toggle</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_limit" title="pyrealsense2.option.auto_exposure_limit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_limit</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_mode" title="pyrealsense2.option.auto_exposure_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_mode</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_limit_toggle" title="pyrealsense2.option.auto_exposure_limit_toggle"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_limit_toggle</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_priority" title="pyrealsense2.option.auto_exposure_priority"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_priority</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_mode" title="pyrealsense2.option.auto_exposure_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_gain_limit" title="pyrealsense2.option.auto_gain_limit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_gain_limit</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_exposure_priority" title="pyrealsense2.option.auto_exposure_priority"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_exposure_priority</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_gain_limit_toggle" title="pyrealsense2.option.auto_gain_limit_toggle"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_gain_limit_toggle</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_gain_limit" title="pyrealsense2.option.auto_gain_limit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_gain_limit</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_rx_sensitivity" title="pyrealsense2.option.auto_rx_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_rx_sensitivity</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_gain_limit_toggle" title="pyrealsense2.option.auto_gain_limit_toggle"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_gain_limit_toggle</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.backlight_compensation" title="pyrealsense2.option.backlight_compensation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">backlight_compensation</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.auto_rx_sensitivity" title="pyrealsense2.option.auto_rx_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_rx_sensitivity</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.brightness" title="pyrealsense2.option.brightness"><code class="xref py py-obj docutils literal notranslate"><span class="pre">brightness</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.backlight_compensation" title="pyrealsense2.option.backlight_compensation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">backlight_compensation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.color_scheme" title="pyrealsense2.option.color_scheme"><code class="xref py py-obj docutils literal notranslate"><span class="pre">color_scheme</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.brightness" title="pyrealsense2.option.brightness"><code class="xref py py-obj docutils literal notranslate"><span class="pre">brightness</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.confidence_threshold" title="pyrealsense2.option.confidence_threshold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">confidence_threshold</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.color_scheme" title="pyrealsense2.option.color_scheme"><code class="xref py py-obj docutils literal notranslate"><span class="pre">color_scheme</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.contrast" title="pyrealsense2.option.contrast"><code class="xref py py-obj docutils literal notranslate"><span class="pre">contrast</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.confidence_threshold" title="pyrealsense2.option.confidence_threshold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">confidence_threshold</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.depth_offset" title="pyrealsense2.option.depth_offset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">depth_offset</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.contrast" title="pyrealsense2.option.contrast"><code class="xref py py-obj docutils literal notranslate"><span class="pre">contrast</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.depth_units" title="pyrealsense2.option.depth_units"><code class="xref py py-obj docutils literal notranslate"><span class="pre">depth_units</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.depth_offset" title="pyrealsense2.option.depth_offset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">depth_offset</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.detection_distance" title="pyrealsense2.option.detection_distance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">detection_distance</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.depth_units" title="pyrealsense2.option.depth_units"><code class="xref py py-obj docutils literal notranslate"><span class="pre">depth_units</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.digital_gain" title="pyrealsense2.option.digital_gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">digital_gain</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.detection_distance" title="pyrealsense2.option.detection_distance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">detection_distance</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.disparity_shift" title="pyrealsense2.option.disparity_shift"><code class="xref py py-obj docutils literal notranslate"><span class="pre">disparity_shift</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.digital_gain" title="pyrealsense2.option.digital_gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">digital_gain</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.downscale_ratio" title="pyrealsense2.option.downscale_ratio"><code class="xref py py-obj docutils literal notranslate"><span class="pre">downscale_ratio</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.disparity_shift" title="pyrealsense2.option.disparity_shift"><code class="xref py py-obj docutils literal notranslate"><span class="pre">disparity_shift</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.downscale_ratio" title="pyrealsense2.option.downscale_ratio"><code class="xref py py-obj docutils literal notranslate"><span class="pre">downscale_ratio</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.dual_rgb_enable_auto_exposure" title="pyrealsense2.option.dual_rgb_enable_auto_exposure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dual_rgb_enable_auto_exposure</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.dual_rgb_exposure" title="pyrealsense2.option.dual_rgb_exposure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dual_rgb_exposure</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.dual_rgb_gain" title="pyrealsense2.option.dual_rgb_gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dual_rgb_gain</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.dual_rgb_rectification" title="pyrealsense2.option.dual_rgb_rectification"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dual_rgb_rectification</span></code></a></p></td>
@@ -385,31 +404,37 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.lld_temperature" title="pyrealsense2.option.lld_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lld_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.ma_temperature" title="pyrealsense2.option.ma_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ma_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.lpcl_segmentation" title="pyrealsense2.option.lpcl_segmentation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lpcl_segmentation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.max_distance" title="pyrealsense2.option.max_distance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">max_distance</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.ma_temperature" title="pyrealsense2.option.ma_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ma_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.mc_temperature" title="pyrealsense2.option.mc_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mc_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.max_distance" title="pyrealsense2.option.max_distance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">max_distance</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.min_distance" title="pyrealsense2.option.min_distance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_distance</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.mc_temperature" title="pyrealsense2.option.mc_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mc_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.motion_module_temperature" title="pyrealsense2.option.motion_module_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion_module_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.min_distance" title="pyrealsense2.option.min_distance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_distance</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.motion_range" title="pyrealsense2.option.motion_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion_range</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.motion_module_temperature" title="pyrealsense2.option.motion_module_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion_module_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code>(-&gt; str)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.motion_range" title="pyrealsense2.option.motion_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion_range</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.noise_estimation" title="pyrealsense2.option.noise_estimation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_estimation</span></code></a></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code>(-&gt; str)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.noise_filtering" title="pyrealsense2.option.noise_filtering"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_filtering</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.noise_estimation" title="pyrealsense2.option.noise_estimation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_estimation</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.noise_filtering" title="pyrealsense2.option.noise_filtering"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_filtering</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.occupancy_grid_segmentation" title="pyrealsense2.option.occupancy_grid_segmentation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">occupancy_grid_segmentation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.ohm_temperature" title="pyrealsense2.option.ohm_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ohm_temperature</span></code></a></p></td>
@@ -418,128 +443,136 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.output_trigger_enabled" title="pyrealsense2.option.output_trigger_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">output_trigger_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.post_processing_sharpening" title="pyrealsense2.option.post_processing_sharpening"><code class="xref py py-obj docutils literal notranslate"><span class="pre">post_processing_sharpening</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.passive_depth_mode" title="pyrealsense2.option.passive_depth_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">passive_depth_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.power_line_frequency" title="pyrealsense2.option.power_line_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">power_line_frequency</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.post_processing_sharpening" title="pyrealsense2.option.post_processing_sharpening"><code class="xref py py-obj docutils literal notranslate"><span class="pre">post_processing_sharpening</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.pre_processing_sharpening" title="pyrealsense2.option.pre_processing_sharpening"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pre_processing_sharpening</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.power_line_frequency" title="pyrealsense2.option.power_line_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">power_line_frequency</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.projector_temperature" title="pyrealsense2.option.projector_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">projector_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.pre_processing_sharpening" title="pyrealsense2.option.pre_processing_sharpening"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pre_processing_sharpening</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.readout_shaping" title="pyrealsense2.option.readout_shaping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">readout_shaping</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.projector_temperature" title="pyrealsense2.option.projector_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">projector_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.receiver_gain" title="pyrealsense2.option.receiver_gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">receiver_gain</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.readout_shaping" title="pyrealsense2.option.readout_shaping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">readout_shaping</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.receiver_sensitivity" title="pyrealsense2.option.receiver_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">receiver_sensitivity</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.receiver_gain" title="pyrealsense2.option.receiver_gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">receiver_gain</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.region_of_interest" title="pyrealsense2.option.region_of_interest"><code class="xref py py-obj docutils literal notranslate"><span class="pre">region_of_interest</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.receiver_sensitivity" title="pyrealsense2.option.receiver_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">receiver_sensitivity</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.reset_camera_accuracy_health" title="pyrealsense2.option.reset_camera_accuracy_health"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reset_camera_accuracy_health</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.region_of_interest" title="pyrealsense2.option.region_of_interest"><code class="xref py py-obj docutils literal notranslate"><span class="pre">region_of_interest</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.rgb_tnr_enabled" title="pyrealsense2.option.rgb_tnr_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rgb_tnr_enabled</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.reset_camera_accuracy_health" title="pyrealsense2.option.reset_camera_accuracy_health"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reset_camera_accuracy_health</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.rotation" title="pyrealsense2.option.rotation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotation</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.rgb_tnr_enabled" title="pyrealsense2.option.rgb_tnr_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rgb_tnr_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_mcu_temperature" title="pyrealsense2.option.safety_mcu_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mcu_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.rotation" title="pyrealsense2.option.rotation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_mode" title="pyrealsense2.option.safety_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mode</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_mcu_temperature" title="pyrealsense2.option.safety_mcu_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mcu_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_preset_active_index" title="pyrealsense2.option.safety_preset_active_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_preset_active_index</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_mode" title="pyrealsense2.option.safety_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.saturation" title="pyrealsense2.option.saturation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">saturation</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_preset_active_index" title="pyrealsense2.option.safety_preset_active_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_preset_active_index</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.sensor_mode" title="pyrealsense2.option.sensor_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sensor_mode</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.saturation" title="pyrealsense2.option.saturation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">saturation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.sensors_config_mode" title="pyrealsense2.option.sensors_config_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sensors_config_mode</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.sensor_mode" title="pyrealsense2.option.sensor_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sensor_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.sequence_id" title="pyrealsense2.option.sequence_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_id</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.sensors_config_mode" title="pyrealsense2.option.sensors_config_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sensors_config_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.sequence_name" title="pyrealsense2.option.sequence_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_name</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.sequence_id" title="pyrealsense2.option.sequence_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_id</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.sequence_size" title="pyrealsense2.option.sequence_size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_size</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.sequence_name" title="pyrealsense2.option.sequence_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_name</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.sharpness" title="pyrealsense2.option.sharpness"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sharpness</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.sequence_size" title="pyrealsense2.option.sequence_size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_size</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.soc_pvt_temperature" title="pyrealsense2.option.soc_pvt_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">soc_pvt_temperature</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.sharpness" title="pyrealsense2.option.sharpness"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sharpness</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.stereo_baseline" title="pyrealsense2.option.stereo_baseline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stereo_baseline</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.soc_pvt_temperature" title="pyrealsense2.option.soc_pvt_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">soc_pvt_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.stream_filter" title="pyrealsense2.option.stream_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_filter</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.stereo_baseline" title="pyrealsense2.option.stereo_baseline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stereo_baseline</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.stream_format_filter" title="pyrealsense2.option.stream_format_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_format_filter</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.stream_filter" title="pyrealsense2.option.stream_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_filter</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.stream_index_filter" title="pyrealsense2.option.stream_index_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_index_filter</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.stream_format_filter" title="pyrealsense2.option.stream_format_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_format_filter</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.texture_source" title="pyrealsense2.option.texture_source"><code class="xref py py-obj docutils literal notranslate"><span class="pre">texture_source</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.stream_index_filter" title="pyrealsense2.option.stream_index_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_index_filter</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.thermal_compensation" title="pyrealsense2.option.thermal_compensation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">thermal_compensation</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.texture_source" title="pyrealsense2.option.texture_source"><code class="xref py py-obj docutils literal notranslate"><span class="pre">texture_source</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.threshold" title="pyrealsense2.option.threshold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">threshold</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.thermal_compensation" title="pyrealsense2.option.thermal_compensation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">thermal_compensation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.total_frame_drops" title="pyrealsense2.option.total_frame_drops"><code class="xref py py-obj docutils literal notranslate"><span class="pre">total_frame_drops</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.threshold" title="pyrealsense2.option.threshold"><code class="xref py py-obj docutils literal notranslate"><span class="pre">threshold</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.transmitter_frequency" title="pyrealsense2.option.transmitter_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transmitter_frequency</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.total_frame_drops" title="pyrealsense2.option.total_frame_drops"><code class="xref py py-obj docutils literal notranslate"><span class="pre">total_frame_drops</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.trigger_camera_accuracy_health" title="pyrealsense2.option.trigger_camera_accuracy_health"><code class="xref py py-obj docutils literal notranslate"><span class="pre">trigger_camera_accuracy_health</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.transmitter_frequency" title="pyrealsense2.option.transmitter_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transmitter_frequency</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.unknown" title="pyrealsense2.option.unknown"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unknown</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.trigger_camera_accuracy_health" title="pyrealsense2.option.trigger_camera_accuracy_health"><code class="xref py py-obj docutils literal notranslate"><span class="pre">trigger_camera_accuracy_health</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.value" title="pyrealsense2.option.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.unknown" title="pyrealsense2.option.unknown"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unknown</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.vertical_binning" title="pyrealsense2.option.vertical_binning"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vertical_binning</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.value" title="pyrealsense2.option.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.visual_preset" title="pyrealsense2.option.visual_preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">visual_preset</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.vertical_binning" title="pyrealsense2.option.vertical_binning"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vertical_binning</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.white_balance" title="pyrealsense2.option.white_balance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">white_balance</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.visual_preset" title="pyrealsense2.option.visual_preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">visual_preset</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.zero_order_enabled" title="pyrealsense2.option.zero_order_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_order_enabled</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.white_balance" title="pyrealsense2.option.white_balance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">white_balance</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.zero_order_point_x" title="pyrealsense2.option.zero_order_point_x"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_order_point_x</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.zero_order_enabled" title="pyrealsense2.option.zero_order_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_order_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.zero_order_point_y" title="pyrealsense2.option.zero_order_point_y"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_order_point_y</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.zero_order_point_x" title="pyrealsense2.option.zero_order_point_x"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_order_point_x</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.zero_order_point_y" title="pyrealsense2.option.zero_order_point_y"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_order_point_y</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
 </table>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.accel_sensitivity">
+<span class="sig-name descname"><span class="pre">accel_sensitivity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">119</span> <span class="pre">'Accel</span> <span class="pre">Sensitivity'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.accel_sensitivity" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.accuracy">
 <span class="sig-name descname"><span class="pre">accuracy</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">14</span> <span class="pre">'Accuracy'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.accuracy" title="Link to this definition">¶</a></dt>
@@ -658,6 +691,21 @@
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.downscale_ratio">
 <span class="sig-name descname"><span class="pre">downscale_ratio</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">108</span> <span class="pre">'Downscale</span> <span class="pre">Ratio'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.downscale_ratio" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.dual_rgb_enable_auto_exposure">
+<span class="sig-name descname"><span class="pre">dual_rgb_enable_auto_exposure</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">116</span> <span class="pre">'Dual</span> <span class="pre">Rgb</span> <span class="pre">Enable</span> <span class="pre">Auto</span> <span class="pre">Exposure'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.dual_rgb_enable_auto_exposure" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.dual_rgb_exposure">
+<span class="sig-name descname"><span class="pre">dual_rgb_exposure</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">117</span> <span class="pre">'Dual</span> <span class="pre">Rgb</span> <span class="pre">Exposure'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.dual_rgb_exposure" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.dual_rgb_gain">
+<span class="sig-name descname"><span class="pre">dual_rgb_gain</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">118</span> <span class="pre">'Dual</span> <span class="pre">Rgb</span> <span class="pre">Gain'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.dual_rgb_gain" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -886,6 +934,11 @@
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.lpcl_segmentation">
+<span class="sig-name descname"><span class="pre">lpcl_segmentation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">121</span> <span class="pre">'LPCL</span> <span class="pre">Segmentation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.lpcl_segmentation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.ma_temperature">
 <span class="sig-name descname"><span class="pre">ma_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">51</span> <span class="pre">'Ma</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.ma_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -931,6 +984,11 @@
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.occupancy_grid_segmentation">
+<span class="sig-name descname"><span class="pre">occupancy_grid_segmentation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">120</span> <span class="pre">'Occupancy</span> <span class="pre">Grid</span> <span class="pre">Segmentation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.occupancy_grid_segmentation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.ohm_temperature">
 <span class="sig-name descname"><span class="pre">ohm_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">95</span> <span class="pre">'Ohm</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.ohm_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -938,6 +996,11 @@
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.output_trigger_enabled">
 <span class="sig-name descname"><span class="pre">output_trigger_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">26</span> <span class="pre">'Output</span> <span class="pre">Trigger</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.output_trigger_enabled" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.passive_depth_mode">
+<span class="sig-name descname"><span class="pre">passive_depth_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">115</span> <span class="pre">'Passive</span> <span class="pre">Depth</span> <span class="pre">Mode'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.passive_depth_mode" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -1102,7 +1165,7 @@
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.unknown">
-<span class="sig-name descname"><span class="pre">unknown</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">115</span> <span class="pre">'UNKNOWN'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.unknown" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">unknown</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">122</span> <span class="pre">'UNKNOWN'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.unknown" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
@@ -1157,6 +1220,7 @@
 <li><a class="reference internal" href="#">pyrealsense2.option</a><ul>
 <li><a class="reference internal" href="#pyrealsense2.option"><code class="docutils literal notranslate"><span class="pre">option</span></code></a><ul>
 <li><a class="reference internal" href="#pyrealsense2.option.__init__"><code class="docutils literal notranslate"><span class="pre">option.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.accel_sensitivity"><code class="docutils literal notranslate"><span class="pre">option.accel_sensitivity</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.accuracy"><code class="docutils literal notranslate"><span class="pre">option.accuracy</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.alternate_ir"><code class="docutils literal notranslate"><span class="pre">option.alternate_ir</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.ambient_light"><code class="docutils literal notranslate"><span class="pre">option.ambient_light</span></code></a></li>
@@ -1181,6 +1245,9 @@
 <li><a class="reference internal" href="#pyrealsense2.option.digital_gain"><code class="docutils literal notranslate"><span class="pre">option.digital_gain</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.disparity_shift"><code class="docutils literal notranslate"><span class="pre">option.disparity_shift</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.downscale_ratio"><code class="docutils literal notranslate"><span class="pre">option.downscale_ratio</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.dual_rgb_enable_auto_exposure"><code class="docutils literal notranslate"><span class="pre">option.dual_rgb_enable_auto_exposure</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.dual_rgb_exposure"><code class="docutils literal notranslate"><span class="pre">option.dual_rgb_exposure</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.dual_rgb_gain"><code class="docutils literal notranslate"><span class="pre">option.dual_rgb_gain</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.dual_rgb_rectification"><code class="docutils literal notranslate"><span class="pre">option.dual_rgb_rectification</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.embedded_filter_enabled"><code class="docutils literal notranslate"><span class="pre">option.embedded_filter_enabled</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.emitter_always_on"><code class="docutils literal notranslate"><span class="pre">option.emitter_always_on</span></code></a></li>
@@ -1226,6 +1293,7 @@
 <li><a class="reference internal" href="#pyrealsense2.option.led_power"><code class="docutils literal notranslate"><span class="pre">option.led_power</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.left_ir_temperature"><code class="docutils literal notranslate"><span class="pre">option.left_ir_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.lld_temperature"><code class="docutils literal notranslate"><span class="pre">option.lld_temperature</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.lpcl_segmentation"><code class="docutils literal notranslate"><span class="pre">option.lpcl_segmentation</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.ma_temperature"><code class="docutils literal notranslate"><span class="pre">option.ma_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.max_distance"><code class="docutils literal notranslate"><span class="pre">option.max_distance</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.mc_temperature"><code class="docutils literal notranslate"><span class="pre">option.mc_temperature</span></code></a></li>
@@ -1234,8 +1302,10 @@
 <li><a class="reference internal" href="#pyrealsense2.option.motion_range"><code class="docutils literal notranslate"><span class="pre">option.motion_range</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.noise_estimation"><code class="docutils literal notranslate"><span class="pre">option.noise_estimation</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.noise_filtering"><code class="docutils literal notranslate"><span class="pre">option.noise_filtering</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.occupancy_grid_segmentation"><code class="docutils literal notranslate"><span class="pre">option.occupancy_grid_segmentation</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.ohm_temperature"><code class="docutils literal notranslate"><span class="pre">option.ohm_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.output_trigger_enabled"><code class="docutils literal notranslate"><span class="pre">option.output_trigger_enabled</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.passive_depth_mode"><code class="docutils literal notranslate"><span class="pre">option.passive_depth_mode</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.post_processing_sharpening"><code class="docutils literal notranslate"><span class="pre">option.post_processing_sharpening</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.power_line_frequency"><code class="docutils literal notranslate"><span class="pre">option.power_line_frequency</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.pre_processing_sharpening"><code class="docutils literal notranslate"><span class="pre">option.pre_processing_sharpening</span></code></a></li>
@@ -1313,7 +1383,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.option</a></li> 
       </ul>
     </div>

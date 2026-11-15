@@ -21,12 +21,14 @@ pyrealsense2.auto_calibrated_device
       ~auto_calibrated_device.as_debug_protocol
       ~auto_calibrated_device.as_device_calibration
       ~auto_calibrated_device.as_firmware_logger
+      ~auto_calibrated_device.as_nn_loader
       ~auto_calibrated_device.as_playback
       ~auto_calibrated_device.as_recorder
       ~auto_calibrated_device.as_updatable
       ~auto_calibrated_device.as_update_device
       ~auto_calibrated_device.calculate_target_z
       ~auto_calibrated_device.first_color_sensor
+      ~auto_calibrated_device.first_depth_mapping_sensor
       ~auto_calibrated_device.first_depth_sensor
       ~auto_calibrated_device.first_fisheye_sensor
       ~auto_calibrated_device.first_motion_sensor
@@ -48,6 +50,7 @@ pyrealsense2.auto_calibrated_device
       ~auto_calibrated_device.is_firmware_logger
       ~auto_calibrated_device.is_in_recovery_mode
       ~auto_calibrated_device.is_metadata_enabled
+      ~auto_calibrated_device.is_nn_loader
       ~auto_calibrated_device.is_playback
       ~auto_calibrated_device.is_recorder
       ~auto_calibrated_device.is_updatable

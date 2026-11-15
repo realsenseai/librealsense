@@ -18,6 +18,7 @@ pyrealsense2.sensor
       ~sensor.__init__
       ~sensor.as_color_sensor
       ~sensor.as_debug_stream_sensor
+      ~sensor.as_depth_mapping_sensor
       ~sensor.as_depth_sensor
       ~sensor.as_fisheye_sensor
       ~sensor.as_max_usable_range_sensor
@@ -57,6 +58,7 @@ pyrealsense2.sensor
       ~sensor.is_color_sensor
       ~sensor.is_composite_option_read_only
       ~sensor.is_debug_stream_sensor
+      ~sensor.is_depth_mapping_sensor
       ~sensor.is_depth_sensor
       ~sensor.is_fisheye_sensor
       ~sensor.is_max_usable_range_sensor

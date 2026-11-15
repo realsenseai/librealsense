@@ -21,6 +21,7 @@ pyrealsense2.firmware_logger
       ~firmware_logger.as_debug_protocol
       ~firmware_logger.as_device_calibration
       ~firmware_logger.as_firmware_logger
+      ~firmware_logger.as_nn_loader
       ~firmware_logger.as_playback
       ~firmware_logger.as_recorder
       ~firmware_logger.as_updatable
@@ -28,6 +29,7 @@ pyrealsense2.firmware_logger
       ~firmware_logger.create_message
       ~firmware_logger.create_parsed_message
       ~firmware_logger.first_color_sensor
+      ~firmware_logger.first_depth_mapping_sensor
       ~firmware_logger.first_depth_sensor
       ~firmware_logger.first_fisheye_sensor
       ~firmware_logger.first_motion_sensor
@@ -51,6 +53,7 @@ pyrealsense2.firmware_logger
       ~firmware_logger.is_firmware_logger
       ~firmware_logger.is_in_recovery_mode
       ~firmware_logger.is_metadata_enabled
+      ~firmware_logger.is_nn_loader
       ~firmware_logger.is_playback
       ~firmware_logger.is_recorder
       ~firmware_logger.is_updatable

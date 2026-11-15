@@ -115,6 +115,9 @@ Typedefs</h2></td></tr>
 <tr class="memitem:acc0d1d6aa264039bdc3ea6e843faa59e"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="rs__option_8h.html#acc02eb12a0f3eff5a8493305c416a293">rs2_colored_ir_auto_exposure_mode</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#acc0d1d6aa264039bdc3ea6e843faa59e">rs2_colored_ir_auto_exposure_mode</a></td></tr>
 <tr class="memdesc:acc0d1d6aa264039bdc3ea6e843faa59e"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE option on colored-IR devices, where the same imagers feed both the color and the depth pipeline so auto exposure has to be arbitrated between them.  <a href="#acc0d1d6aa264039bdc3ea6e843faa59e">More...</a><br /></td></tr>
 <tr class="separator:acc0d1d6aa264039bdc3ea6e843faa59e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afd0c36ea2401d75787af301322d5826a"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#afd0c36ea2401d75787af301322d5826a">rs2_passive_depth_mode</a></td></tr>
+<tr class="memdesc:afd0c36ea2401d75787af301322d5826a"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which exposure classes produce depth.  <a href="#afd0c36ea2401d75787af301322d5826a">More...</a><br /></td></tr>
+<tr class="separator:afd0c36ea2401d75787af301322d5826a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a11475d2b650d9b06dbb44912619fc4f7"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="rs__option_8h.html#a87c1f9a92fa0b57f575e06a715a7bcb0">rs2_emitter_mode</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#a11475d2b650d9b06dbb44912619fc4f7">rs2_emitter_mode</a></td></tr>
 <tr class="memdesc:a11475d2b650d9b06dbb44912619fc4f7"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_EMITTER_MODE option.  <a href="#a11475d2b650d9b06dbb44912619fc4f7">More...</a><br /></td></tr>
 <tr class="separator:a11475d2b650d9b06dbb44912619fc4f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -127,6 +130,9 @@ Typedefs</h2></td></tr>
 <tr class="memitem:a8674592d74151ae052d30c36862509fe"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="rs__option_8h.html#ab3b54886de1575c1827440b558c8fae2">rs2_gyro_sensitivity</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#a8674592d74151ae052d30c36862509fe">rs2_gyro_sensitivity</a></td></tr>
 <tr class="memdesc:a8674592d74151ae052d30c36862509fe"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_GYRO_SENSITIVITY option.  <a href="#a8674592d74151ae052d30c36862509fe">More...</a><br /></td></tr>
 <tr class="separator:a8674592d74151ae052d30c36862509fe"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae6a7bba6bcc90c2d909bb3fd167dca98"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#ae6a7bba6bcc90c2d909bb3fd167dca98">rs2_accel_sensitivity</a></td></tr>
+<tr class="memdesc:ae6a7bba6bcc90c2d909bb3fd167dca98"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_ACCEL_SENSITIVITY option, the accelerometer full-scale range.  <a href="#ae6a7bba6bcc90c2d909bb3fd167dca98">More...</a><br /></td></tr>
+<tr class="separator:ae6a7bba6bcc90c2d909bb3fd167dca98"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="enum-members"></a>
 Enumerations</h2></td></tr>
@@ -276,7 +282,15 @@ Enumerations</h2></td></tr>
 <a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a57be41ec5a8e11847f2988acb5940bc9">RS2_OPTION_EMITTER_MODE</a>, 
 <a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a8fe36e1270a64496e345e486e2f2560d">RS2_OPTION_ENABLE_ALIGNED_DEPTH</a>, 
 <br />
-&#160;&#160;<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a4158983f553ef28b078dd7716ce73419">RS2_OPTION_COUNT</a>
+&#160;&#160;<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a468cd00cf53ddeef096227cb167e24c0">RS2_OPTION_PASSIVE_DEPTH_MODE</a>, 
+<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a0d5a045648103f07d25495569d25d383">RS2_OPTION_DUAL_RGB_ENABLE_AUTO_EXPOSURE</a>, 
+<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a7a52555a979dcf0a72e7963edc990934">RS2_OPTION_DUAL_RGB_EXPOSURE</a>, 
+<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a08994681ed8d309133f9a30782cbbd09">RS2_OPTION_DUAL_RGB_GAIN</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a92179d57a13479d80cdfc45d38a549fa">RS2_OPTION_ACCEL_SENSITIVITY</a>, 
+<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a0070fa6ff6ea9bc34538dc37cfc4cde7">RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION</a>, 
+<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a3b0df01016a5c6b95435906980aa74a2">RS2_OPTION_LPCL_SEGMENTATION</a>, 
+<a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2a4158983f553ef28b078dd7716ce73419">RS2_OPTION_COUNT</a>
 <br />
  }</td></tr>
 <tr class="memdesc:a8b9c011f705cfab20c7eaaa7a26040e2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Defines general configuration controls. These can generally be mapped to camera UVC controls, and can be set / queried at any time unless stated otherwise.  <a href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2">More...</a><br /></td></tr>
@@ -390,6 +404,13 @@ Enumerations</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:acc02eb12a0f3eff5a8493305c416a293"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE option on colored-IR devices, where the same imagers feed both the color and the depth pipeline so auto exposure has to be arbitrated between them.  <a href="rs__option_8h.html#acc02eb12a0f3eff5a8493305c416a293">More...</a><br /></td></tr>
 <tr class="separator:acc02eb12a0f3eff5a8493305c416a293"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af4d3cb5ad7ae268af82f679c79f523aa"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a> { <a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aaa931202345f84ae04e055418f4dd1c1ba">RS2_PASSIVE_DEPTH_MODE_DISABLED</a> = 0, 
+<a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aaad89180c5ece3e3daf561b3540938178f">RS2_PASSIVE_DEPTH_MODE_ALTERNATING</a> = 1, 
+<a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aaa70bd47b55267facb5829cdf1155e392b">RS2_PASSIVE_DEPTH_MODE_FULL</a> = 2, 
+<a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aaa42de103c5ff2663742f99dad5a451b2f">RS2_PASSIVE_DEPTH_MODE_COUNT</a>
+ }</td></tr>
+<tr class="memdesc:af4d3cb5ad7ae268af82f679c79f523aa"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which exposure classes produce depth.  <a href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">More...</a><br /></td></tr>
+<tr class="separator:af4d3cb5ad7ae268af82f679c79f523aa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a87c1f9a92fa0b57f575e06a715a7bcb0"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#a87c1f9a92fa0b57f575e06a715a7bcb0">rs2_emitter_mode</a> { <br />
 &#160;&#160;<a class="el" href="rs__option_8h.html#a87c1f9a92fa0b57f575e06a715a7bcb0a0c9ef6d36d68dac7e0038aa669affd78">RS2_EMITTER_MODE_OFF</a> = 0, 
 <a class="el" href="rs__option_8h.html#a87c1f9a92fa0b57f575e06a715a7bcb0a2267ab0ce1e4f739b1f2d8ebde3b00c6">RS2_EMITTER_MODE_ON</a> = 1, 
@@ -431,6 +452,17 @@ Enumerations</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:ab3b54886de1575c1827440b558c8fae2"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_GYRO_SENSITIVITY option.  <a href="rs__option_8h.html#ab3b54886de1575c1827440b558c8fae2">More...</a><br /></td></tr>
 <tr class="separator:ab3b54886de1575c1827440b558c8fae2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae6180010a9b07a56c9d5f79807d39aa5"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a> { <br />
+&#160;&#160;<a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5a172a047c04d704254299a897b2ab5624">RS2_ACCEL_SENSITIVITY_3G</a> = 0, 
+<a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5addb7e79157c27d0838c051cf2f7617ee">RS2_ACCEL_SENSITIVITY_6G</a> = 1, 
+<a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5ace4faef8bd11ec26397b647576cb8e53">RS2_ACCEL_SENSITIVITY_12G</a> = 2, 
+<a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5a63efe75a6e959ae1d67b4a44474864eb">RS2_ACCEL_SENSITIVITY_24G</a> = 3, 
+<br />
+&#160;&#160;<a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5a06af03934fb9d73ee7ef72748077df5a">RS2_ACCEL_SENSITIVITY_COUNT</a>
+<br />
+ }</td></tr>
+<tr class="memdesc:ae6180010a9b07a56c9d5f79807d39aa5"><td class="mdescLeft">&#160;</td><td class="mdescRight">values for RS2_OPTION_ACCEL_SENSITIVITY option, the accelerometer full-scale range.  <a href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">More...</a><br /></td></tr>
+<tr class="separator:ae6180010a9b07a56c9d5f79807d39aa5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
@@ -460,6 +492,8 @@ Functions</h2></td></tr>
 <tr class="separator:afa8d2527a60eb0e21001420423005eaf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac9f1d577c3897b0d732bc646bc332134"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#ac9f1d577c3897b0d732bc646bc332134">rs2_colored_ir_auto_exposure_mode_to_string</a> (<a class="el" href="rs__option_8h.html#acc02eb12a0f3eff5a8493305c416a293">rs2_colored_ir_auto_exposure_mode</a> mode)</td></tr>
 <tr class="separator:ac9f1d577c3897b0d732bc646bc332134"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5c0c1a8a6218922d133b3495ea3f05ff"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#a5c0c1a8a6218922d133b3495ea3f05ff">rs2_passive_depth_mode_to_string</a> (<a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a> mode)</td></tr>
+<tr class="separator:a5c0c1a8a6218922d133b3495ea3f05ff"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7e48381ca91583105db9797a6afc0f59"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#a7e48381ca91583105db9797a6afc0f59">rs2_emitter_mode_to_string</a> (<a class="el" href="rs__option_8h.html#a87c1f9a92fa0b57f575e06a715a7bcb0">rs2_emitter_mode</a> mode)</td></tr>
 <tr class="separator:a7e48381ca91583105db9797a6afc0f59"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a56b7bbfc7c4a948c96de5dff91baef5d"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#a56b7bbfc7c4a948c96de5dff91baef5d">rs2_safety_mode_to_string</a> (<a class="el" href="rs__option_8h.html#af04225e63a7512ff8363b4e912f1668c">rs2_safety_mode</a> mode)</td></tr>
@@ -468,6 +502,8 @@ Functions</h2></td></tr>
 <tr class="separator:a18025de44dd3a9edb4369d398f8a00d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa5f570497891cc82a884360a648f3347"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#aa5f570497891cc82a884360a648f3347">rs2_gyro_sensitivity_to_string</a> (<a class="el" href="rs__option_8h.html#ab3b54886de1575c1827440b558c8fae2">rs2_gyro_sensitivity</a> mode)</td></tr>
 <tr class="separator:aa5f570497891cc82a884360a648f3347"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad58a52f1b1c30e78d9a3f1989749fe36"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#ad58a52f1b1c30e78d9a3f1989749fe36">rs2_accel_sensitivity_to_string</a> (<a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a> mode)</td></tr>
+<tr class="separator:ad58a52f1b1c30e78d9a3f1989749fe36"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac1b8d666e304e0b73d7a53d794f751fc"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#ac1b8d666e304e0b73d7a53d794f751fc">rs2_is_option_read_only</a> (const <a class="el" href="rs__types_8h.html#ae51b2a412b632c6caef98bf91629f274">rs2_options</a> *options, <a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2">rs2_option</a> option, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:ac1b8d666e304e0b73d7a53d794f751fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afd731fbcfb4f43b3c46bd23d720b506a"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__option_8h.html#afd731fbcfb4f43b3c46bd23d720b506a">rs2_get_option</a> (const <a class="el" href="rs__types_8h.html#ae51b2a412b632c6caef98bf91629f274">rs2_options</a> *options, <a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2">rs2_option</a> option, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -510,6 +546,22 @@ Functions</h2></td></tr>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Exposes sensor options functionality for C compilers. </p>
 </div><h2 class="groupheader">Typedef Documentation</h2>
+<a id="ae6a7bba6bcc90c2d909bb3fd167dca98"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae6a7bba6bcc90c2d909bb3fd167dca98">&#9670;&nbsp;</a></span>rs2_accel_sensitivity</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef enum <a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a>  <a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>values for RS2_OPTION_ACCEL_SENSITIVITY option, the accelerometer full-scale range. </p>
+
+</div>
+</div>
 <a id="ae6ea073efd8782b96363802d6b926127"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ae6ea073efd8782b96363802d6b926127">&#9670;&nbsp;</a></span>rs2_ambient_light</h2>
 
@@ -748,6 +800,22 @@ Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="afd0c36ea2401d75787af301322d5826a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afd0c36ea2401d75787af301322d5826a">&#9670;&nbsp;</a></span>rs2_passive_depth_mode</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef enum <a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a>  <a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which exposure classes produce depth. </p>
+
+</div>
+</div>
 <a id="a9aa61bcf4c9e538dfcc8b30adf910f34"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a9aa61bcf4c9e538dfcc8b30adf910f34">&#9670;&nbsp;</a></span>rs2_rs400_visual_preset</h2>
 
@@ -813,6 +881,29 @@ Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Enumeration Type Documentation</h2>
+<a id="ae6180010a9b07a56c9d5f79807d39aa5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae6180010a9b07a56c9d5f79807d39aa5">&#9670;&nbsp;</a></span>rs2_accel_sensitivity</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>values for RS2_OPTION_ACCEL_SENSITIVITY option, the accelerometer full-scale range. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="ae6180010a9b07a56c9d5f79807d39aa5a172a047c04d704254299a897b2ab5624"></a>RS2_ACCEL_SENSITIVITY_3G&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ae6180010a9b07a56c9d5f79807d39aa5addb7e79157c27d0838c051cf2f7617ee"></a>RS2_ACCEL_SENSITIVITY_6G&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ae6180010a9b07a56c9d5f79807d39aa5ace4faef8bd11ec26397b647576cb8e53"></a>RS2_ACCEL_SENSITIVITY_12G&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ae6180010a9b07a56c9d5f79807d39aa5a63efe75a6e959ae1d67b4a44474864eb"></a>RS2_ACCEL_SENSITIVITY_24G&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ae6180010a9b07a56c9d5f79807d39aa5a06af03934fb9d73ee7ef72748077df5a"></a>RS2_ACCEL_SENSITIVITY_COUNT&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+</div>
+</div>
 <a id="a7683bd69c416b07e341d4083eb533b23"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a7683bd69c416b07e341d4083eb533b23">&#9670;&nbsp;</a></span>rs2_ambient_light</h2>
 
@@ -1303,6 +1394,20 @@ Functions</h2></td></tr>
 </td></tr>
 <tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a8fe36e1270a64496e345e486e2f2560d"></a>RS2_OPTION_ENABLE_ALIGNED_DEPTH&#160;</td><td class="fielddoc"><p>Device-side depth-to-color alignment: the depth stream returns Z16 aligned to the color viewport. </p>
 </td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a468cd00cf53ddeef096227cb167e24c0"></a>RS2_OPTION_PASSIVE_DEPTH_MODE&#160;</td><td class="fielddoc"><p>D585 2C: which exposure classes produce depth, see rs2_passive_depth_mode for values (pre-stream only) </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a0d5a045648103f07d25495569d25d383"></a>RS2_OPTION_DUAL_RGB_ENABLE_AUTO_EXPOSURE&#160;</td><td class="fielddoc"><p>D585 2C: enable / disable auto-exposure of the RGB cameras, independent of the depth auto-exposure </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a7a52555a979dcf0a72e7963edc990934"></a>RS2_OPTION_DUAL_RGB_EXPOSURE&#160;</td><td class="fielddoc"><p>D585 2C: RGB exposure time in 100 microsecond units, like other color sensors. Setting any value disables RGB auto-exposure </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a08994681ed8d309133f9a30782cbbd09"></a>RS2_OPTION_DUAL_RGB_GAIN&#160;</td><td class="fielddoc"><p>D585 2C: RGB gain. Setting any value disables RGB auto-exposure </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a92179d57a13479d80cdfc45d38a549fa"></a>RS2_OPTION_ACCEL_SENSITIVITY&#160;</td><td class="fielddoc"><p>Control of the accel sensitivity (dynamic range) level, see rs2_accel_sensitivity for values. Selects the saturation point only, the reported unit scale is unchanged </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a0070fa6ff6ea9bc34538dc37cfc4cde7"></a>RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION&#160;</td><td class="fielddoc"><p>OccupancyGrid_Segmentation: Off (0) = depth-only labeling, On (1) = OG uses the segmentation mode and classes (pre-stream only) </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a3b0df01016a5c6b95435906980aa74a2"></a>RS2_OPTION_LPCL_SEGMENTATION&#160;</td><td class="fielddoc"><p>LPCL_Segmentation: Off (0) = depth-only labeling, On (1) = Labeled PCL uses the segmentation mode and classes (pre-stream only) </p>
+</td></tr>
 <tr><td class="fieldname"><a id="a8b9c011f705cfab20c7eaaa7a26040e2a4158983f553ef28b078dd7716ce73419"></a>RS2_OPTION_COUNT&#160;</td><td class="fielddoc"><p>Number of enumeration values. Not a valid input: intended to be used in for-loops. </p>
 </td></tr>
 </table>
@@ -1330,6 +1435,32 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a6fbcb41e0f93df91cdc58a011da2d895a2a945218d3467c8f3a9e8b24e2921848"></a>RS2_OPTION_TYPE_BOOLEAN&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a6fbcb41e0f93df91cdc58a011da2d895a94045d6d030c6028fcc5ec8986d880d2"></a>RS2_OPTION_TYPE_RECT&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a6fbcb41e0f93df91cdc58a011da2d895a216cddc5009790cdf7765681f3e21cd0"></a>RS2_OPTION_TYPE_COUNT&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+</div>
+</div>
+<a id="af4d3cb5ad7ae268af82f679c79f523aa"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af4d3cb5ad7ae268af82f679c79f523aa">&#9670;&nbsp;</a></span>rs2_passive_depth_mode</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which exposure classes produce depth. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="af4d3cb5ad7ae268af82f679c79f523aaa931202345f84ae04e055418f4dd1c1ba"></a>RS2_PASSIVE_DEPTH_MODE_DISABLED&#160;</td><td class="fielddoc"><p>Laser on: active depth only </p>
+</td></tr>
+<tr><td class="fieldname"><a id="af4d3cb5ad7ae268af82f679c79f523aaad89180c5ece3e3daf561b3540938178f"></a>RS2_PASSIVE_DEPTH_MODE_ALTERNATING&#160;</td><td class="fielddoc"><p>Laser alternates per frame: active and passive depth are both delivered </p>
+</td></tr>
+<tr><td class="fieldname"><a id="af4d3cb5ad7ae268af82f679c79f523aaa70bd47b55267facb5829cdf1155e392b"></a>RS2_PASSIVE_DEPTH_MODE_FULL&#160;</td><td class="fielddoc"><p>Laser forced off: passive depth only </p>
+</td></tr>
+<tr><td class="fieldname"><a id="af4d3cb5ad7ae268af82f679c79f523aaa42de103c5ff2663742f99dad5a451b2f"></a>RS2_PASSIVE_DEPTH_MODE_COUNT&#160;</td><td class="fielddoc"><p>Number of enumeration values. Not a valid input: intended to be used in for-loops. </p>
+</td></tr>
 </table>
 
 </div>
@@ -1450,6 +1581,24 @@ Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="ad58a52f1b1c30e78d9a3f1989749fe36"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad58a52f1b1c30e78d9a3f1989749fe36">&#9670;&nbsp;</a></span>rs2_accel_sensitivity_to_string()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char* rs2_accel_sensitivity_to_string </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__option_8h.html#ae6180010a9b07a56c9d5f79807d39aa5">rs2_accel_sensitivity</a>&#160;</td>
+          <td class="paramname"><em>mode</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a27ab5196a861cfdb82b8b8ec2fd79941"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a27ab5196a861cfdb82b8b8ec2fd79941">&#9670;&nbsp;</a></span>rs2_ambient_light_to_string()</h2>
 
@@ -2285,6 +2434,24 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a id="a5c0c1a8a6218922d133b3495ea3f05ff"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c0c1a8a6218922d133b3495ea3f05ff">&#9670;&nbsp;</a></span>rs2_passive_depth_mode_to_string()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char* rs2_passive_depth_mode_to_string </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__option_8h.html#af4d3cb5ad7ae268af82f679c79f523aa">rs2_passive_depth_mode</a>&#160;</td>
+          <td class="paramname"><em>mode</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
 
 </div>
 </div>

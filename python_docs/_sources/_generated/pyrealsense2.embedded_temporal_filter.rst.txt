@@ -16,6 +16,7 @@ pyrealsense2.embedded_temporal_filter
    .. autosummary::
    
       ~embedded_temporal_filter.__init__
+      ~embedded_temporal_filter.as_embedded_close_range_filter
       ~embedded_temporal_filter.as_embedded_decimation_filter
       ~embedded_temporal_filter.as_embedded_temporal_filter
       ~embedded_temporal_filter.get_composite_option
@@ -37,6 +38,7 @@ pyrealsense2.embedded_temporal_filter
       ~embedded_temporal_filter.get_temporal_filter_dpp_range
       ~embedded_temporal_filter.get_type
       ~embedded_temporal_filter.is_composite_option_read_only
+      ~embedded_temporal_filter.is_embedded_close_range_filter
       ~embedded_temporal_filter.is_embedded_decimation_filter
       ~embedded_temporal_filter.is_embedded_temporal_filter
       ~embedded_temporal_filter.is_option_read_only

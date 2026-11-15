@@ -21,11 +21,13 @@ pyrealsense2.eth_config_device
       ~eth_config_device.as_debug_protocol
       ~eth_config_device.as_device_calibration
       ~eth_config_device.as_firmware_logger
+      ~eth_config_device.as_nn_loader
       ~eth_config_device.as_playback
       ~eth_config_device.as_recorder
       ~eth_config_device.as_updatable
       ~eth_config_device.as_update_device
       ~eth_config_device.first_color_sensor
+      ~eth_config_device.first_depth_mapping_sensor
       ~eth_config_device.first_depth_sensor
       ~eth_config_device.first_fisheye_sensor
       ~eth_config_device.first_motion_sensor
@@ -56,6 +58,7 @@ pyrealsense2.eth_config_device
       ~eth_config_device.is_firmware_logger
       ~eth_config_device.is_in_recovery_mode
       ~eth_config_device.is_metadata_enabled
+      ~eth_config_device.is_nn_loader
       ~eth_config_device.is_playback
       ~eth_config_device.is_recorder
       ~eth_config_device.is_updatable

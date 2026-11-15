@@ -54,6 +54,7 @@
       STRsm
       STSloColorThresholdsControl
       STSloPenaltyControl
+      accel_sensitivity
       align
       auto_calibrated_device
       calib_location
@@ -77,6 +78,7 @@
       decimation_filter_dpp_config
       decimation_filter_dpp_range
       depth_frame
+      depth_mapping_sensor
       depth_sensor
       depth_stereo_sensor
       device
@@ -87,6 +89,7 @@
       disparity_transform
       distortion
       dpp_header
+      embedded_close_range_filter
       embedded_decimation_filter
       embedded_filter
       embedded_filter_type
@@ -121,11 +124,14 @@
       log_severity
       matchers
       max_usable_range_sensor
+      mjpeg_decoder
       motion_device_intrinsic
       motion_frame
       motion_sensor
       motion_stream
       motion_stream_profile
+      nn_loader
+      nn_target
       notification
       notification_category
       object_detection
@@ -136,6 +142,7 @@
       option_value
       options
       options_list
+      passive_depth_mode
       perception_frame
       perception_sensor
       perception_stream

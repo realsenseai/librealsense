@@ -21,11 +21,13 @@ pyrealsense2.recorder
       ~recorder.as_debug_protocol
       ~recorder.as_device_calibration
       ~recorder.as_firmware_logger
+      ~recorder.as_nn_loader
       ~recorder.as_playback
       ~recorder.as_recorder
       ~recorder.as_updatable
       ~recorder.as_update_device
       ~recorder.first_color_sensor
+      ~recorder.first_depth_mapping_sensor
       ~recorder.first_depth_sensor
       ~recorder.first_fisheye_sensor
       ~recorder.first_motion_sensor
@@ -45,6 +47,7 @@ pyrealsense2.recorder
       ~recorder.is_firmware_logger
       ~recorder.is_in_recovery_mode
       ~recorder.is_metadata_enabled
+      ~recorder.is_nn_loader
       ~recorder.is_playback
       ~recorder.is_recorder
       ~recorder.is_updatable

@@ -1,0 +1,70 @@
+pyrealsense2.nn_loader
+======================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: nn_loader
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~nn_loader.__init__
+      ~nn_loader.as_auto_calibrated_device
+      ~nn_loader.as_calibration_change_device
+      ~nn_loader.as_debug_protocol
+      ~nn_loader.as_device_calibration
+      ~nn_loader.as_firmware_logger
+      ~nn_loader.as_nn_loader
+      ~nn_loader.as_playback
+      ~nn_loader.as_recorder
+      ~nn_loader.as_updatable
+      ~nn_loader.as_update_device
+      ~nn_loader.first_color_sensor
+      ~nn_loader.first_depth_mapping_sensor
+      ~nn_loader.first_depth_sensor
+      ~nn_loader.first_fisheye_sensor
+      ~nn_loader.first_motion_sensor
+      ~nn_loader.first_perception_sensor
+      ~nn_loader.first_pose_sensor
+      ~nn_loader.first_roi_sensor
+      ~nn_loader.first_safety_sensor
+      ~nn_loader.get_device_time_ms
+      ~nn_loader.get_firmware_min_version
+      ~nn_loader.get_info
+      ~nn_loader.hardware_reset
+      ~nn_loader.is_auto_calibrated_device
+      ~nn_loader.is_calibration_change_device
+      ~nn_loader.is_connected
+      ~nn_loader.is_debug_protocol
+      ~nn_loader.is_device_calibration
+      ~nn_loader.is_firmware_logger
+      ~nn_loader.is_in_recovery_mode
+      ~nn_loader.is_metadata_enabled
+      ~nn_loader.is_nn_loader
+      ~nn_loader.is_playback
+      ~nn_loader.is_recorder
+      ~nn_loader.is_updatable
+      ~nn_loader.is_update_device
+      ~nn_loader.is_upload_supported
+      ~nn_loader.nn_upload
+      ~nn_loader.query_sensors
+      ~nn_loader.supports
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~nn_loader.sensors
+   
+   

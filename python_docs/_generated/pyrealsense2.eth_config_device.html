@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.eth_config_device &#8212; pyrealsense2 2.59.1 documentation</title>
+    <title>pyrealsense2.eth_config_device &#8212; pyrealsense2 2.59.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=c16f6a54"></script>
+    <script src="../_static/documentation_options.js?v=f697e03e"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.eth_config_device</a></li> 
       </ul>
     </div>  
@@ -68,19 +68,25 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_firmware_logger</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_playback</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_nn_loader</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_recorder</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_playback</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_updatable</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_recorder</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_update_device</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_updatable</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_color_sensor</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_update_device</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_color_sensor</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_depth_mapping_sensor</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_depth_sensor</span></code>(self)</p></td>
@@ -173,58 +179,61 @@
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_metadata_enabled</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_playback</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_nn_loader</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_recorder</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_playback</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_updatable</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_recorder</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_update_device</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_updatable</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_sensors</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_update_device</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_sensors</span></code>(self)</p></td>
 <td><p>Returns the list of adjacent devices, sharing the same physical parent composite device.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.restore_defaults" title="pyrealsense2.eth_config_device.restore_defaults"><code class="xref py py-obj docutils literal notranslate"><span class="pre">restore_defaults</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.restore_defaults" title="pyrealsense2.eth_config_device.restore_defaults"><code class="xref py py-obj docutils literal notranslate"><span class="pre">restore_defaults</span></code></a>(self)</p></td>
 <td><p>Restores configuration to factory settings</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_dds_domain" title="pyrealsense2.eth_config_device.set_dds_domain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_dds_domain</span></code></a>(self, domain)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_dds_domain" title="pyrealsense2.eth_config_device.set_dds_domain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_dds_domain</span></code></a>(self, domain)</p></td>
 <td><p>Set DDS domain (0-232)</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_dhcp_config" title="pyrealsense2.eth_config_device.set_dhcp_config"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_dhcp_config</span></code></a>(self, enabled, timeout)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_dhcp_config" title="pyrealsense2.eth_config_device.set_dhcp_config"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_dhcp_config</span></code></a>(self, enabled, timeout)</p></td>
 <td><p>Set DHCP configuration</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_gateway" title="pyrealsense2.eth_config_device.set_gateway"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_gateway</span></code></a>(self, gateway)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_gateway" title="pyrealsense2.eth_config_device.set_gateway"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_gateway</span></code></a>(self, gateway)</p></td>
 <td><p>Set gateway address</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_ip_address" title="pyrealsense2.eth_config_device.set_ip_address"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_ip_address</span></code></a>(self, ip)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_ip_address" title="pyrealsense2.eth_config_device.set_ip_address"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_ip_address</span></code></a>(self, ip)</p></td>
 <td><p>Set IP address</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_link_priority" title="pyrealsense2.eth_config_device.set_link_priority"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_link_priority</span></code></a>(self, priority)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_link_priority" title="pyrealsense2.eth_config_device.set_link_priority"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_link_priority</span></code></a>(self, priority)</p></td>
 <td><p>Set link priority</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_link_timeout" title="pyrealsense2.eth_config_device.set_link_timeout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_link_timeout</span></code></a>(self, timeout)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_link_timeout" title="pyrealsense2.eth_config_device.set_link_timeout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_link_timeout</span></code></a>(self, timeout)</p></td>
 <td><p>Set link timeout in milliseconds</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_mtu" title="pyrealsense2.eth_config_device.set_mtu"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_mtu</span></code></a>(self, mtu)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_mtu" title="pyrealsense2.eth_config_device.set_mtu"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_mtu</span></code></a>(self, mtu)</p></td>
 <td><p>Set MTU (Maximum Transmission Unit)</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_netmask" title="pyrealsense2.eth_config_device.set_netmask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_netmask</span></code></a>(self, netmask)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_netmask" title="pyrealsense2.eth_config_device.set_netmask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_netmask</span></code></a>(self, netmask)</p></td>
 <td><p>Set network mask</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_transmission_delay" title="pyrealsense2.eth_config_device.set_transmission_delay"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_transmission_delay</span></code></a>(self, delay)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_transmission_delay" title="pyrealsense2.eth_config_device.set_transmission_delay"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_transmission_delay</span></code></a>(self, delay)</p></td>
 <td><p>Set transmission delay</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_udp_ttl" title="pyrealsense2.eth_config_device.set_udp_ttl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_udp_ttl</span></code></a>(self, ttl)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.set_udp_ttl" title="pyrealsense2.eth_config_device.set_udp_ttl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_udp_ttl</span></code></a>(self, ttl)</p></td>
 <td><p>Set UDP TTL (Time To Live)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports</span></code>(self, info)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports</span></code>(self, info)</p></td>
 <td><p>Check if specific camera info is supported.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.supports_eth_config" title="pyrealsense2.eth_config_device.supports_eth_config"><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports_eth_config</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.eth_config_device.supports_eth_config" title="pyrealsense2.eth_config_device.supports_eth_config"><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports_eth_config</span></code></a>(self)</p></td>
 <td><p>Check if device supports ethernet configuration</p></td>
 </tr>
 </tbody>
@@ -452,7 +461,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.eth_config_device</a></li> 
       </ul>
     </div>

@@ -25,6 +25,7 @@ pyrealsense2.option
    
    .. autosummary::
    
+      ~option.accel_sensitivity
       ~option.accuracy
       ~option.alternate_ir
       ~option.ambient_light
@@ -49,6 +50,9 @@ pyrealsense2.option
       ~option.digital_gain
       ~option.disparity_shift
       ~option.downscale_ratio
+      ~option.dual_rgb_enable_auto_exposure
+      ~option.dual_rgb_exposure
+      ~option.dual_rgb_gain
       ~option.dual_rgb_rectification
       ~option.embedded_filter_enabled
       ~option.emitter_always_on
@@ -94,6 +98,7 @@ pyrealsense2.option
       ~option.led_power
       ~option.left_ir_temperature
       ~option.lld_temperature
+      ~option.lpcl_segmentation
       ~option.ma_temperature
       ~option.max_distance
       ~option.mc_temperature
@@ -103,8 +108,10 @@ pyrealsense2.option
       ~option.name
       ~option.noise_estimation
       ~option.noise_filtering
+      ~option.occupancy_grid_segmentation
       ~option.ohm_temperature
       ~option.output_trigger_enabled
+      ~option.passive_depth_mode
       ~option.post_processing_sharpening
       ~option.power_line_frequency
       ~option.pre_processing_sharpening

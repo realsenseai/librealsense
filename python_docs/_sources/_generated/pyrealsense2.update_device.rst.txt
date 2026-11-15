@@ -21,11 +21,13 @@ pyrealsense2.update_device
       ~update_device.as_debug_protocol
       ~update_device.as_device_calibration
       ~update_device.as_firmware_logger
+      ~update_device.as_nn_loader
       ~update_device.as_playback
       ~update_device.as_recorder
       ~update_device.as_updatable
       ~update_device.as_update_device
       ~update_device.first_color_sensor
+      ~update_device.first_depth_mapping_sensor
       ~update_device.first_depth_sensor
       ~update_device.first_fisheye_sensor
       ~update_device.first_motion_sensor
@@ -45,6 +47,7 @@ pyrealsense2.update_device
       ~update_device.is_firmware_logger
       ~update_device.is_in_recovery_mode
       ~update_device.is_metadata_enabled
+      ~update_device.is_nn_loader
       ~update_device.is_playback
       ~update_device.is_recorder
       ~update_device.is_updatable

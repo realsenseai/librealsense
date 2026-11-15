@@ -1,0 +1,35 @@
+pyrealsense2.accel_sensitivity
+==============================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: accel_sensitivity
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~accel_sensitivity.__init__
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~accel_sensitivity.12g
+      ~accel_sensitivity.24g
+      ~accel_sensitivity.3g
+      ~accel_sensitivity.6g
+      ~accel_sensitivity.name
+      ~accel_sensitivity.value
+   
+   

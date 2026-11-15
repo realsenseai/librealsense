@@ -21,11 +21,13 @@ pyrealsense2.device_calibration
       ~device_calibration.as_debug_protocol
       ~device_calibration.as_device_calibration
       ~device_calibration.as_firmware_logger
+      ~device_calibration.as_nn_loader
       ~device_calibration.as_playback
       ~device_calibration.as_recorder
       ~device_calibration.as_updatable
       ~device_calibration.as_update_device
       ~device_calibration.first_color_sensor
+      ~device_calibration.first_depth_mapping_sensor
       ~device_calibration.first_depth_sensor
       ~device_calibration.first_fisheye_sensor
       ~device_calibration.first_motion_sensor
@@ -45,6 +47,7 @@ pyrealsense2.device_calibration
       ~device_calibration.is_firmware_logger
       ~device_calibration.is_in_recovery_mode
       ~device_calibration.is_metadata_enabled
+      ~device_calibration.is_nn_loader
       ~device_calibration.is_playback
       ~device_calibration.is_recorder
       ~device_calibration.is_updatable

@@ -80,6 +80,8 @@ pyrealsense2.frame_metadata_value
       ~frame_metadata_value.number_of_3d_vertices
       ~frame_metadata_value.occupancy_cell_size
       ~frame_metadata_value.occupancy_grid_columns
+      ~frame_metadata_value.occupancy_grid_origin_x
+      ~frame_metadata_value.occupancy_grid_origin_y
       ~frame_metadata_value.occupancy_grid_rows
       ~frame_metadata_value.power_line_frequency
       ~frame_metadata_value.preset

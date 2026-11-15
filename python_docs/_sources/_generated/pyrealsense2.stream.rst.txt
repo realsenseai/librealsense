@@ -39,6 +39,7 @@ pyrealsense2.stream
       ~stream.name
       ~stream.object_detection
       ~stream.occupancy
+      ~stream.point_cloud
       ~stream.pose
       ~stream.safety
       ~stream.value

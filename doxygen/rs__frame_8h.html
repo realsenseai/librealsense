@@ -243,6 +243,9 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a001deb691d1ed3d4eb66966cedaacb33">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_X_CORD</a>, 
 <a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a143eba52057623ab24ffc8826ca65683">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_Y_CORD</a>, 
 <a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aef4982b0c326d95ad4cb9a83dad779ba">RS2_FRAME_METADATA_EMBEDDED_FILTERS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a3b00be39617b5b55d5ac682059efac1a">RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_X</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a08dce33309d8636e1442248f67c1403e">RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_Y</a>, 
 <a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a39aff1c9248160bd2a660633e5e5d517">RS2_FRAME_METADATA_COUNT</a>
 <br />
  }</td></tr>
@@ -701,6 +704,10 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a143eba52057623ab24ffc8826ca65683"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_Y_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #3, Y coord in mm </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aef4982b0c326d95ad4cb9a83dad779ba"></a>RS2_FRAME_METADATA_EMBEDDED_FILTERS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a3b00be39617b5b55d5ac682059efac1a"></a>RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_X&#160;</td><td class="fielddoc"><p>Occupancy-grid origin on the forward axis, in millimeters </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a08dce33309d8636e1442248f67c1403e"></a>RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_Y&#160;</td><td class="fielddoc"><p>Occupancy-grid origin on the lateral axis, in millimeters </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a39aff1c9248160bd2a660633e5e5d517"></a>RS2_FRAME_METADATA_COUNT&#160;</td><td class="fielddoc"></td></tr>
 </table>
@@ -2058,7 +2065,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>Pointer to an array of texture coordinates, lifetime is managed by the frame </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>Pointer to an array of texture coordinates, lifetime is managed by the frame; nullptr for a device point cloud (RS2_STREAM_POINT_CLOUD), which carries vertices only </dd></dl>
 
 </div>
 </div>

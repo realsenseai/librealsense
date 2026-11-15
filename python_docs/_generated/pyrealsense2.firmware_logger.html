@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.firmware_logger &#8212; pyrealsense2 2.59.1 documentation</title>
+    <title>pyrealsense2.firmware_logger &#8212; pyrealsense2 2.59.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=c16f6a54"></script>
+    <script src="../_static/documentation_options.js?v=f697e03e"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.firmware_logger</a></li> 
       </ul>
     </div>  
@@ -66,25 +66,31 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_firmware_logger</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_playback</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_nn_loader</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_recorder</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_playback</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_updatable</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_recorder</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_update_device</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_updatable</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.create_message" title="pyrealsense2.firmware_logger.create_message"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_message</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_update_device</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.create_message" title="pyrealsense2.firmware_logger.create_message"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_message</span></code></a>(self)</p></td>
 <td><p>Create FW Log</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.create_parsed_message" title="pyrealsense2.firmware_logger.create_parsed_message"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_parsed_message</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.create_parsed_message" title="pyrealsense2.firmware_logger.create_parsed_message"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_parsed_message</span></code></a>(self)</p></td>
 <td><p>Create FW Parsed Log</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_color_sensor</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_color_sensor</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_depth_mapping_sensor</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_depth_sensor</span></code>(self)</p></td>
@@ -156,31 +162,34 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_metadata_enabled</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_playback</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_nn_loader</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_recorder</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_playback</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_updatable</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_recorder</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_update_device</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_updatable</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.parse_log" title="pyrealsense2.firmware_logger.parse_log"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parse_log</span></code></a>(self, msg, parsed_msg)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_update_device</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.parse_log" title="pyrealsense2.firmware_logger.parse_log"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parse_log</span></code></a>(self, msg, parsed_msg)</p></td>
 <td><p>Parse Fw Log</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_sensors</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_sensors</span></code>(self)</p></td>
 <td><p>Returns the list of adjacent devices, sharing the same physical parent composite device.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.start_collecting" title="pyrealsense2.firmware_logger.start_collecting"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_collecting</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.start_collecting" title="pyrealsense2.firmware_logger.start_collecting"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_collecting</span></code></a>(self)</p></td>
 <td><p>Start collecting FW logs</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.stop_collecting" title="pyrealsense2.firmware_logger.stop_collecting"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stop_collecting</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.firmware_logger.stop_collecting" title="pyrealsense2.firmware_logger.stop_collecting"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stop_collecting</span></code></a>(self)</p></td>
 <td><p>Stop collecting FW logs</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports</span></code>(self, info)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports</span></code>(self, info)</p></td>
 <td><p>Check if specific camera info is supported.</p></td>
 </tr>
 </tbody>
@@ -310,7 +319,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.firmware_logger</a></li> 
       </ul>
     </div>

@@ -18,6 +18,7 @@ pyrealsense2.depth_stereo_sensor
       ~depth_stereo_sensor.__init__
       ~depth_stereo_sensor.as_color_sensor
       ~depth_stereo_sensor.as_debug_stream_sensor
+      ~depth_stereo_sensor.as_depth_mapping_sensor
       ~depth_stereo_sensor.as_depth_sensor
       ~depth_stereo_sensor.as_fisheye_sensor
       ~depth_stereo_sensor.as_max_usable_range_sensor
@@ -59,6 +60,7 @@ pyrealsense2.depth_stereo_sensor
       ~depth_stereo_sensor.is_color_sensor
       ~depth_stereo_sensor.is_composite_option_read_only
       ~depth_stereo_sensor.is_debug_stream_sensor
+      ~depth_stereo_sensor.is_depth_mapping_sensor
       ~depth_stereo_sensor.is_depth_sensor
       ~depth_stereo_sensor.is_fisheye_sensor
       ~depth_stereo_sensor.is_max_usable_range_sensor

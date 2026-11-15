@@ -21,6 +21,7 @@ pyrealsense2.playback
       ~playback.as_debug_protocol
       ~playback.as_device_calibration
       ~playback.as_firmware_logger
+      ~playback.as_nn_loader
       ~playback.as_playback
       ~playback.as_recorder
       ~playback.as_updatable
@@ -28,6 +29,7 @@ pyrealsense2.playback
       ~playback.current_status
       ~playback.file_name
       ~playback.first_color_sensor
+      ~playback.first_depth_mapping_sensor
       ~playback.first_depth_sensor
       ~playback.first_fisheye_sensor
       ~playback.first_motion_sensor
@@ -49,6 +51,7 @@ pyrealsense2.playback
       ~playback.is_firmware_logger
       ~playback.is_in_recovery_mode
       ~playback.is_metadata_enabled
+      ~playback.is_nn_loader
       ~playback.is_playback
       ~playback.is_real_time
       ~playback.is_recorder

@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.device &#8212; pyrealsense2 2.59.1 documentation</title>
+    <title>pyrealsense2.device &#8212; pyrealsense2 2.59.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=c16f6a54"></script>
+    <script src="../_static/documentation_options.js?v=f697e03e"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.device</a></li> 
       </ul>
     </div>  
@@ -66,19 +66,25 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.as_firmware_logger" title="pyrealsense2.device.as_firmware_logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_firmware_logger</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.as_playback" title="pyrealsense2.device.as_playback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_playback</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.as_nn_loader" title="pyrealsense2.device.as_nn_loader"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_nn_loader</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.as_recorder" title="pyrealsense2.device.as_recorder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_recorder</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.as_playback" title="pyrealsense2.device.as_playback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_playback</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.as_updatable" title="pyrealsense2.device.as_updatable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_updatable</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.as_recorder" title="pyrealsense2.device.as_recorder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_recorder</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.as_update_device" title="pyrealsense2.device.as_update_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_update_device</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.as_updatable" title="pyrealsense2.device.as_updatable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_updatable</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.first_color_sensor" title="pyrealsense2.device.first_color_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_color_sensor</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.as_update_device" title="pyrealsense2.device.as_update_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_update_device</span></code></a>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.first_color_sensor" title="pyrealsense2.device.first_color_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_color_sensor</span></code></a>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.first_depth_mapping_sensor" title="pyrealsense2.device.first_depth_mapping_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_depth_mapping_sensor</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.first_depth_sensor" title="pyrealsense2.device.first_depth_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_depth_sensor</span></code></a>(self)</p></td>
@@ -138,22 +144,25 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_metadata_enabled" title="pyrealsense2.device.is_metadata_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_metadata_enabled</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_playback" title="pyrealsense2.device.is_playback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_playback</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_nn_loader" title="pyrealsense2.device.is_nn_loader"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_nn_loader</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_recorder" title="pyrealsense2.device.is_recorder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_recorder</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_playback" title="pyrealsense2.device.is_playback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_playback</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_updatable" title="pyrealsense2.device.is_updatable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_updatable</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_recorder" title="pyrealsense2.device.is_recorder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_recorder</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_update_device" title="pyrealsense2.device.is_update_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_update_device</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_updatable" title="pyrealsense2.device.is_updatable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_updatable</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.query_sensors" title="pyrealsense2.device.query_sensors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_sensors</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_update_device" title="pyrealsense2.device.is_update_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_update_device</span></code></a>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.query_sensors" title="pyrealsense2.device.query_sensors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_sensors</span></code></a>(self)</p></td>
 <td><p>Returns the list of adjacent devices, sharing the same physical parent composite device.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.supports" title="pyrealsense2.device.supports"><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports</span></code></a>(self, info)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.supports" title="pyrealsense2.device.supports"><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports</span></code></a>(self, info)</p></td>
 <td><p>Check if specific camera info is supported.</p></td>
 </tr>
 </tbody>
@@ -192,6 +201,11 @@
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.device.as_nn_loader">
+<span class="sig-name descname"><span class="pre">as_nn_loader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">rs2::nn_loader</span></span></span><a class="headerlink" href="#pyrealsense2.device.as_nn_loader" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.device.as_playback">
 <span class="sig-name descname"><span class="pre">as_playback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">rs2::playback</span></span></span><a class="headerlink" href="#pyrealsense2.device.as_playback" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -214,6 +228,11 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.device.first_color_sensor">
 <span class="sig-name descname"><span class="pre">first_color_sensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pyrealsense2.color_sensor.html#pyrealsense2.color_sensor" title="pyrealsense2.color_sensor"><span class="pre">pyrealsense2.color_sensor</span></a></span></span><a class="headerlink" href="#pyrealsense2.device.first_color_sensor" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.device.first_depth_mapping_sensor">
+<span class="sig-name descname"><span class="pre">first_depth_mapping_sensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pyrealsense2.depth_mapping_sensor.html#pyrealsense2.depth_mapping_sensor" title="pyrealsense2.depth_mapping_sensor"><span class="pre">pyrealsense2.depth_mapping_sensor</span></a></span></span><a class="headerlink" href="#pyrealsense2.device.first_depth_mapping_sensor" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -316,6 +335,11 @@
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.device.is_nn_loader">
+<span class="sig-name descname"><span class="pre">is_nn_loader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#pyrealsense2.device.is_nn_loader" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.device.is_playback">
 <span class="sig-name descname"><span class="pre">is_playback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#pyrealsense2.device.is_playback" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -375,11 +399,13 @@
 <li><a class="reference internal" href="#pyrealsense2.device.as_debug_protocol"><code class="docutils literal notranslate"><span class="pre">device.as_debug_protocol()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.as_device_calibration"><code class="docutils literal notranslate"><span class="pre">device.as_device_calibration()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.as_firmware_logger"><code class="docutils literal notranslate"><span class="pre">device.as_firmware_logger()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.device.as_nn_loader"><code class="docutils literal notranslate"><span class="pre">device.as_nn_loader()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.as_playback"><code class="docutils literal notranslate"><span class="pre">device.as_playback()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.as_recorder"><code class="docutils literal notranslate"><span class="pre">device.as_recorder()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.as_updatable"><code class="docutils literal notranslate"><span class="pre">device.as_updatable()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.as_update_device"><code class="docutils literal notranslate"><span class="pre">device.as_update_device()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.first_color_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_color_sensor()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.device.first_depth_mapping_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_depth_mapping_sensor()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.first_depth_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_depth_sensor()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.first_fisheye_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_fisheye_sensor()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.first_motion_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_motion_sensor()</span></code></a></li>
@@ -399,6 +425,7 @@
 <li><a class="reference internal" href="#pyrealsense2.device.is_firmware_logger"><code class="docutils literal notranslate"><span class="pre">device.is_firmware_logger()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_in_recovery_mode"><code class="docutils literal notranslate"><span class="pre">device.is_in_recovery_mode()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_metadata_enabled"><code class="docutils literal notranslate"><span class="pre">device.is_metadata_enabled()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.device.is_nn_loader"><code class="docutils literal notranslate"><span class="pre">device.is_nn_loader()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_playback"><code class="docutils literal notranslate"><span class="pre">device.is_playback()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_recorder"><code class="docutils literal notranslate"><span class="pre">device.is_recorder()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_updatable"><code class="docutils literal notranslate"><span class="pre">device.is_updatable()</span></code></a></li>
@@ -443,7 +470,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.59.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.device</a></li> 
       </ul>
     </div>
