@@ -793,9 +793,15 @@ namespace rs2
         if (directory_exists("/etc/udev/rules.d") || directory_exists("/lib/udev/rules.d/"))
         {
             const std::string udev_rules_man("/etc/udev/rules.d/99-realsense-libusb.rules");
-            const std::string udev_rules_deb("/lib/udev/rules.d/60-librealsense2-udev-rules.rules");
+            std::string udev_rules_deb("/lib/udev/rules.d/99-realsense-libusb.rules");
             std::ifstream f_man(udev_rules_man);
             std::ifstream f_deb(udev_rules_deb);
+            if (!f_deb.good())
+            {
+                // Debian packages before the D555 IMU fix installed the rules under this name
+                udev_rules_deb = "/lib/udev/rules.d/60-librealsense2-udev-rules.rules";
+                f_deb.open(udev_rules_deb);
+            }
 
             std::string message = "UDEV-Rules permissions configuration \n for RealSense devices.`\n"
                         "Missing/outdated UDEV-Rules will cause 'Permissions Denied' errors\nunless the application is running under 'sudo' (not recommended)\n"
