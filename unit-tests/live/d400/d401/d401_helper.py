@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 FPS = 30
 DURATION_S = 4
 MIN_RATIO = 0.75   # frames received / frames expected
+RESOLUTIONS = [(1280, 720), (848, 480), (640, 480), (640, 360), (480, 270), (424, 240)]   # RGB8 outputs
 
 COLOR0 = (rs.stream.color, 0)
 COLOR1 = (rs.stream.color, 1)

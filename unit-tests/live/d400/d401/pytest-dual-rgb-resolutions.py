@@ -15,8 +15,6 @@ pytestmark = [
     pytest.mark.context( "nightly" ),
 ]
 
-RESOLUTIONS = [(1280, 720), (848, 480), (640, 480), (640, 360), (480, 270), (424, 240)]
-
 
 @pytest.fixture( scope="module", autouse=True )
 def require_dual_rgb( test_device ):
@@ -30,7 +28,7 @@ def depth_sensor( test_device ):
     yield dev.first_depth_sensor()
 
 
-@pytest.mark.parametrize( "w,h", RESOLUTIONS )
+@pytest.mark.parametrize( "w,h", helper.RESOLUTIONS )
 def test_both_colors_stream_at( depth_sensor, w, h ):
     profiles = [helper.require_profile( depth_sensor, COLOR0, rs.format.rgb8, w, h ),
                 helper.require_profile( depth_sensor, COLOR1, rs.format.rgb8, w, h )]
