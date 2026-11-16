@@ -65,7 +65,7 @@ namespace rs2
         // so an unpopulated/never-drawn filter reads as disabled rather than enabled.
         bool is_decimation_filter_dpp_enabled() const
         {
-            return _decimation_filter_dpp_editor.initialized && _decimation_filter_dpp_editor.value.enabled != 0;
+            return _decimation_filter_dpp_editor.initialized && _decimation_filter_dpp_editor.latest().enabled != 0;
         }
 
         // Seeds the cache above straight from the device, so is_decimation_filter_dpp_enabled() is
@@ -90,9 +90,6 @@ namespace rs2
 
         void embedded_filter_enable_disable(bool actual, std::string * error_message = nullptr);
 
-        // UI thread: applies composite changes flagged by the options-changed callback to the header toggle
-        void sync_composite_changes( std::string & error_message );
-
     private:
         // The "what to draw" half of each editor - returns whether the user is actively interacting
         // with any field this frame, which the editor's debounce countdown needs.
@@ -111,6 +108,7 @@ namespace rs2
                                        std::string & error_message );
         void populate_composite_options( std::string & error_message );
         void register_options_changed_callback();
+        void register_composite_options_changed_callback();
 
     protected:
         // The viewer stops sensors in the background; a SET sent meanwhile blocks the UI and sees the stream as still open
@@ -119,7 +117,6 @@ namespace rs2
         viewer_model& _viewer;
         subdevice_model * _owner;  // holds this model in its embedded_filters, so it always outlives it
         std::atomic<bool> _destructing;
-        std::atomic<bool> _composite_changed{ false };
         bool _enabled = true;
         std::shared_ptr<rs2::embedded_filter> _embedded_filter;
         std::map< rs2_option, option_model > _options_id_to_model;

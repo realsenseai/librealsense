@@ -22,55 +22,6 @@ options_watcher::~options_watcher()
 {
     _destructing = true;
     stop();
-
-    // An adopted watcher (a filter) can outlive its driver (the sensor)
-    std::lock_guard< std::mutex > lock( _adopted_mutex );
-    for( auto & weak : _adopted )
-        if( auto child = weak.lock() )
-            child->_driver = nullptr;
-}
-
-void options_watcher::adopt( std::shared_ptr< options_watcher > const & child )
-{
-    std::lock_guard< std::mutex > lock( _adopted_mutex );
-    _adopted.push_back( child );
-    child->_driver = this;
-}
-
-bool options_watcher::adopted_have_subscribers() const
-{
-    std::lock_guard< std::mutex > lock( _adopted_mutex );
-    for( auto & weak : _adopted )
-        if( auto child = weak.lock() )
-            if( child->_on_values_changed.size() > 0 )
-                return true;
-    return false;
-}
-
-void options_watcher::poll_adopted()
-{
-    std::vector< std::shared_ptr< options_watcher > > children;
-    {
-        std::lock_guard< std::mutex > lock( _adopted_mutex );
-        for( auto & weak : _adopted )
-            if( auto child = weak.lock() )
-                children.push_back( std::move( child ) );
-    }
-    for( auto & child : children )
-        child->poll_as_adopted();
-}
-
-void options_watcher::poll_as_adopted()
-{
-    if( _on_values_changed.size() == 0 )
-    {
-        _primed = false;
-        return;
-    }
-    auto changed = update_composite_options();
-    if( _primed )
-        notify( {}, changed );
-    _primed = true;  // the first poll only records the baseline
 }
 
 void options_watcher::register_option( rs2_option id, std::shared_ptr< option > option )
@@ -88,7 +39,7 @@ void options_watcher::register_composite_option( rs2_composite_option_id id, std
 {
     {
         std::lock_guard< std::mutex > lock( _mutex );
-        _composite_options.emplace( id, composite_and_value{ std::move( option ), nullptr } );
+        _composite_options.emplace( id, composite_option_and_value{ std::move( option ), nullptr } );
     }
 
     if( should_start() )
@@ -116,6 +67,16 @@ rsutils::subscription options_watcher::subscribe( callback && cb )
     return ret;
 }
 
+rsutils::subscription options_watcher::subscribe_composite( composite_callback && cb )
+{
+    rsutils::subscription ret = _on_composite_values_changed.subscribe( std::move( cb ) );
+
+    if( should_start() )
+        start();
+
+    return ret;
+}
+
 bool options_watcher::should_start() const
 {
     return ! should_stop();
@@ -123,19 +84,12 @@ bool options_watcher::should_start() const
 
 bool options_watcher::should_stop() const
 {
-    return ( _on_values_changed.size() == 0 && ! adopted_have_subscribers() )
-        || ( _options.empty() && _composite_options.empty() && ! adopted_have_subscribers() ) || _destructing;
+    return ( _on_values_changed.size() == 0 && _on_composite_values_changed.size() == 0 )
+        || ( _options.empty() && _composite_options.empty() ) || _destructing;
 }
 
 void options_watcher::start()
 {
-    if( auto driver = _driver.load() ) // Polled by the driver's thread, which has to be running
-    {
-        if( driver->should_start() )
-            driver->start();
-        return;
-    }
-
     if( _running.exchange( true ) ) // Already started; the exchange lets only one of concurrent calls spawn the thread
         return;
 
@@ -148,10 +102,15 @@ void options_watcher::start()
             std::unique_lock< std::mutex > lock( _mutex );
             _stopping.wait( lock, [this] { return should_stop() || ! _paused.load(); } );
         }
-        update_options();
-        update_composite_options();
-        thread_loop();
-        _running = false;
+        options_and_values options;
+        composite_options_and_values composites;
+        update( options, composites );
+        // A subscribe that arrived after the loop decided to exit saw _running and did not start a thread: resume here
+        do
+        {
+            thread_loop();
+            _running = false;
+        } while( should_start() && ! _running.exchange( true ) );
     } );
 }
 
@@ -203,8 +162,9 @@ void options_watcher::thread_loop()
                 continue;
         }
 
-        auto updated_options = update_options();
-        auto updated_composites = update_composite_options();
+        options_and_values updated_options;
+        composite_options_and_values updated_composites;
+        update( updated_options, updated_composites );
 
         // Checking stop conditions after update, if stop requested no need to notify.
         if( should_stop() )
@@ -214,6 +174,12 @@ void options_watcher::thread_loop()
     }
 }
 
+
+void options_watcher::update( options_and_values & updated_options, composite_options_and_values & updated_composites )
+{
+    updated_options = update_options();
+    updated_composites = update_composite_options();
+}
 
 options_watcher::options_and_values options_watcher::update_options()
 {
@@ -257,9 +223,9 @@ options_watcher::options_and_values options_watcher::update_options()
     return updated_options;
 }
 
-options_watcher::composite_ids options_watcher::update_composite_options()
+options_watcher::composite_options_and_values options_watcher::update_composite_options()
 {
-    composite_ids updated;
+    composite_options_and_values updated;
 
     std::lock_guard< std::mutex > lock( _mutex );
 
@@ -276,7 +242,7 @@ options_watcher::composite_ids options_watcher::update_composite_options()
             if( ! opt.second.p_last_known_value || *opt.second.p_last_known_value != curr_val )
             {
                 opt.second.p_last_known_value = std::make_shared< const std::vector< uint8_t > >( std::move( curr_val ) );
-                updated.push_back( opt.first );
+                updated[opt.first] = opt.second;
             }
         }
         catch( ... )
@@ -285,7 +251,7 @@ options_watcher::composite_ids options_watcher::update_composite_options()
             if( opt.second.p_last_known_value && ! opt.second.p_last_known_value->empty() )
             {
                 opt.second.p_last_known_value = std::make_shared< const std::vector< uint8_t > >();
-                updated.push_back( opt.first );
+                updated[opt.first] = opt.second;
             }
         }
     }
@@ -293,10 +259,13 @@ options_watcher::composite_ids options_watcher::update_composite_options()
     return updated;
 }
 
-void options_watcher::notify( options_and_values const & updated_options, composite_ids const & updated_composites )
+void options_watcher::notify( options_and_values const & updated_options,
+                              composite_options_and_values const & updated_composites )
 {
-    if( ! updated_options.empty() || ! updated_composites.empty() )
-        _on_values_changed.raise( updated_options, updated_composites );
+    if( ! updated_options.empty() )
+        _on_values_changed.raise( updated_options );
+    if( ! updated_composites.empty() )
+        _on_composite_values_changed.raise( updated_composites );
 }
 
 }  // namespace librealsense

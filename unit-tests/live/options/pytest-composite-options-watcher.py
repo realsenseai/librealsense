@@ -64,10 +64,12 @@ def watched(test_device):
     if watched is None:
         pytest.skip("No readable composite option on this device")
 
-    watched.filter.on_options_changed(lambda opt_list: watched.changed.extend(opt_list.get_changed_composite_options()))
+    changed = watched.changed  # captured alone: a lambda holding `watched` would keep the filter and its subscription alive
+    watched.filter.on_composite_options_changed(lambda l: changed.extend(l.id(i) for i in range(len(l))))
     time.sleep(1.5)  # let the options-watcher establish its baseline before making changes
     yield watched
 
+    watched.filter.on_composite_options_changed(lambda l: None)  # release the subscription
     watched.restore()
     time.sleep(2)  # let the restore settle, so it is not reported to the next test's watcher
 

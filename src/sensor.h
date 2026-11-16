@@ -265,9 +265,17 @@ namespace librealsense
         rsutils::subscription register_options_changed_callback( options_watcher::callback && cb ) override;
         virtual void register_option_to_update( rs2_option id, std::shared_ptr< option > option );
         virtual void unregister_option_from_update( rs2_option id );
+        void register_composite_option_to_update( rs2_composite_option_id id, std::shared_ptr< composite_option_interface > option )
+        {
+            _options_watcher.register_composite_option( id, std::move( option ) );
+        }
+        // Holds the sensor alive while it is in use; expires with the sensor
+        std::weak_ptr< options_watcher > get_options_watcher()
+        {
+            return std::shared_ptr< options_watcher >( shared_from_this(), &_options_watcher );
+        }
         inline void pause_options_watcher() { _options_watcher.pause(); }
         inline void unpause_options_watcher() { _options_watcher.unpause(); }
-        void adopt_options_watcher( std::shared_ptr< options_watcher > const & child ) { _options_watcher.adopt( child ); }
 
         void prepare_for_bulk_operation() override { _raw_sensor->prepare_for_bulk_operation(); }
         void finished_bulk_operation() override { _raw_sensor->finished_bulk_operation(); }

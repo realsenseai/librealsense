@@ -180,23 +180,6 @@ namespace rs2
 
         std::shared_ptr< rs2_options_list > get() const { return _list; };
 
-        // Composite options whose value changed (options-changed callback only); read them with get_composite_option()
-        std::vector< rs2_composite_option_id > get_changed_composite_options() const
-        {
-            std::vector< rs2_composite_option_id > res;
-            if( ! _list )
-                return res;
-            rs2_error * e = nullptr;
-            auto count = rs2_get_changed_composite_options_list_size( _list.get(), &e );
-            error::handle( e );
-            for( int i = 0; i < count; ++i )
-            {
-                res.push_back( rs2_get_changed_composite_option_from_list( _list.get(), i, &e ) );
-                error::handle( e );
-            }
-            return res;
-        }
-
     private:
         std::shared_ptr< rs2_options_list > _list;
         size_t _size;
@@ -216,6 +199,58 @@ namespace rs2
         {
             std::shared_ptr< rs2_options_list > sptr( list, rs2_delete_options_list );
             options_list opt_list( sptr );
+            _callback( opt_list );
+        }
+
+        void release() override { delete this; }
+    };
+
+    // Composite options that changed value, with their payloads. Delivered to on_composite_options_changed callbacks.
+    class composite_options_list
+    {
+    public:
+        explicit composite_options_list( std::shared_ptr< rs2_composite_options_list > list ) : _list( std::move( list ) ) {}
+
+        size_t size() const
+        {
+            rs2_error * e = nullptr;
+            auto size = rs2_get_composite_options_list_size( _list.get(), &e );
+            error::handle( e );
+            return static_cast< size_t >( size );
+        }
+
+        rs2_composite_option_id id( size_t i ) const
+        {
+            rs2_error * e = nullptr;
+            auto id = rs2_get_composite_option_from_list( _list.get(), static_cast< int >( i ), &e );
+            error::handle( e );
+            return id;
+        }
+
+        // Raw payload of the i-th option; empty when the option cannot be read right now
+        std::vector< uint8_t > get_value( size_t i ) const;
+
+        // Payload of the i-th option cast to T, like options::get_composite_option_as
+        template< typename T >
+        T get_as( size_t i ) const;
+
+    private:
+        std::shared_ptr< rs2_composite_options_list > _list;
+    };
+
+    class composite_options_changed_callback : public rs2_composite_options_changed_callback
+    {
+        std::function< void( const composite_options_list & ) > _callback;
+
+    public:
+        explicit composite_options_changed_callback( const std::function< void( const composite_options_list & ) > & callback )
+            : _callback( callback )
+        {
+        }
+
+        void on_value_changed( rs2_composite_options_list * list ) override
+        {
+            composite_options_list opt_list( std::shared_ptr< rs2_composite_options_list >( list, rs2_delete_composite_options_list ) );
             _callback( opt_list );
         }
 
@@ -363,6 +398,17 @@ namespace rs2
         {
             rs2_error * e = nullptr;
             rs2_set_options_changed_callback_cpp( _options, new options_changed_callback( callback ), &e );
+            error::handle( e );
+        }
+
+        /**
+         * sets a callback in case a composite option in this options container (an embedded filter) changes value
+         * \param[in] callback     the callback function, gets the changed composite options with their payloads
+         */
+        void on_composite_options_changed( std::function< void( const composite_options_list & ) > callback ) const
+        {
+            rs2_error * e = nullptr;
+            rs2_set_composite_options_changed_callback_cpp( _options, new composite_options_changed_callback( callback ), &e );
             error::handle( e );
         }
 
@@ -553,6 +599,8 @@ namespace rs2
 
         virtual ~options() = default;
 
+        friend class composite_options_list;
+
     protected:
         explicit options(rs2_options* o = nullptr) : _options(o)
         {
@@ -661,5 +709,20 @@ namespace rs2
     };
 
 
+
+    inline std::vector< uint8_t > composite_options_list::get_value( size_t i ) const
+    {
+        rs2_error * e = nullptr;
+        auto buffer = rs2_get_composite_option_value_from_list( _list.get(), static_cast< int >( i ), &e );
+        return options::unwrap_raw_data_buffer( buffer, e );
+    }
+
+    template< typename T >
+    T composite_options_list::get_as( size_t i ) const
+    {
+        T value{};
+        options::cast_composite_payload( get_value( i ), value );
+        return value;
+    }
 }
 #endif // LIBREALSENSE_RS2_OIPTIONS_HPP

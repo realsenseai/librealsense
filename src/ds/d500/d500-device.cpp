@@ -275,9 +275,13 @@ namespace librealsense
 
     void d500_depth_sensor::add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter )
     {
-        // The filter's composite options are polled by this sensor's options watcher, in its single bulk-operation scope
+        // The filter's composite options are read by this sensor's watcher: one thread, one bulk-operation scope
         if( auto base = std::dynamic_pointer_cast< embedded_filter_base >( filter ) )
-            adopt_options_watcher( std::shared_ptr< options_watcher >( base, &base->get_options_watcher() ) );
+        {
+            for( auto id : base->get_supported_composite_options() )
+                register_composite_option_to_update( id, base->get_composite_option_handler( id ) );
+            base->use_sensor_watcher( get_options_watcher() );
+        }
         _embedded_filters.push_back( std::move( filter ) );
     }
 
