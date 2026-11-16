@@ -58,13 +58,15 @@ def test_split():
     assert d585_config.split( '__SKIP__:D585 Proto Dual RGB' ) == ( '__SKIP__:D585 Proto Dual RGB', '3c' )
 
 
-def test_only_dual_rgb_patterns_select_the_switchable_camera( lab ):
+def test_only_dual_rgb_patterns_select_the_switchable_camera( monkeypatch, lab ):
     assert d585_config.switchable_to( 'Dual RGB' ) == ['541']
     assert d585_config.switchable_to( 'D585 Proto Dual RGB' ) == ['541']
     assert d585_config.switchable_to( 'D585 Dual RGB' ) == []
     assert d585_config.switchable_to( 'D585' ) == []
     assert d585_config.switchable_to( 'D500*' ) == []
     assert d585_config.switchable_to( '541' ) == []
+    monkeypatch.setattr( d585_config, '_option', lambda: None )
+    assert d585_config.switchable_to( 'Dual RGB' ) == []
 
 
 def test_can_toggle( monkeypatch, lab ):
