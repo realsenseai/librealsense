@@ -163,13 +163,13 @@ void init_pipeline(py::module &m) {
              "To avoid frame drops, this method should be called as fast as the device frame rate.\n"
              "The application can maintain the frames handles to defer processing. However, if the application maintains too long "
              "history, the device may lack memory resources to produce new frames, and the following calls to this method shall "
-             "return no new frames, until resources become available.")
+             "return no new frames, until resources become available.", py::call_guard<py::gil_scoped_release>())
         .def("try_wait_for_frames", [](const rs2::pipeline &self, unsigned int timeout_ms) {
             rs2::frameset fs;
             auto success = self.try_wait_for_frames(&fs, timeout_ms);
             return std::make_tuple(success, fs);
         }, "timeout_ms"_a = 5000, py::call_guard<py::gil_scoped_release>())
-        .def("get_active_profile", &rs2::pipeline::get_active_profile) // No docstring in C++
+        .def("get_active_profile", &rs2::pipeline::get_active_profile, py::call_guard<py::gil_scoped_release>()) // No docstring in C++
         .def( "set_device", &rs2::pipeline::set_device,
               "The function is used to assign the device, useful when the user wish to set controls that cannot be set while streaming. ",
               "device"_a );
