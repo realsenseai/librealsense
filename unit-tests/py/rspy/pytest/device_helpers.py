@@ -165,13 +165,13 @@ def _product_line_of(product):
     return None
 
 
-def _two_c_twin(sn, markers):
-    """'<sn>-2c' when the camera can switch to 2C and no device_exclude marker covers its 2C name, else None"""
+def _dual_rgb_twin(sn, markers):
+    """'<sn>-dual-rgb' when the camera can switch to dual RGB and no device_exclude marker covers its dual RGB name, else None"""
     device = devices.get(sn)
     if not d585_config.can_toggle(device):
         return None
-    two_c = d585_config.two_c_name(device).upper()
-    if any(m.name == 'device_exclude' and m.args and m.args[0].upper() in two_c for m in markers):
+    dual_rgb = d585_config.dual_rgb_name(device).upper()
+    if any(m.name == 'device_exclude' and m.args and m.args[0].upper() in dual_rgb for m in markers):
         return None
     return sn + d585_config.SUFFIX
 
@@ -238,10 +238,10 @@ def resolve_device_each_serials(metafunc):
     all_serials = []
     passes = _build_sn_filter(all_markers, cli_includes, cli_excludes)
 
-    def add_with_twin(sn, with_3c=True):
-        """a camera that can switch to 2C gets a second, 2C instance (the same camera) after its 3C one"""
-        twin = _two_c_twin(sn, all_markers)
-        for serial in ([sn] if with_3c else []) + ([twin] if twin else []):
+    def add_with_twin(sn, with_dedicated_sensor=True):
+        """a camera that can switch to dual RGB gets a second, dual RGB instance (the same camera) after its dedicated sensor one"""
+        twin = _dual_rgb_twin(sn, all_markers)
+        for serial in ([sn] if with_dedicated_sensor else []) + ([twin] if twin else []):
             if serial not in all_serials:
                 all_serials.append(serial)
 
@@ -250,9 +250,9 @@ def resolve_device_each_serials(metafunc):
             for sn in devices.by_spec(pattern, []):
                 if passes(sn):
                     add_with_twin(sn)
-            for sn in d585_config.switchable_to(pattern):   # a "Dual RGB" pattern selects only the 2C instance
+            for sn in d585_config.switchable_to(pattern):   # a "Dual RGB" pattern selects only the dual RGB instance
                 if passes(sn):
-                    add_with_twin(sn, with_3c=False)
+                    add_with_twin(sn, with_dedicated_sensor=False)
 
     # Each single-spec ``device()`` marker independently contributes one parametrized
     # instance (the first matching device, or a sentinel if none).  Multiple stacked
@@ -305,7 +305,7 @@ def resolve_device_each_serials(metafunc):
             dev = devices.get(real_sn)
             if not dev:
                 return sn
-            return f"{d585_config.two_c_name(dev)}-{sn}" if mode == '2c' else f"{dev.name}-{sn}"
+            return f"{d585_config.dual_rgb_name(dev)}-{sn}" if mode == 'dual_rgb' else f"{dev.name}-{sn}"
 
         ids = [_serial_id(sn) for sn in all_serials]
         metafunc.fixturenames.append('_test_device_serial')

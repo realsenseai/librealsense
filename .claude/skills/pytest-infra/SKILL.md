@@ -46,7 +46,7 @@ All Python tests run under pytest. `run-unit-tests.py` is kept only for C++ test
 
    - Exclude unsupported SKUs/transports with markers so they are skipped at collection — don't `pytest.skip()` at runtime for that.
    - When every test of a file needs a FW version, option or sensor, use `requires`, not a check in the body: it is evaluated before the camera is powered (no power cycle for a skip) and honors FW flashed earlier in the session. It skips the whole file, so a requirement of only some tests stays in those tests (`require_min_fw_version`, `pytest.skip`).
-   - A `device` / `device_each` test on a D585 that can switch to 2C also runs on it in 2C (param `<serial>-2c`), after all the 3C runs. Add `pytest.mark.device_exclude("Dual RGB")` to keep a test 3C-only; multi-device tests stay 3C-only.
+   - A `device` / `device_each` test on a D585 that can switch to dual RGB also runs on it in dual RGB (param `<serial>-dual-rgb`), after all the dedicated sensor runs. Add `pytest.mark.device_exclude("Dual RGB")` to keep a test dedicated sensor-only; multi-device tests stay dedicated sensor-only.
    - Don't add `pytest.mark.live`; `--live` filtering is derived from the `device` markers.
    - A new custom marker must be registered in `conftest.py:pytest_configure`.
 3. **Pick the lowest fixture you need**:
