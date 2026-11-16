@@ -400,7 +400,7 @@ def pytest_configure(config):
             hub_reset = config.getoption("--hub-reset", default=False)
             enable_dds = 'dds' in context_list
             devices.query(hub_reset=hub_reset, disable_dds=not enable_dds)
-            d585_config.adopt_3c_names()
+            d585_config.adopt_dedicated_sensor_names()
             devices.map_unknown_ports()
         except Exception as e:
             log.warning(f"Failed to query devices during configuration: {e}")
@@ -439,18 +439,18 @@ def pytest_collection_modifyitems(session, config, items):
         config.hook.pytest_deselected(items=[item for item in items if item not in included])
         items[:] = included
     filter_and_sort_items(config, items)
-    items.sort(key=lambda item: _item_mode(item) == '2c')   # the 2C runs come last: one switch to 2C, one back
+    items.sort(key=lambda item: _item_mode(item) == 'dual_rgb')   # the dual RGB runs come last: one switch to dual RGB, one back
 
 
 def _item_mode(item):
-    """'3c' or '2c' -- the configuration a parametrized device test instance runs its camera in"""
+    """'dedicated_sensor' or 'dual_rgb' -- the configuration a parametrized device test instance runs its camera in"""
     cs = getattr(item, 'callspec', None)
     serial = cs.params.get('_test_device_serial') if cs else None
-    return d585_config.split(serial)[1] if isinstance(serial, str) else '3c'
+    return d585_config.split(serial)[1] if isinstance(serial, str) else 'dedicated_sensor'
 
 
-def _is_last_2c_module(request, serial):
-    """True if this module holds the last 2C instance of the camera (the 2C runs are contiguous at the end)"""
+def _is_last_dual_rgb_module(request, serial):
+    """True if this module holds the last dual RGB instance of the camera (the dual RGB runs are contiguous at the end)"""
     last = [item for item in request.session.items if getattr(item, 'callspec', None)
             and item.callspec.params.get('_test_device_serial') == serial][-1]
     return last.path == request.path
@@ -832,7 +832,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     they get their port powered only because this fixture runs automatically for every
     device-marked module.
     """
-    serial_number, mode = _test_device_serial, '3c'
+    serial_number, mode = _test_device_serial, 'dedicated_sensor'
     if isinstance(serial_number, str):
         serial_number, mode = d585_config.split(serial_number)
 
@@ -938,23 +938,23 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
             log.warning(f"Cleanup after failed enable raised: {cleanup_err}")
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
 
-    # A D585 that can switch between 3C and 2C runs each module in the mode it was selected for
+    # A D585 that can switch between dedicated sensor and dual RGB runs each module in the mode it was selected for
     try:
         if device and d585_config.can_toggle(device):
             d585_config.ensure(serial_number, mode)
-        elif mode == '2c':
+        elif mode == 'dual_rgb':
             raise RuntimeError("sensors_config_mode is not supported")
     except Exception as e:
         _emit_test_header(item_id)
         _teardown([serial_number])
-        pytest.fail(f"Failed to switch {serial_number} to {mode.upper()}: {e}")
+        pytest.fail(f"Failed to switch {serial_number} to {mode}: {e}")
 
     yield serial_number
-    if mode == '2c' and _is_last_2c_module(request, _test_device_serial):
+    if mode == 'dual_rgb' and _is_last_dual_rgb_module(request, _test_device_serial):
         try:
-            d585_config.can_toggle(device) and d585_config.ensure(serial_number, '3c')
+            d585_config.can_toggle(device) and d585_config.ensure(serial_number, 'dedicated_sensor')
         except Exception as e:
-            log.warning(f"Failed to switch {serial_number} back to 3C: {e}")
+            log.warning(f"Failed to switch {serial_number} back to dedicated sensor: {e}")
     _teardown([serial_number])
 
 

@@ -25,7 +25,7 @@ pytestmark = [
     pytest.mark.device_each("D555"),
     pytest.mark.device_each("D585"),
     pytest.mark.device_each("D585S"),
-    pytest.mark.device_exclude("Dual RGB"),   # no firmware update in 2C
+    pytest.mark.device_exclude("Dual RGB"),   # no firmware update in dual RGB
     pytest.mark.priority(1),
     pytest.mark.timeout(2700),  # a recovery flash plus the update flash, each up to FW_TOOL_TIMEOUT
     pytest.mark.skipif(bool(os.environ.get('GITHUB_ACTIONS')), reason="not runnable on GHA"),
