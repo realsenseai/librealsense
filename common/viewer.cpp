@@ -766,8 +766,8 @@ namespace rs2
             }
             left += 80;
 
-            auto& lpc_dev = streams.at(last_labeled_points.get_profile().unique_id()).dev;
-            if (lpc_dev && device_has_safety_sensor(lpc_dev->dev)
+            auto lpc_stream = streams.find(last_labeled_points.get_profile().unique_id());
+            if (lpc_stream != streams.end() && lpc_stream->second.dev && lpc_stream->second.dev->safety_camera
                 && big_button(&show_safety_zones_3d, win, left, 0, textual_icons::draw_polygon,
                     "S. Zones", false, true,
                     "Show/hide Safety Zones"))

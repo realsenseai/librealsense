@@ -507,7 +507,7 @@ namespace rs2
               && dev && device_has_depth_mapping(dev->dev); // hide when zooming in, or for non-depth-mapping devices
         const bool show_safety_zones_button
             = RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1
-              && dev && device_has_safety_sensor(dev->dev);
+              && dev && dev->safety_camera;
 
         if (!viewer.allow_stream_close) --num_of_buttons;
         if (viewer.streams.size() > 1) ++num_of_buttons;
@@ -1276,7 +1276,6 @@ namespace rs2
 
         //add_descriptions_for_d500_metadata_fields(descriptions);
         bool use_depth_mapping_metadata_adaptations = false;
-        bool safety_camera = false;
         if (dev)
         {
             // A separate color sensor, and the D500 color streams, report the exposure in 100 usec units.
@@ -1290,10 +1289,7 @@ namespace rs2
             // devices, so it rides along on the same check here.
             use_depth_mapping_metadata_adaptations = device_has_depth_mapping(dev->dev);
             if (use_depth_mapping_metadata_adaptations)
-            {
                 add_depth_mapping_metadata_descriptions(descriptions);
-                safety_camera = device_has_safety_sensor(dev->dev);
-            }
 
             if (dev->dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
             {
@@ -1311,7 +1307,7 @@ namespace rs2
                 auto val = (rs2_frame_metadata_value)i;
                 std::string name = rs2_frame_metadata_to_string(val);
                 if( use_depth_mapping_metadata_adaptations )
-                    name = adapt_depth_mapping_metadata_name( name, safety_camera );
+                    name = adapt_depth_mapping_metadata_name( name, dev->safety_camera );  // adaptations imply dev
                 std::string desc;
                 if( descriptions.find( val ) != descriptions.end() )
                     desc = descriptions[val];

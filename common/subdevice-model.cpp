@@ -100,14 +100,6 @@ namespace rs2
             && std::string(dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE)) == "D500";
     }
 
-    bool device_has_safety_sensor(const device& dev)
-    {
-        for (auto&& s : dev.query_sensors())
-            if (s.is<safety_sensor>())
-                return true;
-        return false;
-    }
-
     bool is_beta_stream(rs2_stream type)
     {
         return type == RS2_STREAM_OCCUPANCY
@@ -275,6 +267,8 @@ namespace rs2
         // "starts out 'started'" disagrees with the constructor in src/dispatcher.cpp.)
         _set_dispatcher->start();
         supported_options = s->get_supported_options();
+        for (auto&& dev_sensor : dev.query_sensors())
+            safety_camera |= dev_sensor.is<safety_sensor>();
         restore_processing_block("colorizer", depth_colorizer);
         restore_processing_block("yuy2rgb", yuy2rgb);
         restore_processing_block("m420_to_rgb", m420_to_rgb);
