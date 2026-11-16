@@ -86,7 +86,7 @@ def grab_frames(dev, depth_sensor, depth, color):
     try:
         deadline = time.time() + MAX_TIME_TO_WAIT_FOR_FRAMES
         while True:
-            frames = sync.wait_for_frames(MAX_TIME_TO_WAIT_FOR_FRAMES * 1000)
+            frames = sync.wait_for_frames(max(1, int((deadline - time.time()) * 1000)))  # the overall deadline holds
             if frames.get_depth_frame() and (frames.get_color_frame() or not color):
                 return frames.get_depth_frame(), frames.get_color_frame()
             assert time.time() < deadline, "no frameset with all the streams"
