@@ -62,7 +62,8 @@ def color_profiles(dev):
 def depth_and_color(dev, sensor):
     """A depth profile and the color profile to stream next to it. GMSL firmware starts aligned depth only when color
     is set to the same size and fps in YUYV or NV12 - checked even while color is not streaming - so tests stream such
-    a pair. Only GMSL needs it: elsewhere, without such a pair or a dedicated color sensor, depth streams alone (None)."""
+    a pair. Only GMSL needs it: elsewhere, without such a pair, any color at the depth fps does, and without one or
+    a dedicated color sensor, depth streams alone (None)."""
     colors = color_profiles(dev)
     if not colors:
         return depth_profile(sensor), None
@@ -73,7 +74,8 @@ def depth_and_color(dev, sensor):
             return depth, color
     if dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "GMSL":
         pytest.fail("no YUYV or NV12 color profile matching a depth profile in size and fps, which GMSL requires")
-    return depth_profile(sensor), None
+    depth = depth_profile(sensor)
+    return depth, next((c for c in colors if c.fps() == depth.fps()), None)
 
 
 def grab_frames(dev, depth_sensor, depth, color):
