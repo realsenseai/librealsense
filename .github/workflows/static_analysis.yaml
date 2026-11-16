@@ -223,12 +223,13 @@ jobs:
         setarch $(uname -m) -R python3 unit-tests/run-unit-tests.py --no-color --stdout --not-live --context "linux"
 
     # Python isn't instrumented, so libtsan is preloaded; after setarch, or setarch itself loads it and dies
+    # Races are timing-dependent: a single pass missed the playback race in 2 of 6 runs, so run 3 passes
     - name: pytest
       id: pytest
       continue-on-error: true
       run: |
         python3 -m pip install -r unit-tests/requirements.txt
-        setarch $(uname -m) -R env LD_PRELOAD=$(gcc -print-file-name=libtsan.so) python3 -m pytest unit-tests/ --color=no -s --not-live --context "linux"
+        setarch $(uname -m) -R env LD_PRELOAD=$(gcc -print-file-name=libtsan.so) python3 -m pytest unit-tests/ --color=no -s --not-live --context "linux" --count 3
 
     - name: Upload TSan logs
       if: always()
