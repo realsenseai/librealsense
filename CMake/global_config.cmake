@@ -14,10 +14,15 @@ include(CMake/version_config.cmake)
 
 if(ENABLE_CCACHE)
   find_program(CCACHE_FOUND ccache)
-  if(CCACHE_FOUND)
+  if(CCACHE_FOUND AND EXISTS "${CCACHE_FOUND}")  # the cached path outlives an uninstalled ccache
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-  endif(CCACHE_FOUND)
+      if(CMAKE_GENERATOR MATCHES "Visual Studio")
+          # VS generators ignore RULE_LAUNCH_*: MSBuild runs a ccache copy named cl.exe, one source per call
+          configure_file(${CCACHE_FOUND} ${CMAKE_BINARY_DIR}/cl.exe COPYONLY)
+          list(APPEND CMAKE_VS_GLOBALS "CLToolExe=cl.exe" "CLToolPath=${CMAKE_BINARY_DIR}" "UseMultiToolTask=true")
+      endif()
+  endif()
 endif()
 
 macro(global_set_flags)
