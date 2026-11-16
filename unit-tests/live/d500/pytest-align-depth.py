@@ -77,24 +77,27 @@ def depth_and_color(dev, sensor):
 
 
 def grab_frames(dev, depth_sensor, depth, color):
-    """Streams depth, and color when given, once; returns a depth frame and the color frame that came with it."""
+    """Streams depth, and color when given, once; returns the first depth frame and the first color frame (or None).
+    Texture coordinates come from calibration alone, so the two need not be a synced pair."""
     color_sensor = next(s for s in dev.sensors if s.is_color_sensor()) if color else None
     streams = [(depth_sensor, depth)] + ([(color_sensor, color)] if color else [])
-    sync = rs.syncer()
+    queue = rs.frame_queue(10)
     opened, started = [], []
     try:
         for sensor, profile in streams:
             sensor.open(profile)
             opened.append(sensor)
         for sensor in opened:
-            sensor.start(sync)
+            sensor.start(queue)
             started.append(sensor)
+        frames = {}
         deadline = time.time() + MAX_TIME_TO_WAIT_FOR_FRAMES
-        while True:
-            frames = sync.wait_for_frames(max(1, int((deadline - time.time()) * 1000)))  # the overall deadline holds
-            if frames.get_depth_frame() and (frames.get_color_frame() or not color):
-                return frames.get_depth_frame(), frames.get_color_frame()
-            assert time.time() < deadline, "no frameset with all the streams"
+        while len(frames) < len(streams):
+            assert time.time() < deadline, f"no frame of {[p.stream_name() for _, p in streams if p.stream_type() not in frames]}"
+            arrived, f = queue.try_wait_for_frame(100)
+            if arrived:
+                frames.setdefault(f.profile.stream_type(), f)
+        return frames[rs.stream.depth].as_depth_frame(), frames.get(rs.stream.color)
     finally:  # only what got opened and started, so a failure leaves nothing streaming for the next test
         for sensor in started:
             sensor.stop()
