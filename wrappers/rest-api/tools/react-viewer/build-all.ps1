@@ -117,7 +117,7 @@ $Duration = Measure-Duration {
             & $PyBin -m pip install pyinstaller | ForEach-Object { Write-Host $_ }
             if ($LASTEXITCODE -ne 0) { throw "pip install pyinstaller failed" }
         }
-        # Install runtime deps (fastapi, uvicorn, aiortc, pyrealsense2, ...) so
+        # Install runtime deps (fastapi, uvicorn, pyrealsense2, ...) so
         # PyInstaller's Analysis actually finds them; otherwise the produced bundle
         # is missing modules and crashes at first import.
         if (Test-Path "install.py") {

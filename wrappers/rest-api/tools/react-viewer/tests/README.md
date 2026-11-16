@@ -123,10 +123,6 @@ Tests run automatically on:
 
 ## Troubleshooting
 
-### Tests fail with WebRTC errors
-- WebRTC is mocked in `tests/setup/test-setup.ts`
-- Check that mocks are properly initialized
-
 ### E2E tests timeout
 - Ensure the viewer is built and bundled: `npm run build && npm run bundle`
 - Playwright starts the server itself; check `PYTHON_BIN` can import the SDK bindings

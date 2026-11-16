@@ -208,7 +208,7 @@ export function DevicePanel() {
       setFirmwareFileName(label)
       setFirmwareProgressDevice(device)
       setFirmwareProgressState({ is_updating: true, phase, progress: 0, last_error: null })
-      // Rejected outright: no Socket.IO event will arrive, so close the modal ourselves.
+      // Rejected outright: no firmware event will arrive, so close the modal ourselves.
       run(device.device_id).catch((error: Error) => {
         handleCloseFirmwareModal()
         addToast('error', error.message)

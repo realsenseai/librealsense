@@ -4,7 +4,7 @@
 from typing import List
 
 from fastapi import APIRouter
-from app.api.endpoints import advanced_mode, colorizer, devices, filters, firmware, hwm, options, point_cloud, sensors, streams, system, webrtc
+from app.api.endpoints import advanced_mode, colorizer, devices, events, filters, firmware, frames, hwm, options, sensors, streams, system
 
 
 def _get_sdk_version() -> str:
@@ -85,15 +85,15 @@ async def health_check():
         "warnings": _SDK_WARNINGS,
     }
 
+api_router.include_router(events.router, tags=["events"])
 api_router.include_router(devices.router, prefix="/devices", tags=["devices"])
 api_router.include_router(advanced_mode.router, prefix="/devices/{device_id}/advanced_mode", tags=["advanced_mode"])
 api_router.include_router(colorizer.router, prefix="/devices/{device_id}/colorizer", tags=["colorizer"])
 api_router.include_router(filters.router, prefix="/devices/{device_id}/sensors/{sensor_id}/filters", tags=["filters"])
 api_router.include_router(firmware.router, prefix="/devices/{device_id}/firmware", tags=["firmware"])
+api_router.include_router(frames.router, prefix="/devices/{device_id}/frames", tags=["frames"])
 api_router.include_router(hwm.router, prefix="/devices/{device_id}/hwm", tags=["hwm"])
-api_router.include_router(point_cloud.router, prefix="/devices/{device_id}/point_cloud", tags=["point_cloud"])
 api_router.include_router(sensors.router, prefix="/devices/{device_id}/sensors", tags=["sensors"])
 api_router.include_router(options.router, prefix="/devices/{device_id}/sensors/{sensor_id}/options", tags=["options"])
 api_router.include_router(streams.router, prefix="/devices/{device_id}/stream", tags=["streams"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])
-api_router.include_router(webrtc.router, prefix="/webrtc", tags=["webrtc"])

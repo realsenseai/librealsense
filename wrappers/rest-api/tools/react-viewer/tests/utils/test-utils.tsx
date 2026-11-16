@@ -1,7 +1,7 @@
 import { ReactElement, ReactNode } from 'react'
 import { render, RenderOptions } from '@testing-library/react'
 import { useAppStore } from '@/store'
-import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState } from '@/api/types'
+import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, SupportedStreamProfile } from '@/api/types'
 
 /**
  * Reset the store to initial state before each test
@@ -51,10 +51,6 @@ export function createMockDeviceState(device: DeviceInfo, overrides: Partial<Dev
     isActive: false,
     isStreaming: false,
     sensorStreamingStatus: {},
-    isPointCloudEnabled: false,
-    pointCloudVertices: null,
-    streamMetadata: {},
-    latestMetadata: null,
     ...overrides,
   }
 }
@@ -69,9 +65,17 @@ export function createMockSensor(overrides: Partial<SensorInfo> = {}): SensorInf
     supported_stream_profiles: [
       { stream_type: 'depth', stream_index: 0, format: 'z16', width: 640, height: 480, fps: 30, default: true },
     ],
-    is_streaming: false,
+    active_profiles: [],
     ...overrides,
   }
+}
+
+/** The profiles a sensor status reports started, by streamKey ("depth", "infrared-1"). */
+export function startedProfiles(...keys: string[]): SupportedStreamProfile[] {
+  return keys.map((key) => {
+    const [stream_type, index] = key.split('-')
+    return { stream_type, stream_index: Number(index ?? 0), format: 'z16', width: 640, height: 480, fps: 30, default: true }
+  })
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
-import { render, createMockDevice, createMockDeviceState, createMockStreamConfig } from '../../utils/test-utils'
+import { render, createMockDevice, createMockDeviceState, createMockStreamConfig, startedProfiles } from '../../utils/test-utils'
 import { StreamViewer } from '@/components/StreamViewer'
 
 describe('StreamViewer', () => {
@@ -57,7 +57,7 @@ describe('StreamViewer', () => {
         streamConfigs: [depthConfig],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -67,7 +67,7 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(1)
       expect(screen.getByText('DEPTH')).toBeInTheDocument()
     })
 
@@ -87,7 +87,7 @@ describe('StreamViewer', () => {
         streamConfigs: [depthConfig, colorConfig],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color') },
         },
       })
       
@@ -97,7 +97,7 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(2)
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(2)
       expect(screen.getByText('DEPTH')).toBeInTheDocument()
       expect(screen.getByText('COLOR')).toBeInTheDocument()
     })
@@ -116,7 +116,7 @@ describe('StreamViewer', () => {
         streamConfigs: [config1],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       const state2 = createMockDeviceState(device2, {
@@ -124,7 +124,7 @@ describe('StreamViewer', () => {
         streamConfigs: [config2],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -137,7 +137,7 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(2)
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(2)
     })
 
     it('only shows streams from active devices, not inactive ones', () => {
@@ -149,7 +149,7 @@ describe('StreamViewer', () => {
         streamConfigs: [createMockStreamConfig({ enable: true })],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       const inactiveState = createMockDeviceState(inactiveDevice, {
@@ -157,7 +157,7 @@ describe('StreamViewer', () => {
         streamConfigs: [createMockStreamConfig({ enable: true })],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -170,7 +170,7 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(1)
     })
   })
 
@@ -192,15 +192,15 @@ describe('StreamViewer', () => {
       })
 
       expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
-      expect(document.querySelector('video.stream-video')).toBeNull()
+      expect(document.querySelector('canvas.stream-video')).toBeNull()
     })
   })
 
   describe('Tile hiding until streaming', () => {
-    it('renders tile when stream_type is in the active list (case-insensitive)', () => {
+    it('renders tile when its stream is among the started profiles', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({
-        stream_type: 'INFRARED-1',
+        stream_type: 'infrared-1',
         sensor_id: 'sensor-0',
         enable: true,
       })
@@ -212,7 +212,7 @@ describe('StreamViewer', () => {
             sensor_id: 'sensor-0',
             name: 'Stereo Module',
             is_streaming: true,
-            stream_types: ['depth', 'infrared-1'],
+            profiles: startedProfiles('depth', 'infrared-1'),
           },
         },
       })
@@ -223,7 +223,7 @@ describe('StreamViewer', () => {
         },
       })
 
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(1)
     })
 
     it('hides tile when stream_type is not in the active list', () => {
@@ -241,7 +241,7 @@ describe('StreamViewer', () => {
             sensor_id: 'sensor-0',
             name: 'Stereo Module',
             is_streaming: true,
-            stream_types: ['depth'],
+            profiles: startedProfiles('depth'),
           },
         },
       })
@@ -253,7 +253,7 @@ describe('StreamViewer', () => {
       })
 
       expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
-      expect(document.querySelector('video.stream-video')).toBeNull()
+      expect(document.querySelector('canvas.stream-video')).toBeNull()
     })
   })
 
@@ -266,7 +266,7 @@ describe('StreamViewer', () => {
         streamConfigs: [config],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -277,18 +277,18 @@ describe('StreamViewer', () => {
       })
       
       expect(screen.getByText('COLOR')).toBeInTheDocument()
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(1)
     })
 
     it('handles infrared stream type', () => {
       const device = createMockDevice()
-      const config = createMockStreamConfig({ stream_type: 'infrared', format: 'Y8', enable: true })
+      const config = createMockStreamConfig({ stream_type: 'infrared-1', format: 'Y8', enable: true })
       const deviceState = createMockDeviceState(device, {
         isActive: true,
         streamConfigs: [config],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared-1') },
         },
       })
       
@@ -298,8 +298,8 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(screen.getByText('INFRARED')).toBeInTheDocument()
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+      expect(screen.getByText('INFRARED-1')).toBeInTheDocument()
+      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(1)
     })
   })
 })

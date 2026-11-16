@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import { socketService } from './socket'
+import { onEvent } from './events'
 import { BACKEND_ORIGIN } from './backend'
 import { visibleOptions } from './types'
 import type {
@@ -9,9 +9,7 @@ import type {
   SensorFilters,
   SensorInfo,
   OptionInfo,
-  WebRTCOffer,
-  WebRTCSession,
-  ICECandidate,
+  StreamExtrinsics,
   SupportedStreamProfile,
 } from './types'
 
@@ -33,32 +31,21 @@ class ApiClient {
     })
   }
 
-  // ============ Firmware Socket.IO events ============
-  // These piggyback on the shared socketService connection (see api/socket.ts).
+  // ============ Firmware events (api/events.ts) ============
 
   onFirmwareProgress(deviceId: string, callback: FirmwareProgressCallback): () => void {
-    const eventName = `firmware_progress_${deviceId}`
-    const handler = (data: unknown) => {
-      const d = data as { progress: number; phase?: 'downloading' | 'installing' }
-      callback(d.progress, d.phase)
-    }
-    socketService.on(eventName, handler as (...args: unknown[]) => void)
-    return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
+    return onEvent<{ device_id: string; progress: number; phase?: 'downloading' | 'installing' }>('firmware_progress',
+      m => m.device_id === deviceId && callback(m.progress, m.phase))
   }
 
   onFirmwareError(deviceId: string, callback: FirmwareErrorCallback): () => void {
-    const eventName = `firmware_update_failed_${deviceId}`
-    const handler = (data: unknown) => callback((data as { error: string }).error)
-    socketService.on(eventName, handler as (...args: unknown[]) => void)
-    return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
+    return onEvent<{ device_id: string; error: string }>('firmware_update_failed',
+      m => m.device_id === deviceId && callback(m.error))
   }
 
   onFirmwareSuccess(deviceId: string, callback: FirmwareSuccessCallback): () => void {
-    const eventName = `firmware_update_success_${deviceId}`
-    const handler = (data: unknown) =>
-      callback((data as { firmware_version: string | null }).firmware_version)
-    socketService.on(eventName, handler as (...args: unknown[]) => void)
-    return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
+    return onEvent<{ device_id: string; firmware_version: string | null }>('firmware_update_success',
+      m => m.device_id === deviceId && callback(m.firmware_version))
   }
 
   // ============ Health ============
@@ -173,31 +160,6 @@ class ApiClient {
     return response.data.map((s) => ({ ...s, options: visibleOptions(s.options) }))
   }
 
-  async getDepthAtPixel(
-    deviceId: string,
-    x: number,
-    y: number
-  ): Promise<{ depth: number | null; x: number; y: number; units: string }> {
-    const response = await this.client.get<{
-      depth: number | null
-      x: number
-      y: number
-      units: string
-    }>(`/devices/${deviceId}/stream/depth-at-pixel/`, { params: { x, y } })
-    return response.data
-  }
-
-  async getDepthRange(
-    deviceId: string
-  ): Promise<{ min_depth: number; max_depth: number; units: string }> {
-    const response = await this.client.get<{
-      min_depth: number
-      max_depth: number
-      units: string
-    }>(`/devices/${deviceId}/stream/depth-range/`)
-    return response.data
-  }
-
   // ============ Per-Sensor Streaming (Sensor API) ============
 
   async startSensor(
@@ -208,51 +170,14 @@ class ApiClient {
     await this.client.post(`/devices/${deviceId}/sensors/${sensorId}/start`, { profiles })
   }
 
+  /** The device's calibration between its streams, from each to every other */
+  async getExtrinsics(deviceId: string): Promise<StreamExtrinsics[]> {
+    const { data } = await this.client.get<StreamExtrinsics[]>(`/devices/${deviceId}/extrinsics`)
+    return data
+  }
+
   async stopSensor(deviceId: string, sensorId: string): Promise<void> {
     await this.client.post(`/devices/${deviceId}/sensors/${sensorId}/stop`)
-  }
-
-  // ============ Point Cloud ============
-
-  async enablePointCloud(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/point_cloud/activate/`)
-  }
-
-  async disablePointCloud(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/point_cloud/deactivate/`)
-  }
-
-  // ============ WebRTC ============
-
-  async createWebRTCOffer(offer: WebRTCOffer): Promise<WebRTCSession> {
-    const response = await this.client.post<WebRTCSession>('/webrtc/offer/', offer)
-    return response.data
-  }
-
-  async sendWebRTCAnswer(sessionId: string, answer: RTCSessionDescriptionInit): Promise<void> {
-    await this.client.post('/webrtc/answer/', {
-      session_id: sessionId,
-      sdp: answer.sdp,
-      type: answer.type,
-    })
-  }
-
-  async addICECandidate(sessionId: string, candidate: ICECandidate): Promise<void> {
-    await this.client.post('/webrtc/ice-candidates/', {
-      session_id: sessionId,
-      candidate: candidate.candidate,
-      sdpMid: candidate.sdpMid,
-      sdpMLineIndex: candidate.sdpMLineIndex,
-    })
-  }
-
-  async getICECandidates(sessionId: string): Promise<ICECandidate[]> {
-    const response = await this.client.get<ICECandidate[]>(`/webrtc/sessions/${sessionId}/ice-candidates/`)
-    return response.data
-  }
-
-  async closeWebRTCSession(sessionId: string): Promise<void> {
-    await this.client.delete(`/webrtc/sessions/${sessionId}/`)
   }
 
   // ============ System ============

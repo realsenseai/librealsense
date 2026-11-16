@@ -9,7 +9,6 @@ export interface DeviceInfo {
   usb_type?: string
   product_id?: string
   sensors: string[]
-  is_streaming: boolean
   metadata_enabled?: boolean | null
 }
 
@@ -68,6 +67,7 @@ export interface SensorInfo {
   name: string
   type: string
   supported_stream_profiles: SupportedStreamProfile[]
+  active_profiles: SupportedStreamProfile[] // what it streams now, started by any client; empty when stopped
   options: OptionInfo[]
 }
 
@@ -82,7 +82,7 @@ export interface SupportedStreamProfile {
   default: boolean
 }
 
-/** The backend's name for a profile's stream ("depth", "infrared-1"), as frame, WebRTC and status lookups use it. */
+/** The backend's name for a profile's stream ("depth", "infrared-1"), as stream configs and frame lookups use it. */
 export const streamKey = (p: SupportedStreamProfile) =>
   p.stream_type === 'infrared' ? `infrared-${p.stream_index}` : p.stream_type
 
@@ -111,7 +111,6 @@ export interface OptionInfo {
 // (holes_fill lives on three of them), so the key is what tells those controls apart.
 export type SensorFilters = Record<string, {
   enabled: boolean
-  default_enabled: boolean
   options: OptionInfo[]
 }>
 
@@ -131,7 +130,7 @@ export interface ControlGroup {
                       // (the colorizer, advanced mode) is the depth sensor
   name: string        // '' when the section draws its controls without a subheader
   enabled?: boolean   // filters only: whether the frame passes through it
-  default_enabled?: boolean
+  default_enabled?: boolean // filters only: the legacy viewer's starting state, as the viewer starts them
   options: OptionInfo[]
 }
 
@@ -142,65 +141,6 @@ export interface StreamConfig {
   resolution: { width: number; height: number }
   framerate: number
   enable: boolean
-}
-
-export interface WebRTCOffer {
-  device_id: string
-  stream_types: string[]
-}
-
-export interface WebRTCSession {
-  session_id: string
-  sdp: string
-  type: string
-}
-
-export interface ICECandidate {
-  candidate: string
-  sdpMid: string
-  sdpMLineIndex: number
-}
-
-// Metadata from Socket.IO
-export interface StreamMetadata {
-  stream_type: string
-  timestamp: number
-  frame_number: number
-  // frame dims after post processing
-  width: number
-  height: number
-  motion_data?: IMUData
-  point_cloud?: PointCloudData
-  frame_metadata?: Record<string, number>
-  clock_domain?: string
-  hardware_fps?: number
-  pixel_format?: string
-  // frame dims as received from camera
-  hardware_width?: number
-  hardware_height?: number
-}
-
-export interface IMUData {
-  x: number
-  y: number
-  z: number
-}
-
-export interface PointCloudData {
-  // Raw float32 bytes (Socket.IO binary attachment) or base64-encoded string (legacy server).
-  vertices: ArrayBuffer | string
-  texture_coordinates: number[]
-  // Per-vertex RGB triplets (uint8, 3 bytes per vertex), matching `vertices` 1:1
-  // when the server textured the cloud from a live color frame. Same wire
-  // encoding as vertices: ArrayBuffer over binary socket, base64 string otherwise.
-  colors?: ArrayBuffer | string
-}
-
-export interface MetadataUpdate {
-  device_id: string
-  is_streaming: boolean
-  timestamp_server: number
-  metadata_streams: Record<string, StreamMetadata>
 }
 
 // UI State types
@@ -238,17 +178,43 @@ export interface DeviceState {
   isStreaming: boolean
   isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
-  streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
   // Per-sensor streaming state (sensor API)
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
+  extrinsics?: StreamExtrinsics[] // the device's calibration between its streams
 }
 
-// Per-sensor streaming state, kept by the viewer (the sensor API's start/stop return nothing)
+/** As rs2_intrinsics; model is an rs2_distortion name such as "brown_conrady" */
+export interface Intrinsics {
+  width: number
+  height: number
+  ppx: number
+  ppy: number
+  fx: number
+  fy: number
+  model: string
+  coeffs: number[]
+}
+
+/** As rs2_extrinsics: rotation is 3x3 column-major, translation in meters */
+export interface Extrinsics {
+  rotation: number[]
+  translation: number[]
+}
+
+/** From a stream to each stream of its device it is calibrated with */
+export interface StreamExtrinsics {
+  stream_type: string
+  stream_index: number
+  to: (Extrinsics & { stream_type: string; stream_index: number })[]
+}
+
+// Per-sensor streaming state, kept by the viewer
 export interface SensorStreamStatus {
   sensor_id: string
   is_streaming: boolean
-  stream_types?: string[]  // The streams it was started with, by streamKey
+  profiles?: SupportedStreamProfile[]  // what it streams now, started by any client
   error?: string | null
   // UI-only: pending operation state for optimistic updates
   pendingOp?: 'stopping' | null
+  startedHere?: boolean // this page started it, so this page stops it when the device is hidden
 }

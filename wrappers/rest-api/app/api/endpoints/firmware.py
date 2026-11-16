@@ -77,8 +77,8 @@ async def update_firmware_from_file(
         raise HTTPException(status_code=400, detail="Uploaded firmware file is empty")
 
     try:
-        # Firmware update is blocking; run it off the event loop so Socket.IO
-        # can deliver progress / completion events in real time.
+        # Firmware update is blocking; run it off the event loop so the events
+        # route can deliver progress / completion events in real time.
         return await run_in_threadpool(rs_manager.update_firmware_from_bytes, device_id, bytes(fw_buf))
     except RealSenseError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -95,7 +95,7 @@ async def update_firmware_from_recommended(
     """Download the device's recommended firmware (from the online versions DB) and flash it.
 
     One-click alternative to update_from_file: no upload — the backend fetches the .bin
-    and reuses the same DFU flow (and Socket.IO progress events).
+    and reuses the same DFU flow (and its progress events).
     """
     try:
         return await run_in_threadpool(rs_manager.update_firmware_from_recommended, device_id)

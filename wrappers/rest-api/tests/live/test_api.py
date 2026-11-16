@@ -45,10 +45,9 @@ class TestRealSenseAPIIntegration:
     @pytest.fixture
     def real_rs_manager(self):
         """Create a real RealSenseManager instance for integration tests"""
-        from app.services.socketio import sio
         from app.services.rs_manager import RealSenseManager
 
-        manager = RealSenseManager(sio)
+        manager = RealSenseManager()
         assert manager.get_devices(), "RealSenseManager sees no devices — hub/USB enumeration likely failed"
         return manager
 
@@ -178,6 +177,23 @@ class TestRealSenseAPIIntegration:
         url = f"/api/v1/devices/{device_id}/sensors/{sensor['sensor_id']}"
 
         response = client.post(f"{url}/start", json={"profiles": [default]})
+        try:
+            assert response.status_code == 200, response.text
+        finally:
+            client.post(f"{url}/stop")
+
+    def test_start_pipeline_default_profile_rs(self):
+        """Start the pipeline with a sensor's SDK default profile, as rs.config.enable_stream takes it"""
+        client = real_client()
+        device_id = first_device_id(client)
+
+        sensor = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]
+        p = next(p for p in sensor["supported_stream_profiles"] if p["default"])
+        config = {"stream": p["stream_type"], "index": p["stream_index"], "width": p["width"],
+                  "height": p["height"], "format": p["format"], "fps": p["fps"]}
+        url = f"/api/v1/devices/{device_id}/stream"
+
+        response = client.post(f"{url}/start", json=[config])
         try:
             assert response.status_code == 200, response.text
         finally:

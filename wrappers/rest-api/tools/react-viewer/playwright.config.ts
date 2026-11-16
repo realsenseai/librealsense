@@ -56,7 +56,7 @@ export default defineConfig({
   // stdout:'pipe' puts the server's log in the same stream as the test output, so a
   // server error lands next to the test it broke instead of in a separate file.
   webServer: {
-    command: `"${python}" -m uvicorn main:combined_app --host 127.0.0.1 --port ${new URL(apiUrl).port}`,
+    command: `"${python}" -m uvicorn main:app --host 127.0.0.1 --port ${new URL(apiUrl).port}`,
     cwd: '../..',
     url: `${apiUrl}/api/v1/health`,
     // The wrapper always sets API_URL, so CI never reuses a server it did not start; a local

@@ -1,41 +1,33 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-import asyncio
 import platform
 import struct
 import threading
 import time
 import logging
-from collections import defaultdict, deque
-from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
+from collections import defaultdict
+from typing import Callable, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
-import numpy as np
 from app.core.errors import RealSenseError
 from app.services import advanced_mode, options
 from app.models.device import Device, DeviceInfo
 from app.models.sensor import SensorInfo, StreamProfile
 from app.models.option import Option, OptionInfo
-from app.models.stream import PointCloudStatus, StreamConfig, StreamStatus
-import socketio
+from app.models.stream import Extrinsics, StreamConfig, StreamExtrinsics
 
-from app.services.metadata_socket_server import MetadataSocketServer
+from app.services.events import Events
+from app.services.frame_sender import DISCONNECTED, STOPPED, FrameSender
 from app.services import firmware as fw
 
 
 _IS_WINDOWS = platform.system() == "Windows"
 
-# Recent color frames retained per device for texturing the 3D point cloud.
-# Five frames at 30 fps covers the typical depth/color SDK-latency offset
-# (~one capture interval); the picker selects the entry whose timestamp is
-# closest to the depth frame being processed.
-COLOR_FRAME_HISTORY = 5
 
 
-def _stream_name(profile) -> str:
-    if profile.stream_type() == rs.stream.infrared:
-        return f"infrared-{profile.stream_index()}"
-    return profile.stream_type().name.lower()
+def _active_rows(sensor) -> List[StreamProfile]:
+    """What the sensor streams now, started by any client through either API."""
+    return [_profile_row(p) for p in sensor.get_active_streams()]
 
 
 def _profile_row(profile) -> StreamProfile:
@@ -52,72 +44,17 @@ def _profile_row(profile) -> StreamProfile:
 
 
 class RealSenseManager:
-    # Class-level event loop reference for async operations from sync contexts
-    _main_loop: Optional[asyncio.AbstractEventLoop] = None
-    
-    @classmethod
-    def set_event_loop(cls, loop: asyncio.AbstractEventLoop):
-        """Store reference to main event loop for use in sync callbacks."""
-        cls._main_loop = loop
-    
-    def __init__(self, sio: socketio.AsyncServer):
+    def __init__(self):
         self.ctx = rs.context()
         self.devices: Dict[str, rs.device] = {}
         self.device_infos: Dict[str, DeviceInfo] = {}
         self.pipelines: Dict[str, rs.pipeline] = {}
-        self.active_streams: Dict[str, Set[str]] = (
-            {}
-        )  # device_id -> set of stream types
-        self.frame_queues: Dict[str, Dict[str, List]] = (
-            {}
-        )  # device_id -> stream_type -> list of frames
-        self.metadata_queues: Dict[str, Dict[str, List[Dict]]] = (
-            {}
-        )  # device_id -> stream_type -> list of metadata dicts
         self.lock = threading.Lock()
-        self.max_queue_size = 5
-
-        # Frame-arrival signalling for async consumers (WebRTC). ``_frame_seq``
-        # counts frames pushed per "<device_id>:<stream_type>"; collection
-        # threads bump it and set the matching asyncio.Event on the main loop,
-        # so waiters block without occupying an executor thread.
-        self._frame_seq: Dict[str, int] = {}
-        self._frame_events: Dict[str, asyncio.Event] = {}
-        self.is_pointcloud_enabled: Dict[str, bool] = {}
-        # One rs.pointcloud() per device: pc.map_to(color) mutates internal
-        # state, and depth/color threads from different devices would race on
-        # a shared instance (texturing device A's cloud with device B's color).
-        self.point_clouds: Dict[str, "rs.pointcloud"] = {}
-
-        # Store latest raw depth frames for pixel depth queries
-        self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
-
-        # Short history of recent color frames per device for texturing the
-        # 3D point cloud. Sensor-mode runs depth/color on independent threads
-        # so the depth thread looks up the closest-by-timestamp color frame
-        # here via ``_pick_color_for_depth``. Cross-sensor matching by
-        # ``frame.get_timestamp()`` only works because ``start_sensor`` sets
-        # ``global_time_enabled`` on the sensor — without that, different
-        # sensors can report timestamps in different clock domains (a fixed
-        # multi-second offset). A deque(maxlen=N) gives O(1) bounded append
-        # and atomic-under-GIL pop-on-overflow, which the previous
-        # list+pop(0) pattern did not.
-        self.color_frames: Dict[str, Deque[Any]] = {}  # device_id -> deque of rs.video_frame, oldest first
-
-        # Cache of supported frame_metadata values keyed by device_id then profile uid.
-        # Nested so a single device's profiles can be evicted without wiping others.
-        # Avoids re-probing every metadata key on every frame in the hot loop.
-        self._supported_md_by_profile: Dict[str, Dict[int, list]] = {}
 
         # Firmware update tracking (one update at a time per device)
         self._fw_updates_in_progress: Set[str] = set()
 
-        self.sio = sio
-        self.metadata_socket_server = MetadataSocketServer(sio, self)
-
-        # --- Per-Sensor Streaming State (Sensor API) ---
-        # Tracks which mode each device is using: "pipeline", "sensor", or "idle"
-        self.streaming_mode: Dict[str, str] = {}  # device_id -> mode
+        self.events = Events()
 
         # --- Post-Processing Filters ---
         # Stores filter instances per device/sensor: device_id -> sensor_id -> list of filter dicts
@@ -128,6 +65,8 @@ class RealSenseManager:
         self.colorizers: Dict[str, "rs.colorizer"] = defaultdict(rs.colorizer)
         # Per-sensor rs.frame_queue objects: device_id -> sensor_id -> rs.frame_queue
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
+        # Sends each stream's frames, unchanged, to its WebSocket subscribers
+        self.frame_sender = FrameSender()
 
         # Initialize devices
         self.refresh_devices()
@@ -144,38 +83,27 @@ class RealSenseManager:
             for serial, dev in list(self.devices.items()):
                 if info.was_removed(dev):
                     removed.append(serial)
-            for serial in removed:
-                self._remove_device(serial)
+            gone_pipelines = [self._remove_device(serial) for serial in removed]
             for dev in new_devs:
                 serial = self._register_new_device(dev)
                 if serial is not None:
                     added.append(serial)
-
-        for serial in removed:
-            self.metadata_socket_server.stop_broadcast(serial)
+        del gone_pipelines
 
         if added or removed:
             logging.info("devices_changed: +%s -%s", added, removed)
-            self._emit_socket_event("devices_changed", {"added": added, "removed": removed})
+            self.events.emit("devices_changed", {"added": added, "removed": removed})
 
-    def _remove_device(self, serial: str) -> None:
+    def _remove_device(self, serial: str) -> Optional[rs.pipeline]:
+        """Returns the device's pipeline for the caller to drop after releasing the lock:
+        dropping it stops a running pipeline, and the stop waits for frame callbacks, which take the lock."""
         assert self.lock.locked(), "_remove_device called without self.lock held"
-        self.pipelines.pop(serial, None)
-        self.active_streams.pop(serial, None)
-        self.frame_queues.pop(serial, None)
-        self.metadata_queues.pop(serial, None)
-        self.depth_frames.pop(serial, None)
-        self.color_frames.pop(serial, None)
-        self.point_clouds.pop(serial, None)
-        # Drop the point-cloud-enabled flag so a re-plug of the same serial
-        # doesn't silently resume emitting PC metadata that the UI thinks is
-        # off (frontend resets to off on disconnect).
-        self.is_pointcloud_enabled.pop(serial, None)
         self.colorizers.pop(serial, None)
         self.devices.pop(serial, None)
         self.device_infos.pop(serial, None)
-        self._supported_md_by_profile.pop(serial, None)
-        self.streaming_mode.pop(serial, None)
+        self.sensor_rs_queues.pop(serial, None)
+        self.frame_sender.close(serial, DISCONNECTED)
+        return self.pipelines.pop(serial, None)
 
     def _register_new_device(self, dev: rs.device) -> Optional[str]:
         """Cache a freshly-discovered rs.device + its DeviceInfo. Caller must hold self.lock."""
@@ -215,26 +143,16 @@ class RealSenseManager:
             usb_type=_info(rs.camera_info.usb_type_descriptor),
             product_id=_info(rs.camera_info.product_id),
             sensors=sensors,
-            is_streaming=device_id in self.pipelines,
             metadata_enabled=metadata_enabled,
         )
+        pipeline = rs.pipeline(self.ctx)
+        pipeline.set_device(dev)  # skips re-creating the device on start
         # Publish atomically at the end — if anything above raises, no partial
         # cache entry is left behind. Keep new work above this block.
         self.devices[device_id] = dev
         self.device_infos[device_id] = info
-        self.streaming_mode.setdefault(device_id, "idle")
+        self.pipelines[device_id] = pipeline
         return device_id
-
-    def _emit_socket_event(self, event: str, payload: Dict[str, Any]) -> None:
-        """Emit a Socket.IO event from sync contexts using the main FastAPI event loop."""
-        loop = RealSenseManager._main_loop
-        if not loop or loop.is_closed():
-            logging.warning("Socket emit skipped (no main loop): %s", event)
-            return
-        try:
-            asyncio.run_coroutine_threadsafe(self.sio.emit(event, payload), loop)
-        except Exception as exc:
-            logging.warning("Socket emit failed (%s): %s", event, exc)
 
     def refresh_devices(self) -> List[DeviceInfo]:
         """Refresh the list of connected devices.
@@ -258,13 +176,7 @@ class RealSenseManager:
     def _refresh_devices_locked(self) -> List[DeviceInfo]:
         """Actual device enumeration (no FW-in-progress guard)."""
         with self.lock:
-            # Clear existing devices (that aren't streaming, in either mode)
-            for device_id in list(self.devices.keys()):
-                if device_id not in self.pipelines and not self.sensor_rs_queues.get(device_id):
-                    del self.devices[device_id]
-                    self.device_infos.pop(device_id, None)
-                    self._supported_md_by_profile.pop(device_id, None)
-
+            # Known devices are kept; unplugged ones go in _on_devices_changed
             for dev in self.ctx.devices:
                 self._register_new_device(dev)
 
@@ -295,7 +207,7 @@ class RealSenseManager:
         """Download the device's recommended firmware image and flash it.
 
         Looks up the recommended .bin from the online versions DB, downloads it into
-        memory, and reuses the standard DFU flash flow — so Socket.IO
+        memory, and reuses the standard DFU flash flow — so the
         progress/success/failure events are emitted exactly as for a user-supplied file.
         """
         device = self.get_device(device_id)
@@ -319,8 +231,8 @@ class RealSenseManager:
         except Exception as exc:
             # Surface download failures on the same channel as flash failures so the
             # progress modal shows the error instead of hanging.
-            self._emit_socket_event(
-                f"firmware_update_failed_{device_id}",
+            self.events.emit(
+                "firmware_update_failed",
                 {"device_id": device_id, "error": str(exc)},
             )
             with self.lock:
@@ -347,7 +259,7 @@ class RealSenseManager:
 
         Reuses the DFU flow: check_firmware_compatibility -> enter_update_state ->
         wait for DFU device -> update_dev.update(image, on_progress) -> wait for reconnect.
-        Emits the same Socket.IO progress / success / failure events as a bundled-image update.
+        Emits the same progress / success / failure events as a bundled-image update.
         """
         if not slot_held:
             self._claim_fw_update_slot(device_id)
@@ -406,8 +318,8 @@ class RealSenseManager:
                 raise
             except Exception as exc:
                 logging.exception("Firmware update failed for %s", device_id)
-                self._emit_socket_event(
-                    f"firmware_update_failed_{device_id}",
+                self.events.emit(
+                    "firmware_update_failed",
                     {"device_id": device_id, "error": str(exc)},
                 )
                 raise RealSenseError(status_code=500, detail=f"Firmware update failed: {exc}")
@@ -421,8 +333,8 @@ class RealSenseManager:
                            "Power-cycle it and check its version.",
                 )
 
-            self._emit_socket_event(
-                f"firmware_update_success_{device_id}",
+            self.events.emit(
+                "firmware_update_success",
                 {"device_id": device_id, "firmware_version": updated_info.firmware_version},
             )
 
@@ -433,8 +345,8 @@ class RealSenseManager:
                 "status": "success",
             }
         except RealSenseError as exc:
-            self._emit_socket_event(
-                f"firmware_update_failed_{device_id}",
+            self.events.emit(
+                "firmware_update_failed",
                 {"device_id": device_id, "error": exc.detail},
             )
             raise
@@ -477,18 +389,9 @@ class RealSenseManager:
         raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
 
     def _ensure_fw_update_allowed(self, device_id: str) -> None:
-        """Reject the update if the device is unknown or if anything is streaming."""
+        """Reject the update if the device is unknown."""
         if device_id not in self.devices:
             raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
-        # Only refuse if THIS device is streaming. Since we no longer recreate
-        # self.ctx during the update, other devices' handles stay valid and
-        # their pipelines are unaffected by the DFU transition of this device.
-        with self.lock:
-            if device_id in self.pipelines:
-                raise RealSenseError(
-                    status_code=400,
-                    detail="Stop streaming on this device before updating firmware",
-                )
 
     @staticmethod
     def _resolve_firmware_update_id(target_dev: rs.device, device_id: str) -> str:
@@ -525,8 +428,8 @@ class RealSenseManager:
             if now - last_emit_ts["value"] < 0.1 and p < 1.0:
                 return
             last_emit_ts["value"] = now
-            self._emit_socket_event(
-                f"firmware_progress_{device_id}",
+            self.events.emit(
+                "firmware_progress",
                 {"device_id": device_id, "progress": float(p), "phase": phase},
             )
 
@@ -570,8 +473,9 @@ class RealSenseManager:
 
         # Cached refs will become invalid after enter_update_state.
         with self.lock:
-            self._remove_device(device_id)
-        self._emit_socket_event(
+            pipeline = self._remove_device(device_id)
+        del pipeline
+        self.events.emit(
             "devices_changed", {"added": [], "removed": [device_id]},
         )
 
@@ -714,8 +618,8 @@ class RealSenseManager:
                 "Please physically disconnect and reconnect the device, then try again "
                 "with a known-good firmware image."
             )
-            self._emit_socket_event(
-                f"firmware_update_failed_{device_id}",
+            self.events.emit(
+                "firmware_update_failed",
                 {"device_id": device_id, "error": msg},
             )
             raise RealSenseError(status_code=500, detail=msg)
@@ -763,9 +667,10 @@ class RealSenseManager:
                     status_code=404, detail=f"Device {device_id} not found"
                 )
             dev = self.devices[device_id]
-            self._remove_device(device_id)
+            pipeline = self._remove_device(device_id)
+        del pipeline
 
-        self._emit_socket_event("devices_changed", {"added": [], "removed": [device_id]})
+        self.events.emit("devices_changed", {"added": [], "removed": [device_id]})
 
         try:
             dev.hardware_reset()
@@ -775,7 +680,7 @@ class RealSenseManager:
             # Restore cache + announce device back so FE stops showing it as gone.
             with self.lock:
                 self._register_new_device(dev)
-            self._emit_socket_event(
+            self.events.emit(
                 "devices_changed", {"added": [device_id], "removed": []},
             )
             raise RealSenseError(
@@ -814,12 +719,45 @@ class RealSenseManager:
                 name=name,
                 type=sensor_type,
                 supported_stream_profiles=stream_profiles_list,  # Use correct field name
+                active_profiles=_active_rows(sensor),
                 options=sensor_options,
             )
 
             sensors.append(sensor_info)
 
         return sensors
+
+    def is_streaming(self, device_id: str, stream_type: Any, stream_index: int) -> bool:
+        """Whether a sensor of the device streams the stream, through either the sensor API or the pipeline."""
+        dev = self.devices.get(device_id)
+        return dev is not None and any((p.stream_type(), p.stream_index()) == (stream_type, stream_index)
+                                       for sensor in dev.sensors for p in sensor.get_active_streams())
+
+    def get_extrinsics(self, device_id: str) -> List[StreamExtrinsics]:
+        """From each stream of the device to every other; calibration, so they hold whatever streams."""
+        streams = {(p.stream_type(), p.stream_index()): p  # per stream, not per resolution
+                   for sensor in self._require_device(device_id).sensors for p in sensor.get_stream_profiles()}
+        result = []
+        for p in streams.values():
+            to = []
+            for other in streams.values():
+                if other is p:
+                    continue
+                try:
+                    e = p.get_extrinsics_to(other)
+                except RuntimeError:  # no calibration between them
+                    continue
+                to.append(Extrinsics(stream_type=other.stream_type().name, stream_index=other.stream_index(),
+                                     rotation=list(e.rotation), translation=list(e.translation)))
+            result.append(StreamExtrinsics(stream_type=p.stream_type().name, stream_index=p.stream_index(), to=to))
+        return result
+
+    def _streaming_changed(self, device_id: str) -> None:
+        """Tell every client what each sensor of the device streams now, as a start or stop by any client changed it."""
+        dev = self.devices.get(device_id)
+        if dev is not None:
+            self.events.emit("streaming_changed", {"device_id": device_id, "sensors": {
+                f"{device_id}-sensor-{i}": [r.model_dump() for r in _active_rows(s)] for i, s in enumerate(dev.sensors)}})
 
     def get_sensor(self, device_id: str, sensor_id: str) -> SensorInfo:
         """Get a specific sensor by ID"""
@@ -848,7 +786,7 @@ class RealSenseManager:
         """Get or create post-processing filter blocks for a sensor.
         
         Uses the SDK's get_recommended_filters() to get sensor-appropriate filters.
-        Returns list of dicts: { "filter": rs.filter, "name": str, "enabled": bool, "default_enabled": float }
+        Returns list of dicts: { "filter": rs.filter, "name": str, "enabled": bool }; every filter starts off
         """
         if device_id not in self.processing_blocks:
             self.processing_blocks[device_id] = {}
@@ -862,17 +800,8 @@ class RealSenseManager:
                         filter_name = f.get_info(rs.camera_info.name)
                     except RuntimeError:
                         filter_name = "Unknown Filter"
-                    
-                    # All filters disabled by default for performance
-                    # User can enable specific filters as needed
-                    default_enabled = 0.0
-                    
-                    filters.append({
-                        "filter": f,
-                        "name": filter_name,
-                        "enabled": bool(default_enabled),
-                        "default_enabled": default_enabled,
-                    })
+
+                    filters.append({"filter": f, "name": filter_name, "enabled": False})
             except RuntimeError:
                 # Sensor doesn't support get_recommended_filters
                 pass
@@ -892,7 +821,6 @@ class RealSenseManager:
         for filter_info in self._get_or_create_processing_blocks(device_id, sensor_id, sensor):
             filters[filter_info["name"]] = {
                 "enabled": filter_info["enabled"],
-                "default_enabled": bool(filter_info["default_enabled"]),
                 "options": options.all_options(filter_info["filter"]),
             }
         return filters
@@ -1021,25 +949,12 @@ class RealSenseManager:
         
         return frame
 
-    def _apply_color_filters(self, device_id: str, frame: rs.video_frame) -> rs.video_frame:
-        """Apply enabled post-processing filters to a color frame.
-        
-        Currently limited to filters that support color frames.
-        """
-        # Color frame filtering is minimal - most PP filters are depth-specific
-        # Future: could add rotation filter for color here
-        return frame
-
     def start_stream(
         self,
         device_id: str,
         configs: List[StreamConfig],
-        align_to: Optional[str] = None,
-    ) -> StreamStatus:
+    ) -> None:
         """Start streaming from a device"""
-        # Check mode compatibility - pipeline API cannot be used if sensor API is active
-        self._check_streaming_mode(device_id, "pipeline")
-
         # Only refresh when the cache is empty or the requested device is unknown
         if device_id not in self.devices:
             self.refresh_devices()
@@ -1049,872 +964,50 @@ class RealSenseManager:
                 status_code=404, detail=f"Device {device_id} not found"
             )
 
-        pipeline = rs.pipeline(self.ctx)
-        pipeline.set_device(self.devices[device_id])  # skips re-creating the device on start
         config = rs.config()
+        for c in configs:
+            config.enable_stream(c.stream, c.index, c.width, c.height, c.format, c.fps)
 
-        # Track active stream types
-        active_streams = set()
-        for stream_config in configs:
-            # Parse sensor index from sensor_id
-            try:
-                sensor_index = int(stream_config.sensor_id.split("-")[-1])
-                if sensor_index < 0 or sensor_index >= len(
-                    self.devices[device_id].sensors
-                ):
-                    raise RealSenseError(
-                        status_code=404,
-                        detail=f"Sensor {stream_config.sensor_id} not found",
-                    )
-            except (ValueError, IndexError):
-                raise RealSenseError(
-                    status_code=404,
-                    detail=f"Invalid sensor ID format: {stream_config.sensor_id}",
-                )
-            # Get stream type from string
-            stream_name_list = stream_config.stream_type.split("-")
-            stream_type = None
-            for name, val in rs.stream.__members__.items():
-                if name.lower() == stream_name_list[0].lower():
-                    stream_type = val
-                    break
-            if stream_type is None:
-                raise RealSenseError(
-                    status_code=400,
-                    detail=f"Invalid stream type: {stream_config.stream_type}",
-                )
-            format_type = None
-            for name, val in rs.format.__members__.items():
-                if name.lower() == stream_config.format.lower():
-                    format_type = val
-                    break
-            if format_type is None:
-                raise RealSenseError(
-                    status_code=400, detail=f"Invalid format: {stream_config.format}"
-                )
-            if active_streams and stream_config.stream_type in active_streams:
-                continue
+        self.pipelines[device_id].start(config, lambda frames: self._on_frames(device_id, frames))
+        self._streaming_changed(device_id)
 
-            # Try to enable stream - first with exact format, then with any format
-            stream_enabled = False
-            last_error = None
-
-            for try_format in [format_type, rs.format.any]:
-                if stream_enabled:
-                    break
-                try:
-                    if len(stream_name_list) > 1:
-                        stream_index = int(stream_name_list[1])
-                        config.enable_stream(
-                            stream_type,
-                            stream_index,
-                            stream_config.resolution.width,
-                            stream_config.resolution.height,
-                            try_format,
-                            stream_config.framerate,
-                        )
-                    elif format_type == rs.format.combined_motion:
-                        config.enable_stream(stream_type)
-                    else:
-                        config.enable_stream(
-                            stream_type,
-                            stream_config.resolution.width,
-                            stream_config.resolution.height,
-                            try_format,
-                            stream_config.framerate,
-                        )
-                    stream_enabled = True
-                    if try_format == rs.format.any:
-                        logging.info(f"[PIPELINE] Using fallback format for {stream_config.stream_type} "
-                                    f"(requested {stream_config.format} not available at "
-                                    f"{stream_config.resolution.width}x{stream_config.resolution.height}@{stream_config.framerate}fps)")
-                except RuntimeError as e:
-                    last_error = e
-                    continue
-
-            if not stream_enabled:
-                raise RealSenseError(
-                    status_code=400, detail=f"Failed to enable stream {stream_config.stream_type}: {str(last_error)}"
-                )
-            active_streams.add(stream_config.stream_type)
-
-        # Start streaming
-        try:
-            pipeline_profile = pipeline.start(config)
-            # Set up align if requested
-            align_processor = None
-            if align_to:
-                align_stream = None
-                for name, val in rs.stream.__members__.items():
-                    if name.lower() == align_to.lower():
-                        align_stream = val
-                        break
-                if align_stream:
-                    align_processor = rs.align(align_stream)
-            # Store pipeline and config
-            with self.lock:
-                self.pipelines[device_id] = pipeline
-                self.active_streams[device_id] = active_streams
-                self.frame_queues[device_id] = {
-                    stream_type: [] for stream_type in active_streams
-                }
-                self.metadata_queues[device_id] = {
-                    stream_key: [] for stream_key in active_streams
-                }
-                # Track that this device is using pipeline API
-                self.streaming_mode[device_id] = "pipeline"
-
-            # Initialize post-processing filters for enabled sensors if not already done
-            dev = self.devices[device_id]
-            for stream_config in configs:
-                if not stream_config.enable:
-                    continue
-                try:
-                    sensor_index = int(stream_config.sensor_id.split("-")[-1])
-                    if 0 <= sensor_index < len(dev.sensors):
-                        sensor = dev.sensors[sensor_index]
-                        self._get_or_create_processing_blocks(device_id, stream_config.sensor_id, sensor)
-                except (ValueError, IndexError):
-                    pass
-            
-            # Start frame collection thread
-            threading.Thread(
-                target=self._collect_frames,
-                args=(device_id, align_processor),
-                daemon=True,
-            ).start()
-            # Update device info
-            if device_id in self.device_infos:
-                self.device_infos[device_id].is_streaming = True
-            self.metadata_socket_server.start_broadcast(device_id)
-            return StreamStatus(
-                device_id=device_id,
-                is_streaming=True,
-                active_streams=list(active_streams),
-            )
-        except RuntimeError as e:
-            raise RealSenseError(
-                status_code=500, detail=f"Failed to start streaming: {str(e)}"
-            )
-
-    def stop_stream(self, device_id: str) -> StreamStatus:
+    def stop_stream(self, device_id: str) -> None:
         """Stop streaming from a device"""
-        with self.lock:
-            if device_id not in self.devices:
-                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=[])
+        self._require_device(device_id)
+        pipeline = self.pipelines[device_id]
+        profiles = pipeline.get_active_profile().get_streams()
+        pipeline.stop()
+        self._drop_streams(device_id, profiles)
 
-            is_streaming = device_id in self.pipelines
-            active_streams = list(self.active_streams.get(device_id, set()))
-            if not is_streaming:
-                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=active_streams)
+    def _drop_streams(self, device_id: str, profiles) -> None:
+        """Close the given streams' sockets"""
+        self.frame_sender.close(device_id, STOPPED, [(p.stream_type(), p.stream_index()) for p in profiles])
+        self._streaming_changed(device_id)
 
-        try:
-            self.metadata_socket_server.stop_broadcast(device_id)
-            self.pipelines[device_id].stop()
-        except Exception as e:
-            logging.error("Failed to stop streaming for %s: %s", device_id, e)
-        finally:
-            with self.lock:
-                # Clean up resources
-                self.pipelines.pop(device_id, None)
-                self.active_streams.pop(device_id, None)
-                self.frame_queues.pop(device_id, None)
-                self.metadata_queues.pop(device_id, None)
-                self.color_frames.pop(device_id, None)
-                self.point_clouds.pop(device_id, None)
-                self._supported_md_by_profile.pop(device_id, None)
-                # Reset streaming mode to idle
-                self.streaming_mode[device_id] = "idle"
-                if device_id in self.device_infos:
-                    self.device_infos[device_id].is_streaming = False
+    def _on_frames(self, device_id: str, frameset):
+        """Pipeline callback: send each frame"""
+        # A synced set arrives as one frameset; unsynced streams (motion) as single frames
+        for f in list(frameset.as_frameset()) if frameset.is_frameset() else [frameset]:
+            self._send_frame(device_id, f)
 
-        return StreamStatus(
-            device_id=device_id,
-            is_streaming=False,
-            active_streams=active_streams,
-        )
-
-    def activate_point_cloud(self, device_id: str, enable: bool) -> bool:
-        """Activate or deactivate point cloud processing"""
-        if device_id not in self.devices:
-            self.refresh_devices()
-            if device_id not in self.devices:
-                raise RealSenseError(
-                    status_code=404, detail=f"Device {device_id} not found"
-                )
-
-        if enable:
-            self.is_pointcloud_enabled[device_id] = True
-        else:
-            self.is_pointcloud_enabled[device_id] = False
-
-        return PointCloudStatus(device_id=device_id, is_active=enable)
-
-    def get_point_cloud_status(self, device_id: str) -> bool:
-        """Get the point cloud status for a device"""
-        if device_id not in self.devices:
-            self.refresh_devices()
-            if device_id not in self.devices:
-                raise RealSenseError(
-                    status_code=404, detail=f"Device {device_id} not found"
-                )
-
-        return PointCloudStatus(
-            device_id=device_id, is_active=self.is_pointcloud_enabled[device_id]
-        )
-
-    def get_stream_status(self, device_id: str) -> StreamStatus:
-        """Get the streaming status for a device (supports both pipeline and sensor modes)"""
-        if device_id not in self.devices:
-            self.refresh_devices()
-            if device_id not in self.devices:
-                raise RealSenseError(
-                    status_code=404, detail=f"Device {device_id} not found"
-                )
-
-        mode = self.streaming_mode.get(device_id, "idle")
-        
-        # Check pipeline mode
-        is_pipeline_streaming = device_id in self.pipelines
-        pipeline_streams = list(self.active_streams.get(device_id, set()))
-        
-        # Check sensor mode - its active streams are the device's frame queues
-        sensor_streams = list(self.frame_queues.get(device_id, {})) if mode == "sensor" else []
-        
-        # Combine based on mode
-        is_streaming = is_pipeline_streaming or len(sensor_streams) > 0
-        active_streams = pipeline_streams if mode == "pipeline" else sensor_streams
-
-        return StreamStatus(
-            device_id=device_id,
-            is_streaming=is_streaming,
-            active_streams=active_streams,
-        )
-
-    def _publish_frames(self, device_id: str, stream_types) -> None:
-        """Bump the arrival counter for each stream and wake async waiters.
-
-        Runs on collection threads; the events are set via the main loop so
-        waiters need no executor thread.
-        """
-        loop = RealSenseManager._main_loop
-        for stream_type in stream_types:
-            key = f"{device_id}:{stream_type.lower()}"
-            self._frame_seq[key] = self._frame_seq.get(key, 0) + 1
-            event = self._frame_events.get(key)
-            if event is not None and loop is not None and not loop.is_closed():
-                loop.call_soon_threadsafe(event.set)
-
-    async def wait_for_frame_after(
-        self, device_id: str, stream_type: str, last_seq: int, timeout: float = 1.0
-    ) -> Tuple[Optional[np.ndarray], int]:
-        """Wait until a frame newer than ``last_seq`` arrives, then return it.
-
-        Returns ``(frame, seq)``; ``frame`` is None on timeout. The seq is read
-        after the frame is fetched, so a frame landing in between skips ahead
-        rather than being re-delivered.
-        """
-        key = f"{device_id}:{stream_type.lower()}"
-        event = self._frame_events.setdefault(key, asyncio.Event())
-        deadline = time.monotonic() + timeout
-        while self._frame_seq.get(key, 0) <= last_seq:
-            event.clear()
-            if self._frame_seq.get(key, 0) > last_seq:
-                break
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return None, last_seq
-            try:
-                await asyncio.wait_for(event.wait(), remaining)
-            except asyncio.TimeoutError:
-                return None, last_seq
-        frame = self.get_latest_frame(device_id, stream_type)
-        return frame, self._frame_seq.get(key, 0)
-
-    def get_latest_frame(
-        self, device_id: str, stream_type: str
-    ) -> np.ndarray:
-        """Get the latest frame from a specific stream (supports both pipeline and sensor modes)"""
-        with self.lock:
-            queues = self.frame_queues.get(device_id)
-            if queues is None:
-                raise RealSenseError(
-                    status_code=400, detail=f"Device {device_id} is not streaming"
-                )
-            if stream_type not in queues:
-                raise RealSenseError(
-                    status_code=400,
-                    detail=f"Stream type '{stream_type}' is not active. Available: {list(queues)}"
-                )
-            if not queues[stream_type]:
-                # 503 Service Unavailable: stream is active but no frames yet
-                # (transient — caller should retry rather than treat as fatal)
-                raise RealSenseError(
-                    status_code=503,
-                    detail=f"No frames available for stream {stream_type}",
-                )
-            return queues[stream_type][-1]
-
-    def get_latest_metadata(self, device_id: str, stream_type: str) -> Dict:
-        """Get the latest METADATA dictionary from a specific stream (supports both pipeline and sensor modes)"""
-        stream_key = stream_type.lower()  # Use consistent key format
-        with self.lock:
-            queue = self.metadata_queues.get(device_id, {}).get(stream_key)
-            if queue is not None:
-                return queue[-1] if queue else {}
-
-            # If we get here, the stream is not active or device is not streaming
-            if self.streaming_mode.get(device_id, "idle") == "idle":
-                raise RealSenseError(
-                    status_code=400, detail=f"Device {device_id} is not streaming."
-                )
-            else:
-                # Streaming but stream type not found
-                raise RealSenseError(
-                    status_code=400,
-                    detail=f"Stream type '{stream_key}' is not active for device {device_id}.",
-                )
-
-    _FRAME_METADATA_ITEMS = list(rs.frame_metadata_value.__members__.items())
-
-    @staticmethod
-    def _build_viewer_info(frame_data) -> Dict[str, Any]:
-        """Top metadata block, mirrors C++ realsense-viewer."""
-        profile = frame_data.get_profile()
-        actual_fps_key = rs.frame_metadata_value.actual_fps
-        hardware_fps = profile.fps()
-        if frame_data.supports_frame_metadata(actual_fps_key):
-            try:
-                hardware_fps = frame_data.get_frame_metadata(actual_fps_key) / 1000.0
-            except Exception as exc:
-                logging.debug("[METADATA] failed to read %s: %s", actual_fps_key.name, exc)
-        info: Dict[str, Any] = {
-            "timestamp": frame_data.get_timestamp(),
-            "frame_number": frame_data.get_frame_number(),
-            "clock_domain": frame_data.get_frame_timestamp_domain().name,
-            "pixel_format": profile.format().name,
-            "hardware_fps": hardware_fps,
-        }
-        try:  # video frames only; motion frames have no width/height
-            info["width"] = frame_data.get_width()
-            info["height"] = frame_data.get_height()
-            vsp = profile.as_video_stream_profile()
-            info["hardware_width"] = vsp.width()
-            info["hardware_height"] = vsp.height()
-        except Exception:
-            pass
-        return info
-
-    def _get_frame_metadata(self, frame_data, device_id: str) -> Dict[str, int]:
-        """Return all rs2_frame_metadata_value attributes the frame supports.
-        Mirrors common/stream-model.cpp:52-59 in the C++ realsense-viewer.
-        Caches the supported subset per (device, profile uid) so the steady-state
-        per-frame cost is one dict lookup + N get_frame_metadata calls."""
-        try:
-            profile_uid = frame_data.get_profile().unique_id()
-        except Exception:
-            profile_uid = None
-
-        device_cache = self._supported_md_by_profile.get(device_id)
-        supported = device_cache.get(profile_uid) if (device_cache is not None and profile_uid is not None) else None
-        # Build the supported set from the 2nd frame on: delta-computed metadata
-        # (e.g. actual_fps) is not yet available on the first frame.
-        if supported is None and frame_data.get_frame_number() >= 2:
-            supported = [(name, md) for name, md in self._FRAME_METADATA_ITEMS
-                         if frame_data.supports_frame_metadata(md)]
-            if profile_uid is not None:
-                if device_cache is None:
-                    device_cache = self._supported_md_by_profile[device_id] = {}
-                device_cache[profile_uid] = supported
-
-        attrs: Dict[str, int] = {}
-        for name, md in (supported or []):
-            try:
-                attrs[name] = frame_data.get_frame_metadata(md)
-            except Exception as e:
-                # supports_frame_metadata said yes; getting the value should not throw.
-                logging.debug("[METADATA] failed to read %s: %s", name, e)
-                continue
-        return attrs
-
-    # Cap the number of vertices shipped per frame so payload/decode/render cost
-    # stays roughly constant regardless of stream resolution.
-    POINT_CLOUD_MAX_VERTICES = 60000
-
-    def _build_point_cloud_metadata(self, device_id: str, depth_frame, color_frame=None) -> Optional[Dict]:
-        """Compute decimated point-cloud vertices from a depth frame, ready for serialization.
-
-        When ``color_frame`` is supplied and it's an RGB8/BGR8 frame, this also
-        samples a per-vertex RGB triplet using the texture coordinates produced
-        by ``rs.pointcloud.map_to`` — mirrors the C++ realsense-viewer's textured
-        point cloud rendering. The client falls back to a depth colormap when
-        ``colors`` is absent.
-
-        Uses a per-device ``rs.pointcloud`` so map_to()/calculate() can't race
-        across devices.
-
-        Returns None if calculate() yields nothing. Used by both the pipeline-mode
-        frame collector and the sensor-mode frame processor.
-        """
-        pc = self.point_clouds.get(device_id)
-        if pc is None:
-            pc = rs.pointcloud()
-            self.point_clouds[device_id] = pc
-        if color_frame:
-            try:
-                pc.map_to(color_frame)
-            except Exception:
-                color_frame = None  # not all profiles support map_to; fall back silently
-        points = pc.calculate(depth_frame)
-        if not points:
-            return None
-        verts = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
-
-        # Mask + decimate BEFORE sampling colors — at 1280x720 the full vertex
-        # buffer is ~921K entries, and sampling/copying 900K colors per depth
-        # frame was bottlenecking the depth thread down to ~1 Hz (the rotation
-        # desync the user reported: by the time depth_T was ready, color was
-        # already at color_T+1s). Sampling at the final ~60K decimated indices
-        # is ~15x less work.
-        mask = verts[:, 2] >= 0.03  # drop invalid near-camera points
-        verts = verts[mask]
-        count = len(verts)
-        step = 1
-        if count > self.POINT_CLOUD_MAX_VERTICES:
-            step = (count // self.POINT_CLOUD_MAX_VERTICES) + 1
-            verts = verts[::step]
-
-        colors_rgb: Optional[np.ndarray] = None
-        if color_frame:
-            tex = np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
-            tex = tex[mask]
-            if step > 1:
-                tex = tex[::step]
-            colors_rgb = self._sample_color_at_tex(tex, color_frame)
-
-        # Contiguous so .tobytes() in the socket server is a straight memcpy.
-        verts = np.ascontiguousarray(verts, dtype=np.float32)
-        result: Dict[str, Any] = {"vertices": verts, "texture_coordinates": []}
-        if colors_rgb is not None:
-            result["colors"] = np.ascontiguousarray(colors_rgb, dtype=np.uint8)
-        return result
-
-    def _pick_color_for_depth(self, device_id: str, depth_frame) -> Optional[Any]:
-        """Pick the cached color frame whose timestamp is closest to the depth
-        frame's. Both timestamps come from ``frame.get_timestamp()``, which —
-        with ``global_time_enabled`` set on the sensors at start time — are
-        translated by the SDK into a unified system-time domain regardless of
-        which sensor produced them. The short history covers the typical
-        depth/color SDK-latency offset (~one capture interval) so the picked
-        color reflects the same real-time moment as the depth.
-        """
-        # Snapshot the deque before iterating — the color sensor thread can
-        # append/evict concurrently and `for cf in deque` is not safe against
-        # that. tuple() captures the current frame refs atomically under GIL.
-        hist = self.color_frames.get(device_id)
-        if not hist:
-            return None
-        snapshot = tuple(hist)
-        if not snapshot:
-            return None
-        try:
-            depth_ts = depth_frame.get_timestamp()
-        except RuntimeError:
-            return snapshot[-1]
-        best = snapshot[-1]
-        best_dt = float("inf")
-        for cf in snapshot:
-            try:
-                dt = abs(cf.get_timestamp() - depth_ts)
-            except RuntimeError:
-                continue
-            if dt < best_dt:
-                best_dt = dt
-                best = cf
-        return best
-
-    def _is_color_streaming(self, device_id: str) -> bool:
-        """Whether 'color' is currently in this device's active stream set.
-
-        Used by the sensor-mode depth thread to decide whether the cached color
-        frame in ``self.color_frames`` is still fresh enough to texture-map the
-        cloud. Pipeline mode reads color straight from the frameset and doesn't
-        need this — the frameset already drops disabled streams.
-        """
-        return any(st.lower() == "color" for st in self.frame_queues.get(device_id, {}))
-
-    @staticmethod
-    def _sample_color_at_tex(tex: np.ndarray, color_frame) -> Optional[np.ndarray]:
-        """Return Nx3 uint8 RGB sampled at the supplied texture coordinates.
-
-        ``tex`` is the already-masked, already-decimated tex-coord array (Nx2,
-        u/v in [0,1]) — sampling per-vertex on the full pre-decimation buffer
-        is too slow at 1280x720. Only handles RGB8 / BGR8 color frames; other
-        formats (YUYV, Y16, …) return None and the client falls back to the
-        depth colormap.
-        """
-        try:
-            color_format = color_frame.get_profile().format()
-        except Exception:
-            return None
-        if color_format not in (rs.format.rgb8, rs.format.bgr8):
-            return None
-        cim = np.asanyarray(color_frame.get_data())
-        if cim.ndim != 3 or cim.shape[2] < 3:
-            return None
-        H, W = cim.shape[:2]
-        u = tex[:, 0]
-        v = tex[:, 1]
-        # rs2 emits tex coords outside [0,1] for depth pixels that don't project
-        # into the color frame — mark those black instead of clamping (clamping
-        # would smear the frame borders across off-screen points).
-        valid = (u >= 0.0) & (u <= 1.0) & (v >= 0.0) & (v <= 1.0)
-        xi = np.clip((u * W).astype(np.int32), 0, W - 1)
-        yi = np.clip((v * H).astype(np.int32), 0, H - 1)
-        sampled = cim[yi, xi][:, :3].astype(np.uint8, copy=True)
-        sampled[~valid] = 0
-        if color_format == rs.format.bgr8:
-            sampled = sampled[:, ::-1]  # BGR -> RGB so the client doesn't need to swap
-        return sampled
-
-    def _collect_frames(self, device_id: str, align_processor=None):
-        """Thread function to collect frames from the pipeline"""
-        logging.debug("[INFO] Frame collection thread started for device %s", device_id)
-        logging.debug("[INFO] Active streams: %s", self.active_streams.get(device_id, set()))
-        
-        # Pre-compute stream mappings for performance (avoid lookup on every frame)
-        stream_mappings = {}
-        for active_stream in self.active_streams.get(device_id, set()):
-            stream_name_list = active_stream.split("-")
-            stream_type_base = stream_name_list[0]
-            rs_stream = None
-            for name, val in rs.stream.__members__.items():
-                if name.lower() == stream_type_base.lower():
-                    rs_stream = val
-                    break
-            if rs_stream is not None:
-                ir_index = int(stream_name_list[1]) if len(stream_name_list) > 1 else 1
-                stream_mappings[active_stream] = (rs_stream, ir_index)
-        
-        # Cached per-device colorizer so Depth Visualization options apply live
-        colorizer = self.colorizers[device_id]
-
-        try:
-            while device_id in self.pipelines:
-                try:
-                    # Wait for a frameset
-                    frames = self.pipelines[device_id].wait_for_frames()
-                    
-                    # Apply alignment if requested
-                    if align_processor:
-                        frames = align_processor.process(frames)
-
-                    # Process frames outside the lock for better performance
-                    processed_frames = {}
-                    processed_metadata = {}
-                    
-                    for active_stream, (rs_stream, ir_index) in stream_mappings.items():
-
-                        try:
-                            frame = None
-                            frame_data = None
-
-                            # Use the rs_stream enum directly for comparison
-                            if rs_stream == rs.stream.depth:
-                                frame_data = frames.get_depth_frame()
-                                if frame_data:
-                                    # Apply post-processing filters
-                                    frame_data = self._apply_depth_filters(device_id, frame_data)
-                                    # Store raw depth frame for pixel queries
-                                    self.depth_frames[device_id] = frame_data
-                                    colorized = colorizer.colorize(frame_data)
-                                    frame = np.asanyarray(colorized.get_data())
-                            elif rs_stream == rs.stream.color:
-                                frame_data = frames.get_color_frame()
-                                if frame_data:
-                                    # Apply post-processing filters for color
-                                    frame_data = self._apply_color_filters(device_id, frame_data)
-                                    frame = np.asanyarray(frame_data.get_data())
-                            elif rs_stream == rs.stream.infrared:
-                                frame_data = frames.get_infrared_frame(ir_index)
-                                if frame_data:
-                                    frame = np.asanyarray(frame_data.get_data())
-                            elif rs_stream == rs.stream.gyro or rs_stream == rs.stream.accel:
-                                motion_data = None
-                                frame_data = None
-                                for f in frames:
-                                    if f.get_profile().stream_type() == rs_stream:
-                                        frame_data = f.as_motion_frame()
-                                        motion_data = frame_data.get_motion_data()
-                                        break
-
-                                motion_json_data = None
-                                if motion_data:
-                                    motion_json_data = {
-                                        "x": float(motion_data.x),
-                                        "y": float(motion_data.y),
-                                        "z": float(motion_data.z),
-                                    }
-                                    # Placeholder frame; viewers draw motion from metadata["motion_data"]
-                                    frame = np.zeros((120, 320, 3), dtype=np.uint8)
-                            else:
-                                continue  # Unknown stream type
-
-                            # Skip if no frame data was obtained
-                            if frame is None or frame_data is None:
-                                continue
-
-                            # Add metadata
-                            metadata = {
-                                "frame_metadata": self._get_frame_metadata(frame_data, device_id),
-                                **self._build_viewer_info(frame_data),
-                            }
-
-                            if rs_stream == rs.stream.gyro or rs_stream == rs.stream.accel:
-                                if motion_json_data:
-                                    metadata["motion_data"] = motion_json_data
-
-                            if rs_stream == rs.stream.depth and self.is_pointcloud_enabled.get(device_id, False):
-                                # If color is also active in this frameset, use it
-                                # to texture-map the cloud (cpp realsense-viewer
-                                # parity). get_color_frame() returns an empty
-                                # falsy frame when no color stream is enabled.
-                                # Apply the same color filters as the 2D path
-                                # uses so the textured cloud and the color tile
-                                # never diverge if filters become non-trivial.
-                                color_for_texture = frames.get_color_frame() or None
-                                if color_for_texture:
-                                    color_for_texture = self._apply_color_filters(device_id, color_for_texture)
-                                pc_meta = self._build_point_cloud_metadata(device_id, frame_data, color_for_texture)
-                                if pc_meta:
-                                    metadata["point_cloud"] = pc_meta
-
-                            # Store processed frame and metadata
-                            processed_frames[active_stream] = frame
-                            processed_metadata[active_stream] = metadata
-                            
-                        except Exception as e:
-                            if not isinstance(e, RuntimeError):
-                                print(f"Error processing {active_stream}: {type(e).__name__}: {str(e)}")
-
-                    # Now add to queues with lock held briefly
-                    with self.lock:
-                        if device_id not in self.frame_queues:
-                            break
-                            
-                        for active_stream, frame in processed_frames.items():
-                            frame_queue = self.frame_queues[device_id][active_stream]
-                            frame_queue.append(frame)
-                            # Keep queue size limited
-                            while len(frame_queue) > self.max_queue_size:
-                                frame_queue.pop(0)
-                                
-                        for active_stream, metadata in processed_metadata.items():
-                            metadata_queue = self.metadata_queues[device_id][active_stream]
-                            metadata_queue.append(metadata)
-                            while len(metadata_queue) > self.max_queue_size:
-                                metadata_queue.pop(0)
-
-                    self._publish_frames(device_id, processed_frames.keys())
-
-                except RuntimeError as e:
-                    # Handle timeout or other error
-                    print(f"Error collecting frames: {str(e)}")
-                    time.sleep(0.1)
-
-        except Exception as e:
-            print(f"Frame collection thread exception: {str(e)}")
-            # Stop the pipeline if there's an error
-            try:
-                with self.lock:
-                    if device_id in self.pipelines:
-                        self.pipelines[device_id].stop()
-                        del self.pipelines[device_id]
-                        if device_id in self.active_streams:
-                            del self.active_streams[device_id]
-                        if device_id in self.frame_queues:
-                            del self.frame_queues[device_id]
-                        if device_id in self.metadata_queues:
-                            del self.metadata_queues[device_id]
-                        if device_id in self.depth_frames:
-                            del self.depth_frames[device_id]
-                        self.color_frames.pop(device_id, None)
-                        self.point_clouds.pop(device_id, None)
-                        self._supported_md_by_profile.pop(device_id, None)
-                        if device_id in self.device_infos:
-                            self.device_infos[device_id].is_streaming = False
-            except Exception:
-                pass
-
-    def get_depth_at_pixel(self, device_id: str, x: int, y: int) -> Optional[float]:
-        """Get depth value (in meters) at specific pixel coordinates."""
-        with self.lock:
-            if device_id not in self.depth_frames:
-                return None
-            depth_frame = self.depth_frames[device_id]
-            try:
-                # get_distance returns depth in meters
-                return depth_frame.get_distance(x, y)
-            except Exception as e:
-                print(f"Error getting depth at pixel ({x}, {y}): {str(e)}")
-                return None
-
-    def get_depth_range(self, device_id: str) -> Dict[str, Any]:
-        """
-        Calculate dynamic depth range for legend based on current frame.
-        Matches legacy viewer algorithm: mean + 1.5*stddev, rounded up to nearest 4m.
-        """
-        import math
-        with self.lock:
-            if device_id not in self.depth_frames:
-                return {"min_depth": 0, "max_depth": 6, "units": "meters"}
-            depth_frame = self.depth_frames[device_id]
-            try:
-                # Ensure we have a proper depth frame (may be raw frame from sensor mode)
-                if hasattr(depth_frame, 'as_depth_frame'):
-                    depth_frame = depth_frame.as_depth_frame()
-                width = depth_frame.get_width()
-                height = depth_frame.get_height()
-                # Sample every 30th pixel like legacy viewer
-                skip = 30
-                distances = []
-                for y in range(0, height, skip):
-                    for x in range(0, width, skip):
-                        d = depth_frame.get_distance(x, y)
-                        if d > 0:
-                            distances.append(d)
-                if not distances:
-                    return {"min_depth": 0, "max_depth": 6, "units": "meters"}
-                # Calculate mean and standard deviation
-                mean = sum(distances) / len(distances)
-                variance = sum((d - mean) ** 2 for d in distances) / len(distances)
-                stddev = math.sqrt(variance)
-                # Round up to nearest 4m
-                length_jump = 4.0
-                max_depth = math.ceil((mean + 1.5 * stddev) / length_jump) * length_jump
-                # Clamp to reasonable range
-                max_depth = max(4.0, min(max_depth, 16.0))
-                return {"min_depth": 0, "max_depth": max_depth, "units": "meters"}
-            except Exception as e:
-                print(f"Error calculating depth range: {str(e)}")
-                return {"min_depth": 0, "max_depth": 6, "units": "meters"}
+    def _send_frame(self, device_id: str, frame: Any) -> None:
+        """Send one frame to its stream's sockets, depth after the enabled filters"""
+        if frame.get_profile().stream_type() == rs.stream.depth:
+            frame = self._apply_depth_filters(device_id, frame.as_depth_frame())
+        self.frame_sender.send(device_id, frame, self.colorizers[device_id])
 
     # =========================================================================
     # Per-Sensor Streaming API (using RealSense sensor API)
     # =========================================================================
-
-    def _check_streaming_mode(self, device_id: str, requested_mode: str) -> None:
-        """
-        Ensure requested mode is compatible with current state.
-        
-        Args:
-            device_id: The device to check
-            requested_mode: "pipeline" or "sensor"
-            
-        Raises:
-            RealSenseError: If mode conflict detected
-        """
-        current_mode = self.streaming_mode.get(device_id, "idle")
-        
-        if current_mode == "idle":
-            return  # OK to start with any mode
-        
-        if current_mode != requested_mode:
-            raise RealSenseError(
-                status_code=409,
-                detail=f"Device is in '{current_mode}' mode. "
-                       f"Stop all streams before switching to '{requested_mode}' mode."
-            )
-
-    def _process_sensor_frame(
-        self,
-        frame: Any,
-        device_id: str,
-        colorizer: Any,
-    ) -> Tuple[Optional[Any], dict]:
-        """Process a single sensor frame; return (processed_frame, metadata)."""
-        processed_frame = None
-        info_source = frame  # frame to read info from after post processing is done
-        metadata: dict = {
-            "frame_metadata": self._get_frame_metadata(frame, device_id),
-        }
-        stream = frame.get_profile().stream_type()
-
-        if stream == rs.stream.depth:
-            depth_frame = frame.as_depth_frame()
-            depth_frame = self._apply_depth_filters(device_id, depth_frame)
-            self.depth_frames[device_id] = depth_frame
-            colorized = colorizer.colorize(depth_frame)
-            processed_frame = np.asanyarray(colorized.get_data())
-            info_source = depth_frame
-
-            if self.is_pointcloud_enabled.get(device_id, False):
-                # Sensor mode runs depth/color on separate threads so there is
-                # no frameset — pick the cached color frame whose timestamp is
-                # closest to this depth frame's, otherwise rotations show
-                # colors leading the geometry (color has lower SDK latency).
-                # Only do this if color is still streaming; without that check
-                # the depth thread would keep texturing with a stale frame
-                # after the user disables color.
-                color_for_texture = (
-                    self._pick_color_for_depth(device_id, depth_frame)
-                    if self._is_color_streaming(device_id)
-                    else None
-                )
-                pc_meta = self._build_point_cloud_metadata(device_id, depth_frame, color_for_texture)
-                if pc_meta:
-                    metadata["point_cloud"] = pc_meta
-
-        elif stream == rs.stream.color:
-            color_frame = frame.as_video_frame()
-            color_frame = self._apply_color_filters(device_id, color_frame)
-            # Append to bounded history so the depth thread can pick the color
-            # frame closest in time to the depth frame it's processing.
-            hist = self.color_frames.get(device_id)
-            if hist is None:
-                hist = deque(maxlen=COLOR_FRAME_HISTORY)
-                self.color_frames[device_id] = hist
-            hist.append(color_frame)
-            processed_frame = np.asanyarray(color_frame.get_data())
-            info_source = color_frame
-
-        elif stream == rs.stream.infrared:
-            processed_frame = np.asanyarray(frame.get_data())
-            info_source = frame.as_video_frame()
-
-        elif stream in (rs.stream.gyro, rs.stream.accel):
-            motion_frame = frame.as_motion_frame()
-            motion_data = motion_frame.get_motion_data()
-            metadata["motion_data"] = {
-                "x": float(motion_data.x),
-                "y": float(motion_data.y),
-                "z": float(motion_data.z),
-            }
-            processed_frame = np.zeros((120, 320, 3), dtype=np.uint8)
-
-        metadata.update(self._build_viewer_info(info_source))
-        return processed_frame, metadata
 
     def _collect_sensor_frames(
         self,
         device_id: str,
         sensor_id: str,
         rs_queue: Any,
-        queue_keys: Dict[Tuple[Any, int], str]
     ) -> None:
-        """
-        Thread function to collect frames from a single sensor's queue.
-        Routes frames to appropriate per-stream-type queues.
-
-        Args:
-            device_id: Device ID
-            sensor_id: Sensor ID
-            rs_queue: The rs.frame_queue to poll
-            queue_keys: (stream type, stream index) of each opened stream -> its queue key
-        """
-        logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id} streams: {list(queue_keys.values())}")
-
-        colorizer = self.colorizers[device_id]
+        """Thread: send each frame of the sensor's queue, until the sensor is stopped"""
+        logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id}")
 
         try:
             while True:
@@ -1926,34 +1019,8 @@ class RealSenseManager:
                 try:
                     # Wait for frame with timeout
                     frame = rs_queue.wait_for_frame(timeout_ms=1000)
-                    if not frame:
-                        continue
-                    
-                    profile = frame.get_profile()
-                    target_stream_type = queue_keys.get((profile.stream_type(), profile.stream_index()))
-                    if target_stream_type is None:
-                        continue
-
-                    processed_frame, metadata = self._process_sensor_frame(frame, device_id, colorizer)
-
-                    if processed_frame is None:
-                        continue
-
-                    # Add to per-stream-type queues
-                    with self.lock:
-                        queue = self.frame_queues.get(device_id, {}).get(target_stream_type)
-                        if queue is not None:
-                            queue.append(processed_frame)
-                            while len(queue) > self.max_queue_size:
-                                queue.pop(0)
-
-                        mqueue = self.metadata_queues.get(device_id, {}).get(target_stream_type)
-                        if mqueue is not None:
-                            mqueue.append(metadata)
-                            while len(mqueue) > self.max_queue_size:
-                                mqueue.pop(0)
-
-                    self._publish_frames(device_id, (target_stream_type,))
+                    if frame:
+                        self._send_frame(device_id, frame)
 
                 except Exception as e:
                     if "timeout" not in str(e).lower():
@@ -1980,59 +1047,26 @@ class RealSenseManager:
             sensor_id: The sensor ID (format: "{device_id}-sensor-{index}")
             rows: profiles from the sensor's supported_stream_profiles
         """
-        # Check mode compatibility
-        self._check_streaming_mode(device_id, "sensor")
-
         sensor = self._find_sensor(device_id, sensor_id)
+        opened = False  # a sensor another client holds refuses open(), and is not ours to stop
 
         try:
             profiles = [next(p for p in sensor.get_stream_profiles() if _profile_row(p) == r) for r in rows]
 
-            # Translate sensor timestamps to a unified system-time domain so
-            # depth/color frames from independent sensors on the same device
-            # are directly comparable. Without this, sensors can report
-            # timestamps in different clock domains with a fixed multi-second
-            # offset, defeating cross-sensor matching for the textured point
-            # cloud (observed: 1.635s offset on the D585 prototype).
-            # WARN — not debug — when set_option fails on a sensor that
-            # supports() said yes: a partial failure silently reintroduces
-            # the cross-sensor offset and the rotation desync.
-            if sensor.supports(rs.option.global_time_enabled):
-                try:
-                    sensor.set_option(rs.option.global_time_enabled, 1)
-                except RuntimeError as e:
-                    logging.warning(
-                        "[SENSOR] %s: global_time_enabled set failed (%s) — "
-                        "depth/color may stay in different clock domains and "
-                        "textured point cloud may show rotation desync.",
-                        sensor_id, e,
-                    )
-
             # Open sensor with ALL profiles
             sensor.open(profiles)
+            opened = True
             
             # Small queue so the collector always sees fresh frames. A larger
             # capacity (the old value was 50) lets a 1.6s FIFO backlog build up
-            # at 30 fps and the depth thread ends up always processing
-            # 1.6s-stale frames — visible as the textured 3D cloud where the
-            # color (no PC math, no backlog) reacts to motion immediately and
-            # the depth geometry lags ~1.6s behind.
+            # at 30 fps, and a slow stream then always sends 1.6s-stale frames.
             rs_queue = rs.frame_queue(2)
             
             # Start sensor
             sensor.start(rs_queue)
             
-            queue_keys = {(p.stream_type(), p.stream_index()): _stream_name(p) for p in profiles}
-            stream_types = list(queue_keys.values())
 
-            # Update state
             with self.lock:
-                self.streaming_mode[device_id] = "sensor"
-                
-                # Create per-stream-type frame queues
-                for st in stream_types:
-                    self.frame_queues.setdefault(device_id, {})[st] = []
-                    self.metadata_queues.setdefault(device_id, {})[st] = []
                 self.sensor_rs_queues.setdefault(device_id, {})[sensor_id] = rs_queue
             
             # Initialize post-processing filters for this sensor if not already done
@@ -2041,28 +1075,27 @@ class RealSenseManager:
             # Start frame collection thread
             threading.Thread(
                 target=self._collect_sensor_frames,
-                args=(device_id, sensor_id, rs_queue, queue_keys),
+                args=(device_id, sensor_id, rs_queue),
                 daemon=True
             ).start()
             
-            # Start per-device metadata broadcast (no-op if already running for this device).
-            self.metadata_socket_server.start_broadcast(device_id)
-            
-            logging.info(f"[SENSOR] Started {sensor_id} with streams: {stream_types}")
-            
+            logging.info(f"[SENSOR] Started {sensor_id} with streams: {rows}")
+            self._streaming_changed(device_id)
+
         except RealSenseError:
             raise
         except Exception as e:
             logging.error(f"[SENSOR] Failed to start {sensor_id}: {e}")
             # Clean up on failure
-            try:
-                sensor.stop()
-            except:
-                pass
-            try:
-                sensor.close()
-            except:
-                pass
+            if opened:
+                try:
+                    sensor.stop()
+                except:
+                    pass
+                try:
+                    sensor.close()
+                except:
+                    pass
             raise RealSenseError(
                 status_code=500,
                 detail=f"Failed to start sensor: {str(e)}"
@@ -2085,10 +1118,13 @@ class RealSenseManager:
         # Dropping the rs queue claims the stop and ends the collection thread
         with self.lock:
             if self.sensor_rs_queues.get(device_id, {}).pop(sensor_id, None) is None:
+                if sensor.get_active_streams():
+                    raise RealSenseError(status_code=409,
+                                         detail="The sensor streams through the pipeline; stop it with /stream/stop")
                 return
         
         # The sensor reports its open streams until close()
-        stopped_stream_types = [_stream_name(p) for p in sensor.get_active_streams()]
+        stopped = sensor.get_active_streams()
 
         # Stop and close sensor
         try:
@@ -2097,35 +1133,10 @@ class RealSenseManager:
         except Exception as e:
             logging.warning(f"[SENSOR] Error stopping {sensor_id}: {e}")
 
-        # Clean up state
-        last_sensor_stopped = False
         with self.lock:
-            for st in stopped_stream_types:
-                self.frame_queues.get(device_id, {}).pop(st, None)
-                self.metadata_queues.get(device_id, {}).pop(st, None)
-            if not self.frame_queues.get(device_id):
-                self.frame_queues.pop(device_id, None)
-                self.metadata_queues.pop(device_id, None)
-                self.streaming_mode[device_id] = "idle"
-                last_sensor_stopped = True
-
             if not self.sensor_rs_queues.get(device_id, True):
                 del self.sensor_rs_queues[device_id]
-
-            # Free the cached color frames if the stopped sensor was producing
-            # color — otherwise the 5 cached rs.video_frame refs stay pinned
-            # in the SDK pool while depth keeps streaming.
-            stopped_color = any(st.lower() == "color" for st in stopped_stream_types)
-            if stopped_color or last_sensor_stopped:
-                self.color_frames.pop(device_id, None)
-            if last_sensor_stopped:
-                # Per-device rs.pointcloud is only needed while depth runs.
-                self.point_clouds.pop(device_id, None)
-
-        # Stop the per-device metadata broadcaster once the last sensor on this
-        # device has stopped.
-        if last_sensor_stopped:
-            self.metadata_socket_server.stop_broadcast(device_id)
+        self._drop_streams(device_id, stopped)
 
         logging.info(f"[SENSOR] Stopped {sensor_id}")
 

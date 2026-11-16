@@ -109,36 +109,6 @@ describe('API Client', () => {
   })
 
 
-  describe('getDepthRange', () => {
-    it('returns depth range for a device', async () => {
-      const range = await apiClient.getDepthRange(mockDevice.device_id)
-      
-      expect(range.min_depth).toBe(0.3)
-      expect(range.max_depth).toBe(3.5)
-    })
-  })
-
-  describe('getDepthAtPixel', () => {
-    it('returns depth at specified pixel', async () => {
-      const result = await apiClient.getDepthAtPixel(mockDevice.device_id, 320, 240)
-      
-      expect(result.x).toBe(320)
-      expect(result.y).toBe(240)
-      expect(result.depth).toBe(1.5)
-    })
-  })
-
-  describe('Point Cloud', () => {
-    it('enables point cloud', async () => {
-      // enablePointCloud returns void, just check it doesn't throw
-      await expect(apiClient.enablePointCloud(mockDevice.device_id)).resolves.not.toThrow()
-    })
-
-    it('disables point cloud', async () => {
-      await expect(apiClient.disablePointCloud(mockDevice.device_id)).resolves.not.toThrow()
-    })
-  })
-
   describe('Sensor Streaming', () => {
     it('starts sensor streaming with the listed profiles', async () => {
       let body: unknown

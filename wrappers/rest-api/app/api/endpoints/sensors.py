@@ -11,6 +11,7 @@ control than the pipeline-based /streams/* endpoints, allowing individual sensor
 
 import functools
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.concurrency import run_in_threadpool
 from typing import List
 
 from app.models.sensor import SensorInfo, SensorStartRequest
@@ -90,7 +91,7 @@ async def start_sensor(
     **Note:** Cannot be used simultaneously with pipeline API (/streams/start).
     Stop all streams before switching between APIs.
     """
-    return rs_manager.start_sensor(device_id, sensor_id, request.profiles)
+    return await run_in_threadpool(rs_manager.start_sensor, device_id, sensor_id, request.profiles)
 
 
 @router.post("/{sensor_id}/stop")
@@ -105,5 +106,6 @@ async def stop_sensor(
 
     The sensor will be stopped and closed, freeing its resources.
     Other sensors on the same device will continue streaming.
+    A sensor the pipeline API runs is refused with 409: stop it with /stream/stop.
     """
-    return rs_manager.stop_sensor(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.stop_sensor, device_id, sensor_id)

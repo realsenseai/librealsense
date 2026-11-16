@@ -908,6 +908,19 @@ namespace rs2
         {
             return process(depth);
         }
+        /**
+        * The color of every Z16 depth value, as colorize() would paint this depth frame
+        * \param[in] depth - a Z16 depth frame
+        * \return 3 bytes (R, G, B) for each depth value 0..0xFFFF; value 0 is black
+        */
+        std::vector< uint8_t > get_color_table( const depth_frame & depth ) const
+        {
+            std::vector< uint8_t > table( 0x10000 * 3 );
+            rs2_error * e = nullptr;
+            rs2_get_colorizer_color_table( get(), depth.get(), table.data(), int( table.size() ), &e );
+            error::handle( e );
+            return table;
+        }
 
     protected:
         colorizer(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}

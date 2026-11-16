@@ -37,6 +37,7 @@ export const mockDepthSensor: SensorInfo = {
   name: 'Stereo Module',
   type: 'depth',
   supported_stream_profiles: mockDepthSensorProfiles,
+  active_profiles: [],
   options: [],
 }
 
@@ -45,6 +46,7 @@ export const mockColorSensor: SensorInfo = {
   name: 'RGB Camera',
   type: 'color',
   supported_stream_profiles: mockColorSensorProfiles,
+  active_profiles: [],
   options: [],
 }
 
@@ -53,6 +55,7 @@ export const mockMotionSensor: SensorInfo = {
   name: 'Motion Module',
   type: 'motion',
   supported_stream_profiles: mockMotionSensorProfiles,
+  active_profiles: [],
   options: [],
 }
 
@@ -102,7 +105,6 @@ export const mockDepthOptions: OptionInfo[] = [
 export const mockFilters = {
   'Decimation Filter': {
     enabled: false,
-    default_enabled: false,
     options: [
       {
         option_id: 'filter_magnitude',
@@ -121,8 +123,8 @@ export const mockFilters = {
       },
     ],
   },
-  'Spatial Filter': { enabled: false, default_enabled: false, options: [] },
-  'Temporal Filter': { enabled: false, default_enabled: false, options: [] },
+  'Spatial Filter': { enabled: false, options: [] },
+  'Temporal Filter': { enabled: false, options: [] },
 }
 
 export const mockColorOptions: OptionInfo[] = [

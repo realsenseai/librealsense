@@ -7,7 +7,6 @@ This mock implements all the classes and functions used in rs_manager.py.
 """
 from unittest.mock import MagicMock
 import enum
-import numpy as np
 
 # Enums used in the library
 class stream(enum.Enum):
@@ -312,6 +311,9 @@ class stream_profile:
     def is_default(self):
         return self._default
 
+    def get_extrinsics_to(self, other):
+        raise RuntimeError("no calibration")
+
     def is_video_stream_profile(self):
         return isinstance(self, video_stream_profile)
 
@@ -354,7 +356,6 @@ class frame:
         self._height = height
         self._timestamp = timestamp
         self._frame_number = frame_number
-        self._data = np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)
 
     def get_width(self):
         return self._width
@@ -367,9 +368,6 @@ class frame:
 
     def get_frame_number(self):
         return self._frame_number
-
-    def get_data(self):
-        return self._data
 
     def is_video_frame(self):
         return True
@@ -400,33 +398,14 @@ class frame:
 
 # Mock for depth frame
 class depth_frame(frame):
-    def __init__(self, width=640, height=480, timestamp=12345, frame_number=1):
-        super().__init__(width, height, timestamp, frame_number)
-        # Generate random depth data (16-bit)
-        self._depth_data = np.random.randint(0, 65535, (height, width), dtype=np.uint16)
+    pass
 
-    def get_distance(self, x, y):
-        return self._depth_data[y, x] / 1000.0  # Convert to meters
-
-# Mock for color frame
 class color_frame(frame):
-    def __init__(self, width=640, height=480, timestamp=12345, frame_number=1):
-        super().__init__(width, height, timestamp, frame_number)
-        # Generate random color data (RGB)
-        self._data = np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)
+    pass
 
-# Mock for motion frame
 class motion_frame(frame):
     def __init__(self, timestamp=12345, frame_number=1):
         super().__init__(0, 0, timestamp, frame_number)
-
-    def get_motion_data(self):
-        class motion_data:
-            def __init__(self):
-                self.x = np.random.random()
-                self.y = np.random.random()
-                self.z = np.random.random()
-        return motion_data()
 
 # Mock for frameset
 class frameset:
@@ -536,7 +515,7 @@ class config:
     def enable_device(self, device_id):
         self.device_id = device_id
 
-    def enable_stream(self, stream_type, width=0, height=0, format=format.any, framerate=0):
+    def enable_stream(self, stream_type, stream_index=-1, width=0, height=0, format=format.any, framerate=0):
         self.streams.append({
             "stream": stream_type,
             "width": width,
@@ -561,49 +540,10 @@ class align:
         # Just return the original frameset, since we're mocking
         return frameset
 
-# Mock for pointcloud
-class pointcloud:
-    def __init__(self):
-        pass
-
-    def calculate(self, depth_frame):
-        # Return a points object
-        return points()
-
-    def map_to(self, frame, mapped_frame):
-        # Return a points object
-        return points()
-
-# Mock for points
-class points:
-    def __init__(self):
-        pass
-
-    def get_vertices(self):
-        # Return random 3D points
-        return np.random.random((100, 3)).astype(np.float32)
-
-    def get_texture_coordinates(self):
-        # Return random texture coordinates
-        return np.random.random((100, 2)).astype(np.float32)
-
 # Mock for colorizer
 class colorizer:
     def __init__(self):
         pass
-
-    def colorize(self, depth_frame):
-        # Return a color frame from a depth frame
-        width = depth_frame.get_width()
-        height = depth_frame.get_height()
-        # Create a colorized version of the depth frame
-        colorized = color_frame(width, height, depth_frame.get_timestamp(), depth_frame.get_frame_number())
-        # Generate a blue-to-red heatmap look
-        colorized._data = np.zeros((height, width, 3), dtype=np.uint8)
-        depth_data = depth_frame._depth_data.astype(float) / 65535.0  # Normalize to 0-1
-        colorized._data[:,:,0] = (1.0 - depth_data) * 255  # Red (far)
-        colorized._data[:,:,2] = depth_data * 255  # Blue (near)
-        return colorized
 
 # Mock for hole_filling_filter
 class hole_filling_filter:

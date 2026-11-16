@@ -1,63 +1,16 @@
 import { useState, useRef } from 'react'
+import { rulerTicks } from '../utils/depthRuler'
 
 interface DepthLegendProps {
-  minDepth: number // in meters
-  maxDepth: number // in meters
-  colorScheme?: 'jet' | 'classic' | 'white_to_black' | 'black_to_white'
-  show?: boolean
+  minDepth: number // in meters, at the bottom
+  maxDepth: number
+  gradient: string // CSS background, min at the bottom (utils/depthRuler.ts)
 }
 
-export function DepthLegend({
-  minDepth = 0,
-  maxDepth = 6,
-  colorScheme = 'jet',
-  show = true,
-}: DepthLegendProps) {
+export function DepthLegend({ minDepth, maxDepth, gradient }: DepthLegendProps) {
   const [hoverY, setHoverY] = useState<number | null>(null)
   const [hoverDepth, setHoverDepth] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  if (!show) return null
-
-  // Color schemes matching the old viewer colorizer
-  const getColorScheme = (scheme: string): string[] => {
-    switch (scheme) {
-      case 'jet':
-        return [
-          'rgb(50, 0, 0)',    // dark red (far)
-          'rgb(255, 0, 0)',   // red
-          'rgb(255, 255, 0)', // yellow
-          'rgb(0, 255, 255)', // cyan
-          'rgb(0, 0, 255)',   // blue (near)
-        ]
-      case 'classic':
-        return [
-          'rgb(198, 33, 24)',  // red (far)
-          'rgb(196, 57, 178)', // pink
-          'rgb(204, 108, 191)',
-          'rgb(45, 117, 220)',
-          'rgb(25, 60, 192)',
-          'rgb(30, 77, 203)',  // blue (near)
-        ]
-      case 'white_to_black':
-        return ['rgb(0, 0, 0)', 'rgb(255, 255, 255)']
-      case 'black_to_white':
-        return ['rgb(255, 255, 255)', 'rgb(0, 0, 0)']
-      default:
-        return [
-          'rgb(50, 0, 0)',
-          'rgb(255, 0, 0)',
-          'rgb(255, 255, 0)',
-          'rgb(0, 255, 255)',
-          'rgb(0, 0, 255)',
-        ]
-    }
-  }
-
-  const colors = getColorScheme(colorScheme)
-  const gradientStops = colors
-    .map((color, i) => `${color} ${(i / (colors.length - 1)) * 100}%`)
-    .join(', ')
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return
@@ -75,14 +28,8 @@ export function DepthLegend({
     setHoverDepth(null)
   }
 
-  // Generate scale labels
   const depthRange = maxDepth - minDepth
-  // Match legacy viewer ticks: label every 1m from max down to min (integers only)
-  const labels: number[] = []
-  for (let v = Math.floor(maxDepth); v >= Math.ceil(minDepth); v -= 1) {
-    labels.push(v)
-    if (labels.length > 20) break
-  }
+  const ticks = rulerTicks(minDepth, maxDepth)
 
   return (
     <div className="flex items-stretch h-full">
@@ -91,7 +38,7 @@ export function DepthLegend({
         ref={containerRef}
         className="relative w-5 cursor-crosshair"
         style={{
-          background: `linear-gradient(to bottom, ${gradientStops})`,
+          background: gradient,
           border: '1px solid rgba(0, 0, 0, 0.8)',
         }}
         onMouseMove={handleMouseMove}
@@ -108,15 +55,15 @@ export function DepthLegend({
 
       {/* Numeric scale */}
       <div className="relative w-12 text-xs text-white font-mono ml-1">
-        {labels.map((depth, i) => {
+        {ticks.values.map((depth) => {
           const y = ((maxDepth - depth) / depthRange) * 100
           return (
             <div
-              key={i}
+              key={depth}
               className="absolute right-0 transform -translate-y-1/2"
               style={{ top: `${y}%` }}
             >
-              {depth.toFixed(1)}
+              {depth.toFixed(ticks.decimals)}
             </div>
           )
         })}

@@ -180,6 +180,15 @@ void init_processing(py::module &m) {
              "7 - Quantized\n"
              "8 - Pattern", "color_scheme"_a)
         .def("colorize", &rs2::colorizer::colorize, "Start to generate color image base on depth frame", "depth"_a, py::call_guard<py::gil_scoped_release>())
+        .def("get_color_table", [](const rs2::colorizer& self, const rs2::depth_frame& depth) {
+                std::vector< uint8_t > table;
+                {
+                    py::gil_scoped_release release;
+                    table = self.get_color_table( depth );
+                }
+                return py::bytes( reinterpret_cast< const char * >( table.data() ), table.size() );
+            }, "The color of every Z16 depth value as colorize() would paint this depth frame: "
+               "3 bytes (R, G, B) per value 0..0xFFFF, value 0 black", "depth"_a)
         /*.def("__call__", &rs2::colorizer::operator())*/;
 
     py::class_<rs2::decimation_filter, rs2::filter> decimation_filter(m, "decimation_filter", "Performs downsampling by using the median with specific kernel size.");

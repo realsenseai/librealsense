@@ -28,7 +28,6 @@
     "react-markdown": "^10.1.0",
     "recharts": "^2.9.0",
     "remark-gfm": "^4.0.1",
-    "socket.io-client": "^4.6.0",
     "three": "^0.158.0",
     "zustand": "^4.4.0"
   },

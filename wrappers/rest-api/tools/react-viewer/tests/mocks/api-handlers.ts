@@ -91,51 +91,13 @@ export const handlers = [
     }
   ),
 
-  // Get depth range
-  http.get(`${API_BASE}/devices/:deviceId/stream/depth-range`, () => {
-    return HttpResponse.json({
-      min_depth: 0.3,
-      max_depth: 3.5,
-    })
-  }),
-
-  // Get depth at pixel
-  http.get(`${API_BASE}/devices/:deviceId/stream/depth-at-pixel`, ({ request }) => {
-    const url = new URL(request.url)
-    const x = url.searchParams.get('x')
-    const y = url.searchParams.get('y')
-    
-    return HttpResponse.json({
-      x: parseInt(x || '0'),
-      y: parseInt(y || '0'),
-      depth: 1.5,
-    })
-  }),
-
-  // Activate point cloud
-  http.post(`${API_BASE}/devices/:deviceId/point_cloud/activate`, () => {
-    return HttpResponse.json({
-      device_id: mockDevice.device_id,
-      is_active: true,
-    })
-  }),
-
-  // Deactivate point cloud
-  http.post(`${API_BASE}/devices/:deviceId/point_cloud/deactivate`, () => {
-    return HttpResponse.json({
-      device_id: mockDevice.device_id,
-      is_active: false,
-    })
-  }),
-
   // Per-sensor streaming: start / stop return no body
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/start`, () => HttpResponse.json(null)),
+  http.get(`${API_BASE}/devices/:deviceId/extrinsics`, () => HttpResponse.json([])),
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/stop`, () => HttpResponse.json(null)),
 
   // Recommended firmware (none, unless a test says otherwise)
   http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),
 
-  http.post(`${API_BASE}/webrtc/offer/`, () =>
-    HttpResponse.json({ session_id: 'test-session', sdp: '', type: 'answer' })),
 ]
 
