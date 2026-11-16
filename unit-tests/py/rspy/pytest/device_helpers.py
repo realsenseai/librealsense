@@ -165,6 +165,17 @@ def _product_line_of(product):
     return None
 
 
+def _two_c_twin(sn, markers):
+    """'<sn>-2c' when the camera can switch to 2C and no device_exclude marker covers its 2C name, else None"""
+    device = devices.get(sn)
+    if not d585_config.can_toggle(device):
+        return None
+    two_c = d585_config.two_c_name(device).upper()
+    if any(m.name == 'device_exclude' and m.args and m.args[0].upper() in two_c for m in markers):
+        return None
+    return sn + d585_config.SUFFIX
+
+
 def resolve_device_each_serials(metafunc):
     """Expand @device_each and @device markers into parametrized test instances.
 
@@ -227,14 +238,21 @@ def resolve_device_each_serials(metafunc):
     all_serials = []
     passes = _build_sn_filter(all_markers, cli_includes, cli_excludes)
 
+    def add_with_twin(sn, with_3c=True):
+        """a camera that can switch to 2C gets a second, 2C instance (the same camera) after its 3C one"""
+        twin = _two_c_twin(sn, all_markers)
+        for serial in ([sn] if with_3c else []) + ([twin] if twin else []):
+            if serial not in all_serials:
+                all_serials.append(serial)
+
     for marker in device_each_markers:
         for pattern in marker.args:
             for sn in devices.by_spec(pattern, []):
-                if passes(sn) and sn not in all_serials:
-                    all_serials.append(sn)
-            for sn in d585_config.switchable_to(pattern):   # the same camera, switched to 2C for the module
-                if passes(sn) and sn + d585_config.SUFFIX not in all_serials:
-                    all_serials.append(sn + d585_config.SUFFIX)
+                if passes(sn):
+                    add_with_twin(sn)
+            for sn in d585_config.switchable_to(pattern):   # a "Dual RGB" pattern selects only the 2C instance
+                if passes(sn):
+                    add_with_twin(sn, with_3c=False)
 
     # Each single-spec ``device()`` marker independently contributes one parametrized
     # instance (the first matching device, or a sentinel if none).  Multiple stacked
@@ -255,8 +273,7 @@ def resolve_device_each_serials(metafunc):
                 found_sn = sn
                 break
         if found_sn is not None:
-            if found_sn not in all_serials:
-                all_serials.append(found_sn)
+            add_with_twin(found_sn)
         elif had_raw_match or _pattern_excluded(pattern, cli_excludes):
             # Excluded on the CLI (e.g. the map-check reported it missing): a skip,
             # not an unattributed failure, even though nothing of that pattern enumerated
@@ -284,8 +301,11 @@ def resolve_device_each_serials(metafunc):
                 return f"MISSING-{sn[len(_MISSING_SENTINEL_PREFIX):]}"
             if sn.startswith(_SKIP_SENTINEL_PREFIX):
                 return f"SKIP-{sn[len(_SKIP_SENTINEL_PREFIX):]}"
-            dev = devices.get(sn)
-            return f"{dev.name}-{sn}" if dev else sn
+            real_sn, mode = d585_config.split(sn)
+            dev = devices.get(real_sn)
+            if not dev:
+                return sn
+            return f"{d585_config.two_c_name(dev)}-{sn}" if mode == '2c' else f"{dev.name}-{sn}"
 
         ids = [_serial_id(sn) for sn in all_serials]
         metafunc.fixturenames.append('_test_device_serial')

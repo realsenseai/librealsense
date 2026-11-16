@@ -4,8 +4,10 @@
 """
 D585 sensor configurations: 3C (dedicated color sensor, the lab default) and 2C (dual RGB).
 
-A device_each() pattern naming the 2C product ("... Dual RGB") also selects a 3C camera that can switch to it, as
-the parameter "<serial>-2c". conftest.module_device_setup switches the camera to the mode each module asked for.
+Every device-marked test that runs on a 3C camera able to switch also runs on it in 2C, as the parameter
+"<serial>-2c" (unless it device_exclude()s the 2C name, e.g. "Dual RGB"); a "Dual RGB" pattern selects only that run.
+The 2C runs come last in the session, see conftest. conftest.module_device_setup switches the camera to the mode
+each module asked for.
 """
 
 from rspy import log
@@ -38,6 +40,11 @@ def _option():
 def _supports_switch( device ):
     opt = _option()
     return opt is not None and device.handle.first_depth_sensor().supports( opt )
+
+
+def two_c_name( device ):
+    """:return: the product name of this camera in 2C, '' if it has none"""
+    return TWO_C_NAMES.get( device.name, '' )
 
 
 def can_toggle( device ):

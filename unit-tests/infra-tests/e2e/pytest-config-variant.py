@@ -1,11 +1,12 @@
-# A D455 stands in for a camera that can switch to 2C (2C name "D455 Dual RGB"). Selecting it by both names
-# runs the module twice on the same camera: once in 3C (param "111") and once in 2C (param "111-2c").
-# Every setup puts the camera in the mode it was selected for; the 2C module switches back at teardown.
+# A D455 stands in for a camera that can switch to 2C. Every test on it also runs in 2C (param "111-2c"), after
+# all the 3C runs, unless it excludes "Dual RGB". Every setup puts the camera in the mode it was selected for;
+# it switches back to 3C once, after the last 2C run.
 import conftest
 from rspy import d585_config
 
 d585_config.switchable_to = lambda pattern: ['111'] if 'Dual RGB' in pattern else []
 d585_config.can_toggle = lambda device: device.name == 'D455'
+d585_config.two_c_name = lambda device: 'D455 Dual RGB'
 
 
 def _ensure(serial, key):
@@ -18,8 +19,14 @@ d585_config.ensure = _ensure
 import pytest
 
 
-@pytest.mark.device_each("D455", "D455 Dual RGB")
-def test_both_modes(module_device_setup):
+@pytest.mark.device_each("D455")
+def test_runs_in_both_modes(module_device_setup):
+    assert module_device_setup == '111'
+
+
+@pytest.mark.device_each("D455")
+@pytest.mark.device_exclude("Dual RGB")
+def test_excluded_from_2c(module_device_setup):
     assert module_device_setup == '111'
 
 

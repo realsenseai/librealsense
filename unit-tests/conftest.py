@@ -439,6 +439,21 @@ def pytest_collection_modifyitems(session, config, items):
         config.hook.pytest_deselected(items=[item for item in items if item not in included])
         items[:] = included
     filter_and_sort_items(config, items)
+    items.sort(key=lambda item: _item_mode(item) == '2c')   # the 2C runs come last: one switch to 2C, one back
+
+
+def _item_mode(item):
+    """'3c' or '2c' -- the configuration a parametrized device test instance runs its camera in"""
+    cs = getattr(item, 'callspec', None)
+    serial = cs.params.get('_test_device_serial') if cs else None
+    return d585_config.split(serial)[1] if isinstance(serial, str) else '3c'
+
+
+def _is_last_2c_module(request, serial):
+    """True if this module holds the last 2C instance of the camera (the 2C runs are contiguous at the end)"""
+    last = [item for item in request.session.items if getattr(item, 'callspec', None)
+            and item.callspec.params.get('_test_device_serial') == serial][-1]
+    return last.path == request.path
 
 
 def _emit_test_header(nodeid):
@@ -935,7 +950,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         pytest.fail(f"Failed to switch {serial_number} to {mode.upper()}: {e}")
 
     yield serial_number
-    if mode == '2c':
+    if mode == '2c' and _is_last_2c_module(request, _test_device_serial):
         try:
             d585_config.can_toggle(device) and d585_config.ensure(serial_number, '3c')
         except Exception as e:

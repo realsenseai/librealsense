@@ -103,3 +103,13 @@ def test_ensure_fails_when_the_camera_does_not_come_back( monkeypatch, lab ):
     monkeypatch.setattr( dev, 'hw_reset', lambda sns, **kw: False, raising = False )
     with pytest.raises( RuntimeError, match='did not come back' ):
         d585_config.ensure( '541', '2c' )
+
+
+def test_every_switchable_camera_gets_a_2c_twin_unless_the_test_excludes_dual_rgb( lab ):
+    from types import SimpleNamespace
+    from rspy.pytest.device_helpers import _two_c_twin
+    exclude = lambda pattern: SimpleNamespace( name = 'device_exclude', args = (pattern,) )
+    assert _two_c_twin( '541', [] ) == '541-2c'
+    assert _two_c_twin( '541', [exclude( 'Dual RGB' )] ) is None
+    assert _two_c_twin( '541', [exclude( 'D585S' )] ) == '541-2c'
+    assert _two_c_twin( '353', [] ) is None and _two_c_twin( '207', [] ) is None
