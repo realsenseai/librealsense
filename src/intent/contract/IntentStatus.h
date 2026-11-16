@@ -6,10 +6,6 @@ namespace rsintent {
 // Fixed 1024 B XU data. All enums, offsets and section capacities are generated
 // from dictionary.json. Numeric reasons, UTF-8 text and grammar discovery occupy
 // distinct bounded sections; unused bytes are zero.
-//    0 major          1 minor        2 state         3 last_result    4 last_op
-//    5 source         6 reserved     8 PID          10 sensor        11 branch
-//   12 offset        14 rule        16 detail       18 patch         19 n_reasons
-//   20 rule_revision 24 active_mask(u32) 28 reserved 32 REJECT_REASON x n_reasons
 // Bytes 10..17 repeat the first reason plus the decoder byte offset. Host-token
 // echo is reserved at offset 40; its valid flag is clear until token input exists.
 static_assert(max_reject_reasons <= 0xffU, "n_reasons is one byte");
@@ -22,7 +18,6 @@ struct RejectReason {
     uint16_t id;     // constraint/rule for CONSTRAINT, ctl_id for CONTROL_STATE, else 0
     uint16_t detail; // ParseDetail for INVALID/INCOMPLETE, StreamMismatch bits for A1
 };
-// REJECT_REASON.detail of an A1 STREAM_MISMATCH: which requested attributes differ.
 // Result codes that carry a REJECT_REASON (design v0.4 section 7.8 kind list).
 inline bool hasReason(uint8_t code) {
     return code == INVALID || code == INCOMPLETE || code == CONSTRAINT || code == STREAM_MISMATCH ||
