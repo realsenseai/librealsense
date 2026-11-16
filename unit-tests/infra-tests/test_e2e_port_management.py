@@ -112,9 +112,9 @@ class TestDevicePortManagement:
         assert_outcomes(out, skipped=1)
 
     def test_d585_config_runs_one_camera_in_both_modes(self):
-        """Selecting a switchable camera by its 3C and 2C names runs the module once per mode on the same port:
-        each setup puts the camera in its mode, and the 2C run switches back to 3C before the port is disabled."""
+        """Every test on a switchable camera also runs on it in 2C, after all the 3C runs (a test that excludes
+        "Dual RGB" does not); the camera is switched to 2C for those and back to 3C once, at the end."""
         rc, out, tracking = run_e2e("pytest-config-variant.py")
-        assert_outcomes(out, passed=3)
-        assert [c['serials'] for c in tracking["enable_only_calls"]] == [['111'], ['111'], ['222']]
+        assert_outcomes(out, passed=4)
+        assert out.index("test_runs_in_both_modes[D455 Dual RGB-111-2c]") > out.index("test_other_camera_untouched[D435-222]")
         assert tracking["ensure_calls"] == [['111', '3c'], ['111', '2c'], ['111', '3c']]
