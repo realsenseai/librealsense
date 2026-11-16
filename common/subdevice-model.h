@@ -48,6 +48,9 @@ namespace rs2
     // True for D500 devices with a wired-up depth-mapping sensor (occupancy grid / labeled point cloud).
     bool device_has_depth_mapping(const device& dev);
 
+    // True for safety cameras; their mapping-stream metadata carries the safety zone polygons
+    bool device_has_safety_sensor(const device& dev);
+
     // Perception streams that are still maturing and get a BETA badge in the UI
     bool is_beta_stream(rs2_stream type);
 
