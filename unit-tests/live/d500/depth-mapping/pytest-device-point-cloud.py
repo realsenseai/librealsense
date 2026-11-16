@@ -10,7 +10,7 @@ import time
 import pyrealsense2 as rs
 import pyrsutils as rsutils
 from pytest_check import check
-from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
 
@@ -61,7 +61,8 @@ def collect( sensor, profile, count ):
 
 
 def test_pcl_frames( pcl ):
-    _, sensor, profile = pcl
+    dev, sensor, profile = pcl
+    skip_d585_on_gmsl( dev, "no point cloud frames over GMSL" )
     vsp = profile.as_video_stream_profile()
     frames = collect( sensor, profile, FRAMES_TO_CHECK )
     check.equal( len( frames ), FRAMES_TO_CHECK )
