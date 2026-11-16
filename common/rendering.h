@@ -449,6 +449,8 @@ namespace rs2
             return last[idx];
         }
 
+        const std::vector< uint8_t > & get_raw16_preview() const { return raw16_preview; }
+
         texture_buffer() : last_queue(), texture() {}
 
         GLuint get_gl_handle() const {
