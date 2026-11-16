@@ -6,7 +6,7 @@
 import logging
 from typing import List
 
-from rspy import devices
+from rspy import devices, d585_config
 
 log = logging.getLogger('librealsense')
 
@@ -64,7 +64,7 @@ def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
     required_types, excluded_types = _build_type_sets(markers)
 
     def passes(sn):
-        if sn in excluded_sns or devices.real_serial(sn) in excluded_sns:   # a config variant follows its camera
+        if sn in excluded_sns:
             return False
         if included_sns is not None and sn not in included_sns:
             return False
@@ -232,6 +232,9 @@ def resolve_device_each_serials(metafunc):
             for sn in devices.by_spec(pattern, []):
                 if passes(sn) and sn not in all_serials:
                     all_serials.append(sn)
+            for sn in d585_config.switchable_to(pattern):   # the same camera, switched to 2C for the module
+                if passes(sn) and sn + d585_config.SUFFIX not in all_serials:
+                    all_serials.append(sn + d585_config.SUFFIX)
 
     # Each single-spec ``device()`` marker independently contributes one parametrized
     # instance (the first matching device, or a sentinel if none).  Multiple stacked
