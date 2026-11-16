@@ -425,8 +425,11 @@ def test_fw_update( request, module_device_setup, test_context_var ):
 
     if result.returncode != 0:
         if "D585S" in product_name:  # a failed flash may not have rebooted the camera out of service mode
-            device, ctx = find_device_or_fail( serial )
-            tests_wrapper.set_safety_mode( device.first_safety_sensor(), rs.safety_mode.run )
+            try:
+                device, ctx = find_device_or_fail( serial )
+                tests_wrapper.set_safety_mode( device.first_safety_sensor(), rs.safety_mode.run )
+            except ( Exception, pytest.fail.Exception ) as e:  # gone or in DFU: keep the rs-fw-update failure below
+                log.warning( f'could not restore D585S safety run mode: {e}' )
         pytest.fail( f'rs-fw-update should return exit code 0 (got {result.returncode})' )
 
     # make sure update worked and check FW version and update counter
