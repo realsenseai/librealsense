@@ -4,18 +4,18 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "71d207f7e76b8b6b633e9fd4f9f4476d9940609c26cad6db54f82dbc678a27ad";
+static const char dictionary_sha256[] = "2a2b43cff65b7af13408aee6dbbdd9497a03949d81c8abcead84345a8ddbbcb6";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
-static const unsigned wire_size = 1000U;
-static const unsigned status_size = 1000U;
+static const unsigned wire_size = 1024U;
+static const unsigned status_size = 1024U;
 static const unsigned max_branch_id = 31U;
 static const unsigned max_sensor_id = 31U;
 static const unsigned max_streams = 20U;
 static const unsigned envelope_size = 8U;
 static const unsigned record_header_size = 4U;
-static const unsigned max_tlv_size = 992U;
+static const unsigned max_tlv_size = 1016U;
 static const unsigned sensor_record_bytes = 12U;
 static const unsigned enabled_stream_bytes = 44U;
 static const unsigned disabled_stream_bytes = 20U;
@@ -26,10 +26,118 @@ static const unsigned envelope_operation_offset = 3U;
 static const unsigned envelope_tlv_size_offset = 4U;
 static const unsigned envelope_reserved_offset = 6U;
 static const unsigned rule_revision = 5U;
-enum Opcodes {
-    HWMC_SET_INTENT = 193,
-    HWMC_GET_INTENT = 194,
-    HWMC_GET_INTENT_STATUS = 195,
+static const unsigned status_header_size = 64U;
+static const unsigned status_active_mask_offset = 24U;
+static const unsigned status_reason_count_offset = 19U;
+static const unsigned reject_reason_size = 8U;
+static const unsigned max_reject_reasons = 32U;
+static const unsigned no_record_index = 255U;
+static const unsigned status_conformance_offset = 6U;
+static const unsigned status_flags_offset = 7U;
+static const unsigned status_skipped_count_offset = 28U;
+static const unsigned status_skipped_offset_offset = 30U;
+static const unsigned status_skipped_type_offset = 32U;
+static const unsigned status_skipped_sensor_offset = 33U;
+static const unsigned status_skipped_branch_offset = 34U;
+static const unsigned status_skipped_id_offset = 36U;
+static const unsigned status_text_length_offset = 38U;
+static const unsigned status_host_token_offset = 40U;
+static const unsigned status_discovery_length_offset = 48U;
+static const unsigned status_format_version_offset = 50U;
+static const unsigned status_text_offset = 320U;
+static const unsigned status_text_capacity = 128U;
+static const unsigned status_discovery_offset = 448U;
+static const unsigned status_discovery_capacity = 576U;
+static const unsigned status_major_offset = 0U;
+static const unsigned status_minor_offset = 1U;
+static const unsigned status_state_offset = 2U;
+static const unsigned status_result_offset = 3U;
+static const unsigned status_operation_offset = 4U;
+static const unsigned status_source_offset = 5U;
+static const unsigned status_sku_offset = 8U;
+static const unsigned status_error_sensor_offset = 10U;
+static const unsigned status_error_branch_offset = 11U;
+static const unsigned status_error_offset_offset = 12U;
+static const unsigned status_error_rule_offset = 14U;
+static const unsigned status_error_detail_offset = 16U;
+static const unsigned status_patch_offset = 18U;
+static const unsigned status_rule_revision_offset = 20U;
+static const unsigned status_total_reasons_offset = 52U;
+static const unsigned reason_kind_offset = 0U;
+static const unsigned reason_sensor_offset = 1U;
+static const unsigned reason_record_offset = 2U;
+static const unsigned reason_branch_offset = 3U;
+static const unsigned reason_id_offset = 4U;
+static const unsigned reason_detail_offset = 6U;
+enum Result : uint8_t {
+    OK = 0,
+    BUSY = 1,
+    INVALID = 2,
+    INCOMPLETE = 3,
+    CONSTRAINT = 4,
+    WRONG_STATE = 5,
+    STREAM_MISMATCH = 6,
+    CONTROL_STATE = 7,
+    READ_ONLY = 8,
+    INTERNAL = 255,
+};
+enum ParseDetail : uint16_t {
+    PARSE_NONE = 0,
+    PARSE_TRANSFER_SIZE = 1,
+    PARSE_MAJOR = 2,
+    PARSE_OPERATION = 3,
+    PARSE_RESERVED = 4,
+    PARSE_TLV_SIZE = 5,
+    PARSE_BOUNDS = 6,
+    PARSE_SHAPE = 7,
+    PARSE_MISPLACED = 8,
+    PARSE_UNKNOWN_CRITICAL = 9,
+    PARSE_UNSUPPORTED = 10,
+    PARSE_DUPLICATE = 11,
+    PARSE_VALUE = 12,
+    PARSE_CAPACITY = 13,
+    PARSE_MISSING = 14,
+};
+enum Operation : uint8_t {
+    SET = 0,
+    VALIDATE_ONLY = 1,
+    CLEAR = 2,
+};
+enum State : uint8_t {
+    UNSET = 0,
+    VALIDATING = 1,
+    CONFIGURED = 2,
+    ACTIVATING = 3,
+    LOCKED = 4,
+    UNLOCKING = 5,
+};
+enum Conformance : uint8_t {
+    CONFORMANCE_UNAVAILABLE = 0,
+    CONFORMANCE_MATCH = 1,
+    CONFORMANCE_MISMATCH = 2,
+};
+enum StreamMismatch : uint16_t {
+    MISMATCH_UNDECLARED = 1,
+    MISMATCH_DISABLED = 2,
+    MISMATCH_FORMAT = 4,
+    MISMATCH_WIDTH = 8,
+    MISMATCH_HEIGHT = 16,
+    MISMATCH_FPS = 32,
+    MISMATCH_STALE = 64,
+};
+enum StatusFlags : uint8_t {
+    STATUS_SKIPPED_ITEMS = 1,
+    STATUS_NEWER_SENDER = 2,
+    STATUS_HOST_TOKEN_VALID = 4,
+    STATUS_REASONS_TRUNCATED = 8,
+};
+enum TransportDefinitions {
+    XU_INTENT = 28,
+    XU_STATUS = 29,
+    GMSL_INTENT_ADDRESS = 28672,
+    GMSL_STATUS_ADDRESS = 29696,
+    GMSL_INTENT_CID_OFFSET = 65,
+    GMSL_STATUS_CID_OFFSET = 66,
 };
 enum Records {
     SENSOR = 16,
@@ -45,16 +153,16 @@ enum Records {
 };
 inline uint8_t recordCritical(uint8_t type) {
     switch (type) {
-    case BRANCH_ID: return 1U;
+    case BRANCH_ID: return 0U;
     case CONTROL: return 0U;
-    case FORMAT: return 1U;
-    case FPS: return 1U;
-    case HEIGHT: return 1U;
+    case FORMAT: return 0U;
+    case FPS: return 0U;
+    case HEIGHT: return 0U;
     case SENSOR: return 0U;
-    case SENSOR_ID: return 1U;
-    case STATE: return 1U;
+    case SENSOR_ID: return 0U;
+    case STATE: return 0U;
     case STREAM: return 0U;
-    case WIDTH: return 1U;
+    case WIDTH: return 0U;
     default: return 0U;
     }
 }
@@ -78,6 +186,7 @@ static const uint8_t supported_records[] = {SENSOR, SENSOR_ID, STREAM, BRANCH_ID
 static const uint8_t stream_attributes[] = {BRANCH_ID, FORMAT, WIDTH, HEIGHT, FPS, STATE};
 struct SensorDefinition { uint8_t id; const char* name; uint8_t since; const char* sdk_name; };
 static const SensorDefinition sensors[] = {
+    {0U, "DEVICE", 0U, "Device"},
     {1U, "STEREO", 0U, "Stereo Module"},
     {2U, "COLOR", 0U, "RGB Camera"},
     {3U, "MOTION", 0U, "Motion Module"},

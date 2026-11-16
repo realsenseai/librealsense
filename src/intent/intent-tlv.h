@@ -47,7 +47,7 @@ inline bool known(uint8_t type) {
     switch (type) {
     case rsintent::SENSOR: case rsintent::SENSOR_ID: case rsintent::STREAM:
     case rsintent::BRANCH_ID: case rsintent::FORMAT: case rsintent::WIDTH:
-    case rsintent::HEIGHT: case rsintent::FPS: case rsintent::STATE: case rsintent::CONTROL:
+    case rsintent::HEIGHT: case rsintent::FPS: case rsintent::STATE:
         return true;
     default: return false;
     }
@@ -58,12 +58,14 @@ inline unsigned id(const Record &r) {
     const auto children = parse(r.value);
     const unsigned type = r.type == rsintent::SENSOR ? rsintent::SENSOR_ID : rsintent::BRANCH_ID;
     unsigned result = 0;
+    bool found = false;
     for (const auto &c : children) if (c.type == type) {
-        require(!result && !(c.flags & 2U) && c.value.size() == (type == rsintent::SENSOR_ID ? 4U : 1U));
+        require(!found && !(c.flags & 2U) && c.value.size() == (type == rsintent::SENSOR_ID ? 4U : 1U));
+        found = true;
         result = c.value[0];
         if (type == rsintent::SENSOR_ID) require(!c.value[1] && !c.value[2] && !c.value[3]);
     }
-    require(result != 0);
+    require(found && (r.type == rsintent::SENSOR || result != 0));
     return result;
 }
 inline bool recognized(const Record &r) {
@@ -86,13 +88,17 @@ inline void structure(const std::vector<Record> &records, unsigned level = 0) {
             const auto children = parse(r.value);
             if (r.type == rsintent::SENSOR)
                 require(!children.empty() && children.front().type == rsintent::SENSOR_ID);
-            if (r.type == rsintent::SENSOR)
-                for (const auto &child : children)
-                    if (child.type == rsintent::STREAM && (child.flags & 1U))
-                        require((r.flags & 1U) != 0U);
             if (recognized(r)) structure(children, level + 1);
         }
     }
+}
+inline std::vector<Record> noncritical(std::vector<Record> records) {
+    for (auto &record : records) {
+        record.flags &= 2U;
+        if (record.type == rsintent::SENSOR || record.type == rsintent::STREAM)
+            record.value = pack(noncritical(parse(record.value)));
+    }
+    return records;
 }
 inline std::vector<Record> filter(const std::vector<Record> &records) {
     std::vector<Record> clean;

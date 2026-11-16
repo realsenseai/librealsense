@@ -80,7 +80,7 @@ extern "C" {
     */
     void rs2_config_enable_all_stream(rs2_config* config, rs2_error ** error);
     /**
-    * Opt in to declaring resolved pipeline profiles as required device-wide Intent before open/start.
+    * Opt in to declaring resolved profiles and disabled peer streams in device-wide Intent before open/start.
     * Disabled by default. Unsupported firmware or a rejected SET fails start without legacy fallback.
     * This does not start streaming immediately or clear the declaration on stop.
     * \param[in] config Config to update

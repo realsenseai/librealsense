@@ -4,37 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 namespace rsintent {
-enum Result : uint8_t {
-    OK,
-    BUSY,
-    INVALID,
-    INCOMPLETE,
-    CONSTRAINT,
-    WRONG_STATE,
-    STREAM_MISMATCH,
-    CONTROL_STATE,
-    READ_ONLY,
-    INTERNAL = 0xff // Local backend/transport failure only; never a public Intent last_result.
-};
-// Error::detail for INVALID/INCOMPLETE decode results (Error::rule is 0).
-enum ParseDetail : uint16_t {
-    PARSE_NONE,
-    PARSE_TRANSFER_SIZE,    // null buffer or size != wire_size (truncated/oversized)
-    PARSE_MAJOR,            // major version differs from the FW major
-    PARSE_OPERATION,        // unknown operation code
-    PARSE_RESERVED,         // nonzero envelope reserved byte
-    PARSE_TLV_SIZE,         // tlv_size too large, unaligned, or CLEAR with a body
-    PARSE_BOUNDS,           // record exceeds its parent, bad flag bits or nonzero pad
-    PARSE_SHAPE,            // container/scalar flag, scalar width or SENSOR_ID position
-    PARSE_MISPLACED,        // known record outside its grammar position
-    PARSE_UNKNOWN_CRITICAL, // unknown record marked CRITICAL
-    PARSE_UNSUPPORTED,      // CONTROL record; not supported in Phase 1
-    PARSE_DUPLICATE,        // repeated sensor, branch or stream attribute
-    PARSE_VALUE,            // out-of-range sensor/branch ID or STATE value
-    PARSE_CAPACITY,         // more than max_streams streams
-    PARSE_MISSING           // stream attribute set incomplete (Result INCOMPLETE)
-};
-enum Operation : uint8_t { SET, VALIDATE_ONLY, CLEAR };
 struct Error {
     Result code;
     uint8_t sensor, branch;
@@ -48,18 +17,22 @@ struct Stream {
     bool enabled;
     uint32_t format;
     uint16_t width, height, fps;
-    bool required;
-    bool optional;
 };
 struct Model {
     Stream streams[max_streams];
     size_t count;
+    bool deviceDeclared;
+};
+struct Compatibility {
+    uint16_t skippedCount, offset, id;
+    uint8_t type, sensor, branch;
 };
 struct Request {
     Operation op;
     uint8_t minorVersion;
     uint8_t patchVersion;
     Model model;
+    Compatibility compatibility;
 };
 uint16_t read16(const uint8_t *p);
 uint32_t read32(const uint8_t *p);

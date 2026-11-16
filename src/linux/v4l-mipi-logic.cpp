@@ -7,6 +7,7 @@
 #include <src/librealsense-exception.h>  // linux_backend_exception
 
 #include <src/platform/uvc-device.h>  // extension_unit
+#include <src/intent/contract/rs_intent_tlv.h>
 #include <rsutils/string/from.h>
 
 #include <linux/media.h>  // media_device_info, MEDIA_IOC_DEVICE_INFO
@@ -340,6 +341,8 @@ namespace librealsense
                 {
                     switch( control )
                     {
+                    case RS_INTENT_XU_INTENT: return RS_CAMERA_CID_BASE + RS_INTENT_GMSL_INTENT_CID_OFFSET;
+                    case RS_INTENT_XU_STATUS: return RS_CAMERA_CID_BASE + RS_INTENT_GMSL_STATUS_CID_OFFSET;
                     case RS_DUAL_RGB_MODE: return RS_CAMERA_CID_DEVICE_MODE;
                     case RS_COLORED_IR_AE_POLICY: return RS_CAMERA_CID_2C_AE_POLICY;
                     // D500 composite DPP controls - LibRS-side ctrl ids from ds-private.h that

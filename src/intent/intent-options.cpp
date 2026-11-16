@@ -10,7 +10,6 @@
 #include <src/ds/d500/d500-device.h>
 #include <src/ds/ds-private.h>
 #include <src/librealsense-exception.h>
-#include <src/hw-monitor.h>
 #include <rsutils/json.h>
 #include <src/uvc-sensor.h>
 namespace librealsense {
@@ -35,7 +34,7 @@ void declare_pipeline_intent(device_interface &device,
         for (auto &stream : sensor["streams"]) {
             stream.erase("layout");
             const auto name = stream["stream"], index = stream["index"];
-            stream = {{"stream", name}, {"index", index}, {"state", "DISABLED"}, {"required", false}};
+            stream = {{"stream", name}, {"index", index}, {"state", "DISABLED"}};
         }
     }
     for (const auto &profile : profiles) {
@@ -50,7 +49,6 @@ void declare_pipeline_intent(device_interface &device,
                 const auto video = dynamic_cast<const video_stream_profile_interface *>(profile.get());
                 stream["width"] = video ? video->get_width() : 0;
                 stream["height"] = video ? video->get_height() : 0;
-                stream["required"] = true;
                 matched = true;
             }
         if (!matched) throw invalid_value_exception("Resolved SDK stream/index is absent from FW Intent capabilities: " + name);
@@ -61,41 +59,50 @@ void declare_pipeline_intent(device_interface &device,
 namespace {
 class intent_option : public composite_option_interface {
     std::weak_ptr<uvc_sensor> _sensor;
-    std::shared_ptr<hw_monitor> _monitor;
     bool _status;
     uint16_t _sku;
     std::mutex _mutex;
     std::vector<uint8_t> _expected;
 
   public:
-    intent_option(std::shared_ptr<uvc_sensor> sensor, std::shared_ptr<hw_monitor> monitor,
+    intent_option(std::shared_ptr<uvc_sensor> sensor,
                   bool status, uint16_t sku = 0)
-        : _sensor(sensor), _monitor(monitor), _status(status), _sku(sku) {}
+        : _sensor(sensor), _status(status), _sku(sku) {}
     std::vector<uint8_t> read(uint8_t opcode, size_t expected, uint32_t selector = 0) const {
-        auto wire = _monitor->send(command(opcode, selector));
-        if (wire.size() != expected)
-            throw std::runtime_error("Intent HWMC response has an invalid length");
-        return wire;
+        if (selector != 0U) throw std::invalid_argument("Intent XU has no HWMC selector");
+        auto sensor = _sensor.lock();
+        if (!sensor) throw std::runtime_error("Intent: sensor disconnected");
+        return sensor->invoke_powered([&](platform::uvc_device &device) {
+            std::vector<uint8_t> wire(expected);
+            if (!device.get_xu(ds::depth_xu, opcode, wire.data(), static_cast<int>(wire.size())))
+                throw invalid_value_exception("Intent XU GET_CUR failed");
+            return wire;
+        });
     }
     std::vector<uint8_t> get_raw() const override {
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
-        return read(_status ? rsintent::HWMC_GET_INTENT_STATUS : rsintent::HWMC_GET_INTENT,
+        return read(_status ? rsintent::XU_STATUS : rsintent::XU_INTENT,
                     _status ? rsintent::status_size : rsintent::wire_size);
     }
     void set_raw(const void *data, size_t size) override {
         if (_status)
             throw std::invalid_argument("Intent status is read-only");
         if (!data || size != rsintent::wire_size)
-            throw std::invalid_argument("Intent HWMC data must contain 1000 bytes");
+            throw std::invalid_argument("Intent XU data must contain 1024 bytes");
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
         std::vector<uint8_t> payload(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
-        auto version = read(rsintent::HWMC_GET_INTENT_STATUS, rsintent::status_size);
-        auto firmware = read(rsintent::HWMC_GET_INTENT, rsintent::wire_size);
-        auto discovery = read(rsintent::HWMC_GET_INTENT, rsintent::wire_size, 2U);
+        auto version = read(rsintent::XU_STATUS, rsintent::status_size);
+        auto firmware = read(rsintent::XU_INTENT, rsintent::wire_size);
+        const size_t discoveryLength = rsintent::read16(version.data() + rsintent::status_discovery_length_offset);
+        if (discoveryLength < 16U || discoveryLength > rsintent::status_discovery_capacity)
+            throw invalid_value_exception("Intent STATUS has invalid discovery length");
+        std::vector<uint8_t> discovery(rsintent::wire_size);
+        std::copy(version.begin() + rsintent::status_discovery_offset,
+                  version.begin() + rsintent::status_discovery_offset + discoveryLength, discovery.begin());
         decode_intent_capabilities(discovery);
         // Raw composite-option callers follow the same version policy as the JSON API.
         const auto document = decode_intent_json(payload, version);
@@ -131,9 +138,11 @@ class intent_option : public composite_option_interface {
                 throw std::invalid_argument("Intent: cannot normalize declaration");
         }
         std::lock_guard<std::mutex> lock(_mutex);
-        command hwmc_request(rsintent::HWMC_SET_INTENT);
-        hwmc_request.data = std::move(payload);
-        _monitor->send(hwmc_request);
+        sensor->invoke_powered([&](platform::uvc_device &device) {
+            if (!device.set_xu(ds::depth_xu, rsintent::XU_INTENT, payload.data(),
+                               static_cast<int>(payload.size())))
+                throw invalid_value_exception("Intent XU SET_CUR failed");
+        });
         if (request.op != rsintent::VALIDATE_ONLY)
             _expected.swap(next);
     }
@@ -145,7 +154,7 @@ class intent_option : public composite_option_interface {
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
-        auto status = read(rsintent::HWMC_GET_INTENT_STATUS, rsintent::status_size);
+        auto status = read(rsintent::XU_STATUS, rsintent::status_size);
         // An older SDK can compare known fields, not interpret newer opaque entries.
         if (status[2] == 0U || intent_tlv::canonical_known(get_raw()) != _expected)
             throw std::runtime_error(
@@ -161,11 +170,11 @@ class intent_option : public composite_option_interface {
     }
 };
 } // namespace
-void register_intent_options(d500_depth_sensor &sensor, std::shared_ptr<hw_monitor> monitor) {
+void register_intent_options(d500_depth_sensor &sensor) {
     auto raw = std::dynamic_pointer_cast<uvc_sensor>(sensor.get_raw_sensor());
     if (!raw)
         return;
-    auto status = std::make_shared<intent_option>(raw, monitor, true);
+    auto status = std::make_shared<intent_option>(raw, true);
     uint16_t sku = 0;
     try {
         const auto wire = status->get_raw();
@@ -178,7 +187,7 @@ void register_intent_options(d500_depth_sensor &sensor, std::shared_ptr<hw_monit
         return;
     } // Unsupported firmware keeps legacy behavior.
     sensor.register_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT,
-                                     std::make_shared<intent_option>(raw, monitor, false, sku));
+                                     std::make_shared<intent_option>(raw, false, sku));
     sensor.register_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS, status);
 }
 } // namespace librealsense

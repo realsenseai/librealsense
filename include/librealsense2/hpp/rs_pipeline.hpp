@@ -159,7 +159,7 @@ namespace rs2
             rs2_config_enable_stream(_config.get(), stream_type, stream_index, width, height, format, framerate, &e);
             error::handle(e);
         }
-        /** Declare resolved profiles as required Intent before open/start.
+        /** Declare resolved profiles and disabled peer streams before open/start.
          * Disabled by default; rejection fails start rather than falling back.
          * Stop does not implicitly clear the device-wide declaration.
          */

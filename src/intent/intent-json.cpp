@@ -84,7 +84,7 @@ unsigned sensorId(const std::string &name) {
     for (const auto &s : rsintent::sensors)
         if (name == s.sdk_name || name == s.name)
             return s.id;
-    return 0U;
+    throw std::invalid_argument("Intent: unknown sensor " + name);
 }
 const json &childDocument(const json &j, const intent_tlv::Record &r, unsigned level) {
     const unsigned id = intent_tlv::id(r);
@@ -140,7 +140,6 @@ std::vector<intent_tlv::Record> applyLayouts(const json &j, std::vector<intent_t
             require(match < records.size() && consumed.insert(match).second);
             Record r = records[match];
             require((flags & 2U) == (r.flags & 2U));
-            require(!(r.flags & 1U) || (flags & 1U));
             r.flags = flags;
             result.push_back(r);
         }
@@ -195,10 +194,10 @@ void warn_unsupported(const std::vector<intent_tlv::Record> &records,
     }
 }
 void warn_version(const std::vector<uint8_t> &status) {
-    if (!status.empty() && status[1] != rsintent::minor) {
+    if (!status.empty() && status[rsintent::status_minor_offset] != rsintent::minor) {
         LOG_WARNING("Intent dictionary mismatch: SDK " << rsintent::major << "." << rsintent::minor
-                    << "." << rsintent::patch << ", firmware " << unsigned(status[0]) << "."
-                    << unsigned(status[1]) << "." << unsigned(status[18])
+                    << "." << rsintent::patch << ", firmware " << unsigned(status[rsintent::status_major_offset]) << "."
+                    << unsigned(status[rsintent::status_minor_offset]) << "." << unsigned(status[rsintent::status_patch_offset])
                     << "; continuing with known fields and opaque pass-through");
     }
 }
@@ -258,8 +257,8 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
                                        const std::vector<uint8_t> &firmware,
                                        const std::vector<uint8_t> &discovery) {
     const json j = json::parse(text);
-    if (!status.empty() && (status.size() != rsintent::status_size || status[0] != rsintent::major ||
-                           status[3] > rsintent::READ_ONLY))
+    if (!status.empty() && (status.size() != rsintent::status_size || status[rsintent::status_major_offset] != rsintent::major ||
+                           status[rsintent::status_result_offset] > rsintent::READ_ONLY))
         throw std::invalid_argument("Intent: firmware major mismatch or invalid status");
     if (!firmware.empty() && (firmware.size() != rsintent::wire_size || firmware[0] != rsintent::major))
         throw std::invalid_argument("Intent: firmware major mismatch or invalid GET_CUR");
@@ -289,13 +288,14 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
             keys(sensor, {"sensor", "streams", "layout"});
             const auto name = sensor.at("sensor").get<std::string>();
             const unsigned id = sensorId(name);
-            if (!id || !sensors.insert(id).second)
+            if (!sensors.insert(id).second)
                 throw std::invalid_argument("Intent: invalid or duplicate sensor");
+            model.deviceDeclared |= id == 0U;
             const auto &streams = sensor.at("streams");
             if (!streams.is_array())
                 throw std::invalid_argument("Intent: streams must be an array");
             for (const auto &entry : streams) {
-                keys(entry, {"stream", "index", "branch", "state", "format", "width", "height", "fps", "layout", "required"});
+                keys(entry, {"stream", "index", "branch", "state", "format", "width", "height", "fps", "layout"});
                 if (entry.contains("stream") && entry.contains("branch"))
                     throw std::invalid_argument("Intent: use one stream identity form");
                 const auto &def = definition(entry);
@@ -306,12 +306,6 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
                 s.sensor = def.sensor;
                 s.branch = def.id;
                 s.enabled = !entry.contains("state");
-                if (entry.contains("required") && !entry.at("required").is_boolean())
-                    throw std::invalid_argument("Intent: required must be boolean");
-                s.required = entry.value("required", s.enabled);
-                s.optional = s.enabled && !s.required;
-                if (s.optional && rsintent::recordCritical(rsintent::STREAM))
-                    throw std::invalid_argument("Intent: dictionary-required stream cannot be optional");
                 if (!s.enabled) {
                     if (entry.at("state") != "DISABLED" || entry.contains("format") || entry.contains("width") ||
                         entry.contains("height") || entry.contains("fps"))
@@ -359,8 +353,9 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
             return intent_tlv::id(a) < intent_tlv::id(b);
         });
         records = applyLayouts(j, records, 0);
+        records = intent_tlv::noncritical(records);
         intent_tlv::structure(records);
-        if (!status.empty()) warn_unsupported(records, status[1], minor);
+        if (!status.empty()) warn_unsupported(records, status[rsintent::status_minor_offset], minor);
         if (!firmware.empty()) warn_unreported(records, intent_tlv::body(firmware));
         if (!discovery.empty()) {
             const auto report = json::parse(decode_intent_capabilities(discovery));
@@ -434,7 +429,7 @@ std::string decode_intent_capabilities(const std::vector<uint8_t> &data) {
     for (unsigned i = 0; i < data[10]; ++i) {
         need(2U);
         const uint8_t id = data[pos++];
-        if (!id || !sensorIds.insert(id).second) throw std::invalid_argument("Intent: invalid capability sensor");
+        if (!sensorIds.insert(id).second) throw std::invalid_argument("Intent: invalid capability sensor");
         report["sensors"].push_back({{"id", id}, {"since", data[pos++]}});
     }
     for (unsigned i = 0; i < data[11]; ++i) {
@@ -464,8 +459,8 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     const auto clean = intent_tlv::transfer(wire, intent_tlv::filter(records));
     rsintent::Request request = {};
     if (rsintent::decode(clean.data(), clean.size(), request).code != rsintent::OK ||
-        status.size() != rsintent::status_size || status[0] != rsintent::major ||
-        status[3] > rsintent::READ_ONLY ||
+        status.size() != rsintent::status_size || status[rsintent::status_major_offset] != rsintent::major ||
+        status[rsintent::status_result_offset] > rsintent::READ_ONLY ||
         status[rsintent::status_reason_count_offset] > rsintent::max_reject_reasons)
         throw std::invalid_argument("Intent: invalid firmware response");
     warn_version(status);
@@ -489,8 +484,7 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
                     branch = &b;
             if (!branch)
                 throw std::invalid_argument("Intent: firmware branch requires a newer SDK");
-            json stream = {{"stream", branch->sdk_name}, {"index", branch->sdk_index},
-                           {"required", s.required}};
+            json stream = {{"stream", branch->sdk_name}, {"index", branch->sdk_index}};
             if (!s.enabled)
                 stream["state"] = "DISABLED";
             else {
@@ -510,18 +504,39 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
         throw std::invalid_argument("Intent: firmware sensor requires a newer SDK");
     if (request.op == rsintent::CLEAR) j.erase("sensors");
     else attachLayouts(j, records, 0);
-    j["status"] = {{"state", status[2]},
-                   {"last_result", status[3]},
-                   {"error_sensor", status[10]},
-                   {"error_branch", status[11]},
-                   {"error_offset", rsintent::read16(status.data() + 12)},
-                   {"error_rule", rsintent::read16(status.data() + 14)},
-                   {"error_detail", rsintent::read16(status.data() + 16)},
-                   {"source", status[5] ? "DEFAULT" : "CURRENT"},
+    j["status"] = {{"state", status[rsintent::status_state_offset]},
+                   {"last_result", status[rsintent::status_result_offset]},
+                   {"error_sensor", status[rsintent::status_error_sensor_offset]},
+                   {"error_branch", status[rsintent::status_error_branch_offset]},
+                   {"error_offset", rsintent::read16(status.data() + rsintent::status_error_offset_offset)},
+                   {"error_rule", rsintent::read16(status.data() + rsintent::status_error_rule_offset)},
+                   {"error_detail", rsintent::read16(status.data() + rsintent::status_error_detail_offset)},
+                   {"source", status[rsintent::status_source_offset] ? "DEFAULT" : "CURRENT"},
                    {"active_mask", rsintent::read32(status.data() + rsintent::status_active_mask_offset)},
-                   {"sku", rsintent::read16(status.data() + 8)},
-                   {"rule_revision", rsintent::read32(status.data() + 20)},
+                   {"sku", rsintent::read16(status.data() + rsintent::status_sku_offset)},
+                   {"rule_revision", rsintent::read32(status.data() + rsintent::status_rule_revision_offset)},
                    {"reasons", json::array()}};
+    const size_t textLength = rsintent::read16(status.data() + rsintent::status_text_length_offset);
+    const size_t discoveryLength = rsintent::read16(status.data() + rsintent::status_discovery_length_offset);
+    if (status[rsintent::status_format_version_offset] != 1U ||
+        textLength >= rsintent::status_text_capacity || discoveryLength > rsintent::status_discovery_capacity ||
+        status[rsintent::status_conformance_offset] > rsintent::CONFORMANCE_MISMATCH)
+        throw std::invalid_argument("Intent: malformed STATUS sections");
+    j["status"]["conformance"] = status[rsintent::status_conformance_offset];
+    j["status"]["host_token_supported"] = false;
+    j["status"]["total_reasons"] = rsintent::read16(status.data() + rsintent::status_total_reasons_offset);
+    j["status"]["reasons_truncated"] = (status[rsintent::status_flags_offset] & rsintent::STATUS_REASONS_TRUNCATED) != 0U;
+    j["status"]["reason_text"] = std::string(reinterpret_cast<const char *>(status.data() + rsintent::status_text_offset), textLength);
+    j["status"]["compatibility"] = {
+        {"skipped_count", rsintent::read16(status.data() + rsintent::status_skipped_count_offset)},
+        {"first_offset", rsintent::read16(status.data() + rsintent::status_skipped_offset_offset)},
+        {"first_type", status[rsintent::status_skipped_type_offset]},
+        {"sensor", status[rsintent::status_skipped_sensor_offset]},
+        {"branch", status[rsintent::status_skipped_branch_offset]},
+        {"id", rsintent::read16(status.data() + rsintent::status_skipped_id_offset)}};
+    if (status[rsintent::status_flags_offset] & 3U)
+        LOG_WARNING("Intent: firmware reports dictionary misalignment; skipped "
+                    << rsintent::read16(status.data() + rsintent::status_skipped_count_offset) << " item(s)");
     for (size_t i = 0; i < status[rsintent::status_reason_count_offset]; ++i) {
         const auto r = rsintent::readReason(status.data() + rsintent::status_header_size +
                                             i * rsintent::reject_reason_size);
@@ -544,13 +559,13 @@ std::string describe_intent_status(const std::vector<uint8_t> &status) {
         return code < sizeof(results) / sizeof(*results) ? std::string(results[code])
                                                           : std::to_string(code);
     };
-    if (status.size() != rsintent::status_size || status[0] != rsintent::major)
+    if (status.size() != rsintent::status_size || status[rsintent::status_major_offset] != rsintent::major)
         return "status unavailable";
-    const uint16_t sku = rsintent::read16(status.data() + 8);
+    const uint16_t sku = rsintent::read16(status.data() + rsintent::status_sku_offset);
     std::ostringstream out;
-    out << "last_result=" << result(status[3]);
-    if (status[3] == rsintent::INVALID || status[3] == rsintent::INCOMPLETE)
-        out << " at byte " << rsintent::read16(status.data() + 12);
+    out << "last_result=" << result(status[rsintent::status_result_offset]);
+    if (status[rsintent::status_result_offset] == rsintent::INVALID || status[rsintent::status_result_offset] == rsintent::INCOMPLETE)
+        out << " at byte " << rsintent::read16(status.data() + rsintent::status_error_offset_offset);
     const unsigned count = status[rsintent::status_reason_count_offset];
     if (count > rsintent::max_reject_reasons)
         return out.str() + ", malformed reason count " + std::to_string(count);
