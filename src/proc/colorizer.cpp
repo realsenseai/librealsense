@@ -262,14 +262,16 @@ namespace librealsense
         auto equalize = _equalize;
         auto min = _min, max = _max;
         auto cm = _maps[_map_index];
+        // Its own histogram, not the shared _hist_data: called directly, this can run beside colorize()
+        std::vector< int > hist( MAX_DEPTH );
         if( equalize )
-            update_histogram( _hist_data, reinterpret_cast< const uint16_t * >( depth.get_data() ),
+            update_histogram( hist.data(), reinterpret_cast< const uint16_t * >( depth.get_data() ),
                               depth.get_width(), depth.get_height() );
-        auto pixels = (float)_hist_data[MAX_DEPTH - 1];
+        auto pixels = (float)hist.back();
         for( int d = 0; d < MAX_DEPTH; ++d )
             colorize_pixel( table, d, cm, d, [&]( int data ) {
                 if( equalize )
-                    return _hist_data[data] / pixels;
+                    return hist[data] / pixels;
                 if( min >= max )
                     return 0.f;
                 return ( float( data ) * units - min ) / ( max - min );
