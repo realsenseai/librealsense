@@ -2,6 +2,8 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Currently, we exclude D555 as it's failing
+# D405 has no separate color sensor: color streams from the depth sensor, so the sensor-interface
+# tests open both streams on that one sensor (see get_color_sensor / start_sensors)
 
 import pytest
 import pyrealsense2 as rs, os, time, tempfile, platform, sys
@@ -59,6 +61,44 @@ def find_default_profile_settings():
             depth_width = p.as_video_stream_profile().width()
             depth_height = p.as_video_stream_profile().height()
             break
+    # One sensor streaming both depth and color (D405) runs them at a single fps
+    if color_sensor.is_depth_sensor():
+        color_fps = depth_fps
+
+
+def get_color_sensor( device ):
+    """
+    The device's color sensor. Devices without one (D405) stream color from the depth sensor,
+    so that sensor is returned instead.
+    """
+    try:
+        return device.first_color_sensor()
+    except RuntimeError as e:
+        # Fall back only when there is no color sensor; any other device error propagates
+        if 'Could not find requested sensor type' not in str( e ):
+            raise
+        ds = device.first_depth_sensor()
+        if any( p.stream_type() == rs.stream.color for p in ds.profiles ):
+            return ds
+        raise
+
+
+def start_sensors( depth_cb, color_cb ):
+    """
+    Open and start the depth and color streams. When color comes from the depth sensor (D405), both
+    streams must be opened together on that sensor, and one callback dispatches frames by stream type.
+    """
+    if color_sensor.is_depth_sensor():
+        depth_sensor.open( [dp, cp] )
+        if depth_cb is color_cb:   # e.g. a syncer: hand it every frame
+            depth_sensor.start( depth_cb )
+        else:
+            depth_sensor.start( lambda f: ( color_cb if f.get_profile().stream_type() == rs.stream.color else depth_cb )( f ) )
+    else:
+        depth_sensor.open( dp )
+        depth_sensor.start( depth_cb )
+        color_sensor.open( cp )
+        color_sensor.start( color_cb )
 
 
 def color_frame_call_back( frame ):
@@ -177,7 +217,7 @@ def test_sensor_interface(test_device, test_context_var):
     global dev, ctx, depth_sensor, color_sensor, is_d400
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()
-    color_sensor = dev.first_color_sensor()
+    color_sensor = get_color_sensor( dev )
 
     # The test also checks frame drops, therefore D400-specific relaxation must apply
     # The follow code is borrowed fro test-drops-on-set.py and later can be merged/refactored
@@ -194,10 +234,7 @@ def test_sensor_interface(test_device, test_context_var):
 
         restart_profiles()
 
-        depth_sensor.open( dp )
-        depth_sensor.start( lambda f: None )
-        color_sensor.open( cp )
-        color_sensor.start( lambda f: None )
+        start_sensors( lambda f: None, lambda f: None )
 
         time.sleep(3)
 
@@ -217,7 +254,7 @@ def test_sensor_interface(test_device, test_context_var):
         playback = ctx.load_device( file_name )
 
         depth_sensor = playback.first_depth_sensor()
-        color_sensor = playback.first_color_sensor()
+        color_sensor = get_color_sensor( playback )
 
         playback_color_filters = [f.get_info(rs.camera_info.name) for f in color_sensor.get_recommended_filters()]
         playback_depth_filters = [f.get_info(rs.camera_info.name) for f in depth_sensor.get_recommended_filters()]
@@ -227,10 +264,7 @@ def test_sensor_interface(test_device, test_context_var):
 
         restart_profiles()
 
-        depth_sensor.open( dp )
-        depth_sensor.start( depth_frame_call_back )
-        color_sensor.open( cp )
-        color_sensor.start( color_frame_call_back )
+        start_sensors( depth_frame_call_back, color_frame_call_back )
 
         time.sleep(3)
 
@@ -257,7 +291,7 @@ def test_sensor_interface_with_syncer(test_device):
     global dev, ctx, depth_sensor, color_sensor
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()
-    color_sensor = dev.first_color_sensor()
+    color_sensor = get_color_sensor( dev )
     find_default_profile_settings()
 
     temp_dir = tempfile.TemporaryDirectory( prefix='recordings_' )
@@ -270,10 +304,7 @@ def test_sensor_interface_with_syncer(test_device):
 
         restart_profiles()
 
-        depth_sensor.open( dp )
-        depth_sensor.start( sync )
-        color_sensor.open( cp )
-        color_sensor.start( sync )
+        start_sensors( sync, sync )
 
         time.sleep(3)
 
@@ -287,14 +318,11 @@ def test_sensor_interface_with_syncer(test_device):
         playback = ctx.load_device( file_name )
 
         depth_sensor = playback.first_depth_sensor()
-        color_sensor = playback.first_color_sensor()
+        color_sensor = get_color_sensor( playback )
 
         restart_profiles()
 
-        depth_sensor.open( dp )
-        depth_sensor.start( sync )
-        color_sensor.open( cp )
-        color_sensor.start( sync )
+        start_sensors( sync, sync )
 
         # if the record-playback worked we will get frames, otherwise the next line will timeout and throw
         sync.wait_for_frames()
