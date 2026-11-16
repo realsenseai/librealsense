@@ -27,7 +27,7 @@ def switchable_to( pattern ):
     from rspy import devices
     p = pattern.upper()
     return [ sn for sn in devices.all()
-             if 'DUAL RGB' in p and p in TWO_C_NAMES.get( devices.get( sn ).name, '' ).upper() ]
+             if 'DUAL RGB' in p and p in TWO_C_NAMES.get( devices.get( sn ).name, '' ).upper() and can_toggle( devices.get( sn ) ) ]
 
 
 def _option():
