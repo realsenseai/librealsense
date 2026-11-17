@@ -5,6 +5,7 @@
 
 #include "sensor.h"
 #include "platform/hid-device.h"
+#include <rsutils/concurrency/concurrency.h>
 
 
 namespace librealsense {
@@ -79,6 +80,10 @@ private:
     //Keeps set sensitivity values for gyro and accel
     std::map< rs2_stream, float > _imu_sensitivity_per_rs2_stream;
     bool _gyro_sensitivity_uses_range_index = false;
+
+    std::mutex _frame_timeout_mutex;
+    std::map< std::string, std::chrono::steady_clock::time_point > _last_frame_times;
+    active_object<> _frame_timeout_monitor;
 
     stream_profiles get_sensor_profiles( std::string sensor_name ) const;
 

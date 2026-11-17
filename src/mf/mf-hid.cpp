@@ -11,7 +11,6 @@
 
 #include "../types.h"
 #include "mf-hid.h"
-#include "hid-startup.h"
 #include "win/win-helpers.h"
 #include "metadata.h"
 
@@ -43,16 +42,9 @@ namespace librealsense
         public:
             virtual ~sensor_events() = default;
 
-            explicit sensor_events( const std::vector<std::string> & names, uint64_t started_at,
-                                    hid_callback callback, double gyro_scale_factor, double accel_scale_factor )
+            explicit sensor_events( hid_callback callback, double gyro_scale_factor, double accel_scale_factor )
                 : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor),
-                  _accel_scale_factor(accel_scale_factor), _startup(names, started_at) {}
-
-            void wait_for_first_samples()
-            {
-                // SetEventSink success does not prove that power-on succeeded.
-                _startup.wait_for( std::chrono::seconds(5) );
-            }
+                  _accel_scale_factor(accel_scale_factor) {}
 
             STDMETHODIMP QueryInterface(REFIID iid, void** ppv)
             {
@@ -229,10 +221,6 @@ namespace librealsense
                 const uint64_t report_time = ( uint64_t( file_time.dwHighDateTime ) << 32 ) | file_time.dwLowDateTime;
                 d.fo.backend_time = ( report_time - WIN_FILETIME_2_UNIX_SYSTIME ) * 0.0001;
 
-                // The caller holds its configure lock until start returns.
-                // Forwarding a warm-up callback could block the other sensor.
-                if( ! _startup.on_report( d.sensor.name, report_time ) )
-                    return S_OK;
                 _callback(d);
 
                 return S_OK;
@@ -281,22 +269,22 @@ namespace librealsense
             hid_callback _callback;
             double _gyro_scale_factor = 10.0;
             double _accel_scale_factor = 1000.0;
-            hid_startup _startup;
         };
 
         // SetProperties uses S_FALSE for per-property failures, which CHECK_HR
         // alone does not reject. Both supported calls set exactly one property.
-        static void set_sensor_property( ISensor * sensor, IPortableDeviceValues * values, REFPROPERTYKEY key )
+        static HRESULT set_sensor_property( ISensor * sensor, IPortableDeviceValues * values, REFPROPERTYKEY key )
         {
             CComPtr<IPortableDeviceValues> results;
             HRESULT hr = sensor->SetProperties( values, &results );
-            CHECK_HR(hr);
             if( hr == S_FALSE )
             {
                 HRESULT property_error;
-                CHECK_HR(results->GetErrorValue( key, &property_error ));
-                CHECK_HR(property_error);
+                hr = results->GetErrorValue( key, &property_error );
+                if( SUCCEEDED(hr) )
+                    return property_error;
             }
+            return hr;
         }
 
         void wmf_hid_device::open(const std::vector<hid_profile>&iio_profiles)
@@ -313,7 +301,9 @@ namespace librealsense
                         CHECK_HR(interval.CoCreateInstance( CLSID_PortableDeviceValues ));
                         CHECK_HR(interval->SetUnsignedIntegerValue( SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL,
                                                                   profile.frequency ));
-                        set_sensor_property( sensor->get_sensor(), interval, SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL );
+                        const HRESULT hr = set_sensor_property( sensor->get_sensor(), interval,
+                                                                SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL );
+                        CHECK_HR(hr);
 
                         const bool is_gyro = profile.sensor_name == "HID Sensor Class Device: Gyroscope";
                         const bool is_accel = profile.apply_sensitivity_to_accel
@@ -333,7 +323,12 @@ namespace librealsense
                             CHECK_HR(axes->SetValue( is_gyro ? SENSOR_DATA_TYPE_ANGULAR_VELOCITY_Z_DEGREES_PER_SECOND
                                                            : SENSOR_DATA_TYPE_ACCELERATION_Z_G, &value ));
                             CHECK_HR(properties->SetIPortableDeviceValuesValue( SENSOR_PROPERTY_CHANGE_SENSITIVITY, axes ));
-                            set_sensor_property( sensor->get_sensor(), properties, SENSOR_PROPERTY_CHANGE_SENSITIVITY );
+                            // Older firmware may not support sensitivity control.
+                            const HRESULT hr = set_sensor_property( sensor->get_sensor(), properties,
+                                                                    SENSOR_PROPERTY_CHANGE_SENSITIVITY );
+                            if( FAILED(hr) )
+                                LOG_WARNING( "Failed to set HID sensitivity for " << profile.sensor_name << ": "
+                                             << rsutils::hresult::hr_to_string(hr) );
                         }
                         _opened_sensors.push_back(sensor);
                     }
@@ -357,18 +352,7 @@ namespace librealsense
         {
             if( ! _streaming_sensors.empty() )
                 throw std::runtime_error( "Previous Windows HID capture is still active" );
-            std::vector<std::string> names;
-            for( auto const & sensor : _opened_sensors )
-            {
-                auto const & info = sensor->get_device_info();
-                if( hid_startup::is_required( info.vid, info.pid ) )
-                    names.push_back( sensor->get_sensor_name() );
-            }
-            FILETIME now{};
-            if( ! names.empty() )
-                GetSystemTimePreciseAsFileTime( &now );
-            const uint64_t started_at = ( uint64_t(now.dwHighDateTime) << 32 ) | now.dwLowDateTime;
-            CComPtr<sensor_events> events = new sensor_events( names, started_at, callback,
+            CComPtr<sensor_events> events = new sensor_events( callback,
                                                              _gyro_scale_factor, _accel_scale_factor );
             _cb = events.p;
             try
@@ -379,7 +363,6 @@ namespace librealsense
                     CHECK_HR(hr);
                     _streaming_sensors.push_back(sensor);
                 }
-                events->wait_for_first_samples();
             }
             catch (...)
             {
@@ -393,7 +376,8 @@ namespace librealsense
             while( ! _streaming_sensors.empty() )
             {
                 const HRESULT hr = _streaming_sensors.back()->stop_capture();
-                CHECK_HR(hr);
+                if( FAILED(hr) )
+                    LOG_WARNING( "Failed to clear HID event sink: " << rsutils::hresult::hr_to_string(hr) );
                 _streaming_sensors.pop_back();
             }
             _cb = nullptr;
