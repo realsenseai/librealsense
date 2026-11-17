@@ -41,7 +41,8 @@ def lpcl_profile( dev ):
 @pytest.fixture
 def lpcl( test_device ):
     dev, _ = test_device
-    require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "labeled point cloud" )   # older FW has no LPCL stream
+    if "D585S" not in dev.get_info( rs.camera_info.name ):
+        require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "labeled point cloud" )   # older D585 FW has no LPCL stream
     sensor, profile = lpcl_profile( dev )
     assert profile, "no sensor exposes a labeled point cloud profile"
     return dev, sensor, profile
