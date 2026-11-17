@@ -42,13 +42,18 @@ namespace librealsense
             void set_gyro_scale_factor( double scale_factor ) override;
             // accel raw counts pass through unscaled on this backend
             void set_accel_scale_factor( double scale_factor ) override {}
+            bool read_sensitivity( const std::string & sensor_name, double & value ) override;
+            bool is_token_sensitivity_read_lossy() const override { return true; }
 
         private:
             void handle_interrupt();
             rs_usb_endpoint get_hid_endpoint();
             rs_usb_interface get_hid_interface();
-            //for gyro sensitivity the default value we set in feature report is 0.1, which is mapped in FW to 30.5 millideg/sec
-            usb_status set_feature_report( unsigned char power, int report_id, int fps = 0, double sensitivity = 0.1, bool apply_to_accel = false );
+            // The feature report is read from FW first, and sent back with only the requested fields changed. The sensitivity is
+            // overwritten only when apply_sensitivity is set (explicit user request), so the FW value is otherwise preserved.
+            usb_status set_feature_report( unsigned char power, int report_id, int fps = 0, bool apply_sensitivity = false, double sensitivity = 0. );
+            // GET_REPORT of the HID feature report of report_id
+            usb_status get_feature_report( const rs_usb_messenger & dev, int report_id, FEATURE_REPORT & report, uint32_t & transferred );
             bool _running = false;
             dispatcher _action_dispatcher;
 

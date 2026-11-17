@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 import time
 import platform
 from rspy.snippets import is_dds_dev
+from rspy.pytest.device_helpers import skip_d585_on_gmsl
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -51,6 +52,7 @@ def time_to_first_frame(ctx, config):
 
 def test_pipeline_first_depth_frame_delay(pipeline_device):
     dev, ctx = pipeline_device
+    skip_d585_on_gmsl(dev, "first frame delay over GMSL is above the limit")
     product_name = dev.get_info(rs.camera_info.name)
     max_delay = 1
     os_name = platform.system()
@@ -78,6 +80,7 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
 
 def test_pipeline_first_color_frame_delay(pipeline_device):
     dev, ctx = pipeline_device
+    skip_d585_on_gmsl(dev, "first frame delay over GMSL is above the limit")
     product_name = dev.get_info(rs.camera_info.name)
     max_delay = 1
     os_name = platform.system()
