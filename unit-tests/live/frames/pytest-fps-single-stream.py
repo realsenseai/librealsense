@@ -41,20 +41,8 @@ def set_exposure_half_frame_time(sensor, requested_fps):
         frame_time_s = 1.0 / float(requested_fps)
         desired_s = frame_time_s / 2.0
 
-        # Decide units based on sensor type: depth -> microseconds; RGB -> 100 microseconds units
-        is_color = False
-        try:
-            for p in sensor.profiles:
-                if p.stream_type() == rs.stream.color:
-                    is_color = True
-                    break
-        except Exception:
-            is_color = False
-
-        if is_color:
-            desired_units = desired_s * 1e6 / 100.0
-        else:
-            desired_units = desired_s * 1e6
+        # RGB sensors take 100 microsecond units; depth sensors (also D405/D401 color) take microseconds
+        desired_units = desired_s * 1e6 / (100.0 if sensor.is_color_sensor() else 1.0)
 
         if desired_units < r.min:
             desired_units = r.min
