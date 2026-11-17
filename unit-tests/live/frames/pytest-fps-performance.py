@@ -5,25 +5,14 @@
 RealSense FPS Performance Test
 Comprehensive testing of all supported resolutions and frame rates for Depth, Color, and IR streams
 Includes multi-stream combination testing for Depth + Color combinations
-
-Code Organization & Redundancy Reduction:
-- check_stream_fps_accuracy_generic(): Consolidated function that eliminates ~200 lines of
-  redundant code from the original three separate FPS test functions
-- get_supported_stream_configurations(): Generic function that consolidates six "get_supported"
-  functions, reducing ~100 lines of redundant code
-- Multi-stream combination testing: Tests all combinations of depth and color configurations
-- Overall code reduction: ~300 lines eliminated while adding comprehensive multi-stream testing
 """
 
 import pytest
 from rspy.stopwatch import Stopwatch
 import pyrealsense2 as rs
 import numpy as np
-import platform
 import time
-import sys
 from collections import deque
-from typing import List, Tuple, Dict
 import logging
 log = logging.getLogger(__name__)
 
@@ -37,10 +26,7 @@ pytestmark = [
 
 # Constants for device initialization and testing
 DEVICE_INIT_SLEEP_SEC = 3  # Sleep time to allow device to get into idle state
-DEFAULT_DEVICE_CREATION_TIMEOUT = 10  # Default timeout for device creation (seconds)
-DDS_DEVICE_CREATION_TIMEOUT = 30  # Extended timeout for DDS devices (seconds)
 MIN_FRAME_COUNT_LOW_FPS = 5  # Minimum frame count for low FPS tests
-MIN_TEST_DURATION_PERCENT = 0.6  # Minimum test duration percentage (60%)
 
 # ---------------------------------------------------------------------------------------------
 # Coverage tiers
@@ -58,9 +44,9 @@ TIER_FULL = "full"
 
 # Per-tier caps (None = no cap, exercise every supported permutation).
 TIER_CONFIG_CAP = {TIER_GATING: 1, TIER_SEMI: 8, TIER_FULL: None}
-TIER_FPS_CAP = {TIER_GATING: 1, TIER_SEMI: 6, TIER_FULL: None}
+TIER_FPS_CAP = {TIER_GATING: 1, TIER_SEMI: 6}
 # Full multistream is capped (not "all 930 combos") to keep weekly bounded; matches the prior
-# CI cap. Config/FPS tests stay uncapped at full.
+# CI cap. Config tests stay uncapped at full.
 TIER_MULTISTREAM_CAP = {TIER_GATING: 1, TIER_SEMI: 6, TIER_FULL: 50}
 
 # Let USB endpoints tear down between stream reconfigurations. Back-to-back stop/close -> open
@@ -82,33 +68,6 @@ def _settle():
     """Pause so USB endpoints fully tear down before the next open()."""
     time.sleep(SETTLE_DELAY)
 
-
-def format_duration(seconds):
-    """
-    Format duration in seconds to a human-readable string
-
-    Args:
-        seconds: Duration in seconds
-
-    Returns:
-        Formatted string (e.g., "2m 30s", "1h 15m 30s", "45s")
-    """
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    elif seconds < 3600:
-        minutes = int(seconds // 60)
-        remaining_seconds = seconds % 60
-        return f"{minutes}m {remaining_seconds:.1f}s"
-    else:
-        hours = int(seconds // 3600)
-        remaining_minutes = int((seconds % 3600) // 60)
-        remaining_seconds = seconds % 60
-        if remaining_seconds > 0:
-            return f"{hours}h {remaining_minutes}m {remaining_seconds:.1f}s"
-        elif remaining_minutes > 0:
-            return f"{hours}h {remaining_minutes}m"
-        else:
-            return f"{hours}h"
 
 def _evenly_spaced_subset(items, max_count):
     """
@@ -205,42 +164,6 @@ class FPSMonitor:
             log.warning(gap_msg)
         else:
             log.info(gap_msg)
-
-# Start depth + color streams and measure the time from stream opened until first frame arrived using sensor API.
-# Verify that the time do not exceeds the maximum time allowed
-# Note - Using Windows Media Foundation to handle power management between USB actions take time (~27 ms)
-
-
-def time_to_first_frame(sensor, profile, max_delay_allowed):
-    """
-    Wait for the first frame for 'max_delay_allowed' + 1 extra second
-    If the frame arrives it will return the seconds it took since open() call
-    If no frame it will return 'max_delay_allowed'
-    """
-    first_frame_time = max_delay_allowed
-    open_call_stopwatch = Stopwatch()
-
-    def frame_cb(frame):
-        nonlocal first_frame_time, open_call_stopwatch
-        if first_frame_time == max_delay_allowed:
-            first_frame_time = open_call_stopwatch.get_elapsed()
-
-    open_call_stopwatch.reset()
-    sensor.open(profile)
-    sensor.start(frame_cb)
-
-    # Wait condition:
-    # 1. first frame did not arrive yet
-    # 2. timeout of 'max_delay_allowed' + 1 extra second reached.
-    while first_frame_time == max_delay_allowed and open_call_stopwatch.get_elapsed() < max_delay_allowed + 1:
-        time.sleep(0.05)
-
-    sensor.stop()
-    sensor.close()
-    _settle()
-
-    return first_frame_time
-
 
 def check_depth_fps_accuracy(device, expected_fps: int, width: int = None, height: int = None, test_duration: float = 10.0, fps_tolerance: float = 0.1):
     """
@@ -425,53 +348,9 @@ def check_stream_fps_accuracy_generic(device, stream_name, stream_type, formats,
         sensor.open(profile)
         sensor.start(frame_callback)
 
-        # Wait for test duration with adaptive early exit for all FPS rates
         test_stopwatch = Stopwatch()
-        # Adjust minimum measurements needed based on FPS rate
-        if expected_fps <= 6:
-            min_measurements_needed = 2  # Reduced requirement for very low FPS
-        else:
-            min_measurements_needed = 3  # Standard requirement for other FPS rates
-
         while test_stopwatch.get_elapsed() < test_duration:
             time.sleep(0.1)
-
-            # Early exit logic based on FPS rate and sufficient measurements
-            if len(fps_measurements) >= min_measurements_needed:
-                elapsed = test_stopwatch.get_elapsed()
-
-                if expected_fps <= 6:
-                    # Very low FPS: exit early after 50% of test duration
-                    if elapsed >= (test_duration * 0.5):
-                        log.info(f"Very low FPS test ({expected_fps} FPS) collected {len(fps_measurements)} measurements in {elapsed:.1f}s - sufficient for analysis")
-                        break
-                elif expected_fps <= 15:
-                    # Low FPS: exit early after 65% of test duration
-                    if elapsed >= (test_duration * 0.65):
-                        log.info(f"Medium-low FPS test ({expected_fps} FPS) collected {len(fps_measurements)} measurements in {elapsed:.1f}s - sufficient for analysis")
-                        break
-                elif expected_fps <= 30:
-                    # Standard FPS: exit early after 70% of test duration
-                    if elapsed >= (test_duration * 0.70):
-                        log.info(f"Standard FPS test ({expected_fps} FPS) collected {len(fps_measurements)} measurements in {elapsed:.1f}s - sufficient for analysis")
-                        break
-                elif expected_fps <= 60:
-                    # High FPS: exit early after 75% of test duration
-                    if elapsed >= (test_duration * 0.75):
-                        log.info(f"High FPS test ({expected_fps} FPS) collected {len(fps_measurements)} measurements in {elapsed:.1f}s - sufficient for analysis")
-                        break
-                else:
-                    # Very high FPS: exit early after 80% of test duration
-                    if elapsed >= (test_duration * 0.80):
-                        log.info(f"Very high FPS test ({expected_fps} FPS) collected {len(fps_measurements)} measurements in {elapsed:.1f}s - sufficient for analysis")
-                        break
-
-            # Special case for very low FPS: allow early exit with fewer measurements if we have reasonable frame count
-            if expected_fps <= 6 and len(fps_measurements) >= 1 and frame_count >= MIN_FRAME_COUNT_LOW_FPS:
-                elapsed = test_stopwatch.get_elapsed()
-                if elapsed >= (test_duration * MIN_TEST_DURATION_PERCENT):  # At least 60% of test duration
-                    log.info(f"Very low FPS test ({expected_fps} FPS) collected {len(fps_measurements)} measurements with {frame_count} frames in {elapsed:.1f}s - acceptable for low FPS analysis")
-                    break
 
     finally:
         # Guard teardown so a failed open()/start() surfaces its real error instead of being
@@ -524,12 +403,7 @@ def check_stream_fps_accuracy_generic(device, stream_name, stream_type, formats,
         "fps_min": fps_min,
         "fps_max": fps_max,
         "fps_std": fps_std,
-        "fps_deviation": fps_deviation,
-        "fps_tolerance": fps_tolerance,
-        "measurements": fps_measurements,
-        "warmup_frames": warmup_frames,
-        "measurement_interval": measurement_interval,
-        "measurements_count": len(fps_measurements)
+        "fps_deviation": fps_deviation
     }
 
     # Extra logging for optimized FPS cases
@@ -541,10 +415,6 @@ def check_stream_fps_accuracy_generic(device, stream_name, stream_type, formats,
               f"{len(fps_measurements)} measurements, avg FPS: {actual_avg_fps:.2f}")
 
     return fps_passed, actual_avg_fps, stats
-
-
-# The check_color_fps_accuracy and check_ir_fps_accuracy functions have been consolidated
-# into the generic check_stream_fps_accuracy_generic function above to eliminate redundancy
 
 
 def get_supported_stream_configurations(device, stream_type, format_filter, get_sensor_func, include_resolution=True):
@@ -675,16 +545,16 @@ def get_fps_test_parameters(fps_rate):
     """
     # Configuration: list of (threshold, (duration, tolerance))
     fps_test_config = [
-        (6,   (12.0, 0.35)),  # Very low FPS: extended test time and higher tolerance
-        (15,  (10.0, 0.25)),  # Low FPS: increased test time and tolerance
-        (30,  (8.0, 0.15)),   # Standard FPS: increased duration for better measurements
-        (60,  (6.0, 0.18)),   # High FPS: optimized duration and tolerance
-        (90,  (4.0, 0.20)),   # Very high FPS: shorter test with higher tolerance
+        (6,   (4.0, 0.35)),
+        (15,  (4.0, 0.25)),
+        (30,  (3.0, 0.15)),
+        (60,  (3.0, 0.18)),
+        (90,  (2.0, 0.20)),
     ]
     for threshold, params in fps_test_config:
         if fps_rate <= threshold:
             return params
-    return (3.0, 0.25)  # Extremely high FPS: quickest test, highest tolerance
+    return (2.0, 0.25)
 
 
 def check_stream_fps_accuracy_comprehensive(device, stream_type_name, test_function, get_fps_function, max_fps_rates=None):
@@ -1313,9 +1183,7 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
             "frame_count": color_frame_count,
             "deviation": color_deviation,
             "passed": color_passed
-        },
-        "overall_passed": overall_passed,
-        "warmup_frames": warmup_frames
+        }
     }
 
     return overall_passed, stats
@@ -1636,7 +1504,6 @@ def print_multistream_test_summary(all_results, all_passed, product_line):
 
     # Calculate statistics
     passed_tests = sum(1 for r in all_results if r['passed'])
-    failed_tests = len(all_results) - passed_tests
 
     successful_results = [r for r in all_results if r['passed'] and 'error' not in r['stats']]
 
@@ -1697,6 +1564,15 @@ def coverage_tier(request):
     tier = resolve_coverage_tier(request.config)
     log.info(f"FPS-performance coverage tier: {tier}")
     return tier
+
+
+@pytest.fixture
+def fps_rates_tier(coverage_tier):
+    """Coverage tier for the *_fps_rates tests; on weekly they are covered by the *_configurations tests,
+    which stream every supported profile, so they skip."""
+    if coverage_tier == TIER_FULL:
+        pytest.skip("Covered by the *_configurations tests on weekly")
+    return coverage_tier
 
 
 # ============================================================================
@@ -1851,14 +1727,14 @@ def test_multistream_configurations(settled_device, coverage_tier):
 
 
 @pytest.mark.timeout(14400)
-def test_depth_fps_rates(settled_device, coverage_tier):
+def test_depth_fps_rates(settled_device, fps_rates_tier):
     """Test depth FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device
     product_line = dev.get_info(rs.camera_info.product_line)
 
     depth_tests_passed, depth_results = check_stream_fps_accuracy_comprehensive(
         dev, "depth", check_depth_fps_accuracy, get_supported_depth_fps_rates,
-        max_fps_rates=TIER_FPS_CAP[coverage_tier]
+        max_fps_rates=TIER_FPS_CAP[fps_rates_tier]
     )
 
     if depth_results:
@@ -1866,14 +1742,14 @@ def test_depth_fps_rates(settled_device, coverage_tier):
 
 
 @pytest.mark.timeout(14400)
-def test_color_fps_rates(settled_device, coverage_tier):
+def test_color_fps_rates(settled_device, fps_rates_tier):
     """Test color/RGB FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device
     product_line = dev.get_info(rs.camera_info.product_line)
 
     color_tests_passed, color_results = check_stream_fps_accuracy_comprehensive(
         dev, "color", check_color_fps_accuracy, get_supported_color_fps_rates,
-        max_fps_rates=TIER_FPS_CAP[coverage_tier]
+        max_fps_rates=TIER_FPS_CAP[fps_rates_tier]
     )
 
     if color_results:
@@ -1890,14 +1766,14 @@ def test_color_fps_rates(settled_device, coverage_tier):
 
 
 @pytest.mark.timeout(14400)
-def test_ir_fps_rates(settled_device, coverage_tier):
+def test_ir_fps_rates(settled_device, fps_rates_tier):
     """Test IR FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device
     product_line = dev.get_info(rs.camera_info.product_line)
 
     ir_tests_passed, ir_results = check_stream_fps_accuracy_comprehensive(
         dev, "IR", check_ir_fps_accuracy, get_supported_ir_fps_rates,
-        max_fps_rates=TIER_FPS_CAP[coverage_tier]
+        max_fps_rates=TIER_FPS_CAP[fps_rates_tier]
     )
 
     if ir_results:
