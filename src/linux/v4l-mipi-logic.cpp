@@ -67,6 +67,8 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY        = ( RS_CAMERA_CID_BASE + 0x26 );
             static constexpr uint32_t RS_CAMERA_CID_ACCEL_SENSITIVITY       = ( RS_CAMERA_CID_BASE + 0x27 );
             static constexpr uint32_t RS_CAMERA_CID_OD_DISTANCE             = ( RS_CAMERA_CID_BASE + 0x28 );
+            // PROVISIONAL: the d4xx driver has no depth mapping params control yet (RSDEV-16589); confirm the offset when it lands
+            static constexpr uint32_t RS_CAMERA_CID_DEPTH_MAPPING_PARAMS    = ( RS_CAMERA_CID_BASE + 60 );
             // D500 DPP composite XU CIDs, matching the MIPI driver's D500_CAMERA_CID_*
             // allocations (see realsense_mipi_platform_driver#658).
             static constexpr uint32_t RS_CAMERA_CID_MINZ                    = ( RS_CAMERA_CID_BASE + 44 );
@@ -114,6 +116,10 @@ namespace librealsense
             // D500 inference XU, on subdevice 0 like the depth XU but with its own unit and selectors.
             static constexpr uint8_t RS_INFERENCE_XU_UNIT     = 0x10;
             static constexpr uint8_t RS_DETECTION_DISTANCE    = 0x01;
+
+            // D500 mapping XU, on subdevice 0 as well. The driver hosts its controls on the depth node.
+            static constexpr uint8_t RS_MAPPING_XU_UNIT       = 0x18;
+            static constexpr uint8_t RS_DEPTH_MAPPING_PARAMS  = 0x0A;
 
             bool is_auto_exposure_control( uint8_t control )
             {
@@ -392,6 +398,15 @@ namespace librealsense
                 }
             }
 
+            static uint32_t mapping_xu_to_cid( uint8_t control )
+            {
+                switch( control )
+                {
+                case RS_DEPTH_MAPPING_PARAMS: return RS_CAMERA_CID_DEPTH_MAPPING_PARAMS;
+                default: throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for D500 mapping XU control " << std::dec << int( control ) );
+                }
+            }
+
             uint32_t xu_to_cid( const extension_unit & xu, uint8_t control, bool is_d5xx )
             {
                 if( 0 != xu.subdevice )
@@ -399,6 +414,8 @@ namespace librealsense
 
                 if( is_d5xx && xu.unit == RS_INFERENCE_XU_UNIT )
                     return inference_xu_to_cid( control );
+                if( is_d5xx && xu.unit == RS_MAPPING_XU_UNIT )
+                    return mapping_xu_to_cid( control );
                 // Selectors repeat across XUs, so another unit must not be looked up in the depth table
                 if( xu.unit != RS_DEPTH_XU_UNIT )
                     throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );
