@@ -25,6 +25,18 @@ bool knownBranch(uint8_t id) {
     for (const auto &b : branches) if (b.id == id) return true;
     return false;
 }
+const ControlDefinition *controlDefinition(uint8_t sensor, uint8_t kind, uint16_t id) {
+    for (const auto &c : controls)
+        if (c.sensor == sensor && c.kind == kind && c.id == id) return &c;
+    return nullptr;
+}
+const Control *findControl(const Model &m, uint8_t sensor, uint8_t kind, uint16_t id) {
+    for (size_t i = 0; i < m.controlCount; ++i) {
+        const Control &c = m.controls[i];
+        if (c.sensor == sensor && c.kind == kind && c.id == id) return &c;
+    }
+    return nullptr;
+}
 Stream nativeStream(const Stream &stream, bool gmsl) {
     Stream result = stream;
     for (const auto &b : branches) if (b.id == stream.branch) {
@@ -73,8 +85,7 @@ bool next(const uint8_t *data, size_t &cursor, size_t end, Record &r) {
     cursor = r.next;
     return true;
 }
-// A known record outside its grammar position, or CONTROL (Phase 2), is malformed
-// even when not CRITICAL. Only unknown, non-critical records may be skipped.
+// Known records must appear in their grammar scope; unknown identities are skipped.
 bool known(uint8_t type) {
     switch (type) {
     case SENSOR:
@@ -86,6 +97,7 @@ bool known(uint8_t type) {
     case HEIGHT:
     case FPS:
     case STATE:
+    case CONTROL:
         return true;
     default:
         return false;
@@ -106,7 +118,7 @@ void ignored(Compatibility &compatibility, const Record &r, uint8_t sensor, uint
 }
 Error skip(const Record &r, uint8_t sensor, Compatibility &compatibility) {
     if (known(r.type))
-        return bad(r, r.type == CONTROL ? PARSE_UNSUPPORTED : PARSE_MISPLACED, sensor);
+        return bad(r, PARSE_MISPLACED, sensor);
     ignored(compatibility, r, sensor);
     return Error();
 }
@@ -264,6 +276,21 @@ Error decode(const uint8_t *data, size_t size, Request &output) {
             c.start = child;
             if (!next(data, child, childEnd, c))
                 return bad(c, PARSE_BOUNDS, sensor);
+            if (c.type == CONTROL) {
+                if (c.length != 4U || (c.flags & 2U)) return bad(c, PARSE_SHAPE, sensor);
+                const Control value = {sensor, data[c.value], data[c.value + 1U], read16(data + c.value + 2U)};
+                if (value.requiredState == 255U) return bad(c, PARSE_VALUE, sensor);
+                const auto *definition = controlDefinition(sensor, value.kind, value.id);
+                if (!definition) {
+                    ignored(candidate.compatibility, c, sensor, 0U, value.id);
+                    continue;
+                }
+                if (findControl(candidate.model, sensor, value.kind, value.id)) return bad(c, PARSE_DUPLICATE, sensor);
+                if (value.requiredState > definition->max_state) return bad(c, PARSE_VALUE, sensor);
+                if (candidate.model.controlCount == max_controls) return bad(c, PARSE_CAPACITY, sensor);
+                candidate.model.controls[candidate.model.controlCount++] = value;
+                continue;
+            }
             if (c.type != STREAM) {
                 const Error e = skip(c, sensor, candidate.compatibility);
                 if (e.code != OK)
@@ -291,7 +318,7 @@ Error decode(const uint8_t *data, size_t size, Request &output) {
     return Error();
 }
 Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
-    if (!data || size != wire_size || m.count > max_streams || op > CLEAR)
+    if (!data || size != wire_size || m.count > max_streams || m.controlCount > max_controls || op > CLEAR)
         return Error(INVALID);
     size_t needed = envelope_size;
     for (unsigned sensor = 0U; sensor <= max_sensor_id; ++sensor) {
@@ -299,6 +326,8 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
         for (size_t i = 0; i < m.count; ++i)
             if (m.streams[i].sensor == sensor)
                 children += m.streams[i].enabled ? enabled_stream_bytes : disabled_stream_bytes;
+        for (size_t i = 0; i < m.controlCount; ++i)
+            if (m.controls[i].sensor == sensor) children += control_record_bytes;
         if (children || (sensor == 0U && m.deviceDeclared))
             needed += sensor_record_bytes + children;
     }
@@ -308,6 +337,14 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
             return Error(INVALID);
         for (size_t j = 0; j < i; ++j)
             if (m.streams[j].branch == s.branch)
+                return Error(INVALID);
+    }
+    for (size_t i = 0; i < m.controlCount; ++i) {
+        const Control &c = m.controls[i];
+        const auto *def = controlDefinition(c.sensor, c.kind, c.id);
+        if (!def || c.requiredState > def->max_state) return Error(INVALID);
+        for (size_t j = 0; j < i; ++j)
+            if (m.controls[j].sensor == c.sensor && m.controls[j].kind == c.kind && m.controls[j].id == c.id)
                 return Error(INVALID);
     }
     if (needed > size)
@@ -325,6 +362,8 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
         for (size_t i = 0; i < m.count; ++i)
             if (m.streams[i].sensor == sensor)
                 children += m.streams[i].enabled ? enabled_stream_bytes : disabled_stream_bytes;
+        for (size_t i = 0; i < m.controlCount; ++i)
+            if (m.controls[i].sensor == sensor) children += control_record_bytes;
         if (!children && !(sensor == 0U && m.deviceDeclared))
             continue;
         header(data + pos, SENSOR, 2U, static_cast<uint16_t>(8U + children));
@@ -353,6 +392,24 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
             attr(data + pos, FPS, 2U, s->fps);
             pos += 8U;
         }
+        // Canonical dictionary order, independent of sender record ordering.
+        for (const auto &definition : controls) {
+            if (definition.sensor != sensor) continue;
+            bool first = true;
+            for (const auto &previous : controls) {
+                if (&previous == &definition) break;
+                if (previous.sensor == definition.sensor && previous.kind == definition.kind && previous.id == definition.id)
+                    first = false;
+            }
+            if (!first) continue;
+            const Control *c = findControl(m, definition.sensor, definition.kind, definition.id);
+            if (!c) continue;
+            header(data + pos, CONTROL, 0U, 4U);
+            data[pos + 4U] = c->kind;
+            data[pos + 5U] = c->requiredState;
+            write16(data + pos + 6U, c->id);
+            pos += control_record_bytes;
+        }
     }
     write16(data + envelope_tlv_size_offset, static_cast<uint16_t>(pos - envelope_size));
     return Error();
@@ -367,6 +424,9 @@ Model defaultModel(uint16_t sku) {
             s.branch = branches[i].id;
             m.streams[m.count++] = s;
         }
+    for (const auto &c : controls)
+        if (c.sku == sku && m.controlCount < max_controls)
+            m.controls[m.controlCount++] = Control{c.sensor, c.kind, 0U, c.id};
     return m;
 }
 Error capabilities(uint16_t sku, uint8_t *data, size_t size, CapabilityFilter filter, void *context) {

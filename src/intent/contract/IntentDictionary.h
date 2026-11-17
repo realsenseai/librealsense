@@ -4,13 +4,14 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "2a2b43cff65b7af13408aee6dbbdd9497a03949d81c8abcead84345a8ddbbcb6";
+static const char dictionary_sha256[] = "f07ab3511bb2c16c11f5e1788c8d9768d41f5878f2dc2ead20d5647e54c230ad";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
 static const unsigned wire_size = 1024U;
 static const unsigned status_size = 1024U;
 static const unsigned max_branch_id = 31U;
+static const unsigned max_controls = 16U;
 static const unsigned max_sensor_id = 31U;
 static const unsigned max_streams = 20U;
 static const unsigned envelope_size = 8U;
@@ -19,6 +20,7 @@ static const unsigned max_tlv_size = 1016U;
 static const unsigned sensor_record_bytes = 12U;
 static const unsigned enabled_stream_bytes = 44U;
 static const unsigned disabled_stream_bytes = 20U;
+static const unsigned control_record_bytes = 8U;
 static const unsigned envelope_major_offset = 0U;
 static const unsigned envelope_minor_offset = 1U;
 static const unsigned envelope_patch_offset = 2U;
@@ -131,6 +133,11 @@ enum StatusFlags : uint8_t {
     STATUS_HOST_TOKEN_VALID = 4,
     STATUS_REASONS_TRUNCATED = 8,
 };
+enum ControlKind : uint8_t {
+    CONTROL_SCALAR = 0,
+    CONTROL_COMPOSITE_DPP = 1,
+    CONTROL_HWMC = 2,
+};
 enum TransportDefinitions {
     XU_INTENT = 28,
     XU_STATUS = 29,
@@ -138,6 +145,7 @@ enum TransportDefinitions {
     GMSL_STATUS_ADDRESS = 29696,
     GMSL_INTENT_CID_OFFSET = 65,
     GMSL_STATUS_CID_OFFSET = 66,
+    GMSL_DEFAULT_ADDRESS = 30720,
 };
 enum Records {
     SENSOR = 16,
@@ -181,8 +189,8 @@ inline uint8_t recordSince(uint8_t type) {
     default: return 0U;
     }
 }
-// Implemented grammar metadata; reserved CONTROL is not supported.
-static const uint8_t supported_records[] = {SENSOR, SENSOR_ID, STREAM, BRANCH_ID, FORMAT, WIDTH, HEIGHT, FPS, STATE};
+// Implemented grammar metadata, including CONTROL declarations.
+static const uint8_t supported_records[] = {SENSOR, SENSOR_ID, STREAM, BRANCH_ID, FORMAT, WIDTH, HEIGHT, FPS, STATE, CONTROL};
 static const uint8_t stream_attributes[] = {BRANCH_ID, FORMAT, WIDTH, HEIGHT, FPS, STATE};
 struct SensorDefinition { uint8_t id; const char* name; uint8_t since; const char* sdk_name; };
 static const SensorDefinition sensors[] = {
@@ -255,6 +263,48 @@ static const BranchDefinition branches[] = {
     {13U, 4U, 3078U, 0x465a5958U, "PCL", 0U, "Point Cloud", 0U, 13U, 9U},
     {13U, 4U, 3079U, 0x465a5958U, "PCL", 0U, "Point Cloud", 0U, 13U, 9U},
     {13U, 4U, 3080U, 0x465a5958U, "PCL", 0U, "Point Cloud", 0U, 13U, 9U},
+};
+struct ControlDefinition { uint8_t sensor, kind; uint16_t id, sku; uint8_t since, max_state; const char* name; };
+static const ControlDefinition controls[] = {
+    {1U, 1U, 1U, 3076U, 0U, 1U, "DECIMATION_FILTER_DPP"},
+    {1U, 1U, 1U, 3077U, 0U, 1U, "DECIMATION_FILTER_DPP"},
+    {1U, 1U, 1U, 3078U, 0U, 1U, "DECIMATION_FILTER_DPP"},
+    {1U, 1U, 1U, 3079U, 0U, 1U, "DECIMATION_FILTER_DPP"},
+    {1U, 1U, 1U, 3080U, 0U, 1U, "DECIMATION_FILTER_DPP"},
+    {1U, 1U, 2U, 3076U, 0U, 1U, "TEMPORAL_FILTER_DPP"},
+    {1U, 1U, 2U, 3077U, 0U, 1U, "TEMPORAL_FILTER_DPP"},
+    {1U, 1U, 2U, 3078U, 0U, 1U, "TEMPORAL_FILTER_DPP"},
+    {1U, 1U, 2U, 3079U, 0U, 1U, "TEMPORAL_FILTER_DPP"},
+    {1U, 1U, 2U, 3080U, 0U, 1U, "TEMPORAL_FILTER_DPP"},
+    {1U, 1U, 8U, 3076U, 0U, 2U, "IMPROVED_CLOSE_RANGE"},
+    {1U, 1U, 8U, 3077U, 0U, 2U, "IMPROVED_CLOSE_RANGE"},
+    {1U, 1U, 8U, 3078U, 0U, 2U, "IMPROVED_CLOSE_RANGE"},
+    {1U, 1U, 8U, 3079U, 0U, 2U, "IMPROVED_CLOSE_RANGE"},
+    {1U, 1U, 8U, 3080U, 0U, 2U, "IMPROVED_CLOSE_RANGE"},
+    {1U, 0U, 16U, 3076U, 0U, 1U, "ENABLE_ALIGNED_DEPTH"},
+    {1U, 0U, 16U, 3077U, 0U, 1U, "ENABLE_ALIGNED_DEPTH"},
+    {1U, 0U, 16U, 3078U, 0U, 1U, "ENABLE_ALIGNED_DEPTH"},
+    {1U, 0U, 16U, 3079U, 0U, 1U, "ENABLE_ALIGNED_DEPTH"},
+    {1U, 0U, 16U, 3080U, 0U, 1U, "ENABLE_ALIGNED_DEPTH"},
+    {1U, 2U, 31488U, 3076U, 0U, 1U, "EMITTER_ON_OFF"},
+    {1U, 2U, 31488U, 3077U, 0U, 1U, "EMITTER_ON_OFF"},
+    {1U, 2U, 31488U, 3078U, 0U, 1U, "EMITTER_ON_OFF"},
+    {1U, 2U, 31488U, 3079U, 0U, 1U, "EMITTER_ON_OFF"},
+    {1U, 2U, 31488U, 3080U, 0U, 1U, "EMITTER_ON_OFF"},
+    {1U, 0U, 26U, 3076U, 0U, 1U, "INTER_CAM_SYNC_MODE"},
+    {1U, 0U, 26U, 3077U, 0U, 1U, "INTER_CAM_SYNC_MODE"},
+    {1U, 0U, 26U, 3078U, 0U, 1U, "INTER_CAM_SYNC_MODE"},
+    {1U, 0U, 26U, 3079U, 0U, 1U, "INTER_CAM_SYNC_MODE"},
+    {1U, 0U, 26U, 3080U, 0U, 1U, "INTER_CAM_SYNC_MODE"},
+    {1U, 2U, 32809U, 3076U, 0U, 1U, "DUAL_RGB_RECTIFICATION"},
+    {1U, 2U, 32809U, 3079U, 0U, 1U, "DUAL_RGB_RECTIFICATION"},
+    {1U, 0U, 30U, 3076U, 0U, 0U, "ILLUMINATION_MODE"},
+    {1U, 0U, 30U, 3079U, 0U, 0U, "ILLUMINATION_MODE"},
+    {1U, 0U, 27U, 3076U, 0U, 2U, "PASSIVE_DEPTH_MODE"},
+    {1U, 0U, 27U, 3079U, 0U, 2U, "PASSIVE_DEPTH_MODE"},
+    {2U, 0U, 3U, 3077U, 0U, 1U, "AE_PRIORITY"},
+    {2U, 0U, 3U, 3078U, 0U, 1U, "AE_PRIORITY"},
+    {2U, 0U, 3U, 3080U, 0U, 1U, "AE_PRIORITY"},
 };
 struct FormatDefinition { uint8_t branch; uint32_t format; };
 static const FormatDefinition formats[] = {

@@ -47,12 +47,16 @@ inline bool known(uint8_t type) {
     switch (type) {
     case rsintent::SENSOR: case rsintent::SENSOR_ID: case rsintent::STREAM:
     case rsintent::BRANCH_ID: case rsintent::FORMAT: case rsintent::WIDTH:
-    case rsintent::HEIGHT: case rsintent::FPS: case rsintent::STATE:
+    case rsintent::HEIGHT: case rsintent::FPS: case rsintent::STATE: case rsintent::CONTROL:
         return true;
     default: return false;
     }
 }
 inline unsigned id(const Record &r) {
+    if (r.type == rsintent::CONTROL) {
+        require(r.value.size() == 4U && !(r.flags & 2U));
+        return (unsigned(r.value[0]) << 16U) | rsintent::read16(r.value.data() + 2U);
+    }
     if (r.type != rsintent::SENSOR && r.type != rsintent::STREAM) return 0;
     require((r.flags & 2U) != 0);
     const auto children = parse(r.value);
@@ -68,7 +72,7 @@ inline unsigned id(const Record &r) {
     require(found && (r.type == rsintent::SENSOR || result != 0));
     return result;
 }
-inline bool recognized(const Record &r) {
+inline bool recognized(const Record &r, unsigned sensor = 256U) {
     if (r.type == rsintent::SENSOR) {
         for (const auto &s : rsintent::sensors) if (s.id == id(r)) return true;
         return false;
@@ -77,18 +81,28 @@ inline bool recognized(const Record &r) {
         for (const auto &b : rsintent::branches) if (b.id == id(r)) return true;
         return false;
     }
+    if (r.type == rsintent::CONTROL) {
+        const unsigned identity = id(r);
+        for (const auto &c : rsintent::controls)
+            if ((sensor == 256U || c.sensor == sensor) && ((unsigned(c.kind) << 16U) | c.id) == identity) return true;
+        return false;
+    }
     return known(r.type);
 }
-inline void structure(const std::vector<Record> &records, unsigned level = 0) {
-    std::set<unsigned> ids;
+inline void structure(const std::vector<Record> &records, unsigned level = 0, unsigned sensor = 256U) {
+    std::set<unsigned> ids, controlIds;
     for (const auto &r : records) {
+        if (r.type == rsintent::CONTROL) {
+            require(level == 1U);
+            require(controlIds.insert(id(r)).second);
+        }
         if (r.type == rsintent::SENSOR || r.type == rsintent::STREAM) {
             require((r.type == rsintent::SENSOR && level == 0) || (r.type == rsintent::STREAM && level == 1));
             require(ids.insert(id(r)).second);
             const auto children = parse(r.value);
             if (r.type == rsintent::SENSOR)
                 require(!children.empty() && children.front().type == rsintent::SENSOR_ID);
-            if (recognized(r)) structure(children, level + 1);
+            if (recognized(r, sensor)) structure(children, level + 1, r.type == rsintent::SENSOR ? id(r) : sensor);
         }
     }
 }
@@ -100,10 +114,10 @@ inline std::vector<Record> noncritical(std::vector<Record> records) {
     }
     return records;
 }
-inline std::vector<Record> filter(const std::vector<Record> &records) {
+inline std::vector<Record> filter(const std::vector<Record> &records, unsigned sensor = 256U) {
     std::vector<Record> clean;
-    for (auto r : records) if (recognized(r)) {
-        if (r.type == rsintent::SENSOR || r.type == rsintent::STREAM) r.value = pack(filter(parse(r.value)));
+    for (auto r : records) if (recognized(r, sensor)) {
+        if (r.type == rsintent::SENSOR || r.type == rsintent::STREAM) r.value = pack(filter(parse(r.value), r.type == rsintent::SENSOR ? id(r) : sensor));
         clean.push_back(r);
     }
     return clean;
@@ -141,12 +155,12 @@ inline std::string hex(const std::vector<uint8_t> &bytes) {
     for (auto b : bytes) { text += digits[b >> 4]; text += digits[b & 15]; }
     return text;
 }
-inline json layout(const std::vector<Record> &records) {
+inline json layout(const std::vector<Record> &records, unsigned sensor = 256U) {
     json result = json::array();
     for (const auto &r : records) {
         json entry = {{"type", r.type}, {"flags", r.flags}};
-        if (!recognized(r)) entry["hex"] = hex(r.value);
-        if (r.type == rsintent::SENSOR || r.type == rsintent::STREAM) entry["id"] = id(r);
+        if (!recognized(r, sensor)) entry["hex"] = hex(r.value);
+        if (r.type == rsintent::SENSOR || r.type == rsintent::STREAM || r.type == rsintent::CONTROL) entry["id"] = id(r);
         result.push_back(entry);
     }
     return result;

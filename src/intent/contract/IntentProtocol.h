@@ -18,10 +18,16 @@ struct Stream {
     uint32_t format;
     uint16_t width, height, fps;
 };
+struct Control {
+    uint8_t sensor, kind, requiredState;
+    uint16_t id;
+};
 struct Model {
     Stream streams[max_streams];
     size_t count;
     bool deviceDeclared;
+    Control controls[max_controls];
+    size_t controlCount;
 };
 struct Compatibility {
     uint16_t skippedCount, offset, id;
@@ -44,6 +50,8 @@ Error decode(const uint8_t *data, size_t size, Request &output);
 Error encode(const Model &model, Operation op, uint8_t *data, size_t size);
 // SKU template: every branch of the SKU, DISABLED, in branch-ID order.
 Model defaultModel(uint16_t sku);
+const ControlDefinition *controlDefinition(uint8_t sensor, uint8_t kind, uint16_t id);
+const Control *findControl(const Model &model, uint8_t sensor, uint8_t kind, uint16_t id);
 const Stream *find(const Model &model, uint8_t branch);
 bool same(const Stream &a, const Stream &b);
 uint32_t bit(uint8_t branch);

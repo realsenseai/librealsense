@@ -114,7 +114,7 @@ std::vector<intent_tlv::Record> applyLayouts(const json &j, std::vector<intent_t
         const auto type = static_cast<uint8_t>(integer(entry, "type", 255));
         const auto flags = static_cast<uint8_t>(integer(entry, "flags", 3));
         if (entry.contains("hex")) {
-            const bool container = type == rsintent::SENSOR || type == rsintent::STREAM;
+            const bool container = type == rsintent::SENSOR || type == rsintent::STREAM || type == rsintent::CONTROL;
             require(entry.contains("id") == container);
             const auto text = entry.at("hex").get<std::string>();
             require(text.size() % 2 == 0 && text.size() <= 2 * rsintent::max_tlv_size);
@@ -126,14 +126,14 @@ std::vector<intent_tlv::Record> applyLayouts(const json &j, std::vector<intent_t
                 value = (value << 4) | static_cast<unsigned>(c <= '9' ? c - '0' : (c <= 'F' ? c - 'A' + 10 : c - 'a' + 10));
                 if (n % 2) { r.value.push_back(static_cast<uint8_t>(value)); value = 0; }
             }
-            require(!recognized(r));
-            if (container) require(integer(entry, "id", 255) == id(r));
+            require(!recognized(r, level == 1U ? sensorId(j.at("sensor").get<std::string>()) : 256U));
+            if (container) require(integer(entry, "id", 0xffffffU) == id(r));
             require((type != rsintent::SENSOR || level == 0) && (type != rsintent::STREAM || level == 1));
             result.push_back(r);
         } else {
-            const bool container = type == rsintent::SENSOR || type == rsintent::STREAM;
+            const bool container = type == rsintent::SENSOR || type == rsintent::STREAM || type == rsintent::CONTROL;
             require(entry.contains("id") == container);
-            const unsigned idValue = container ? integer(entry, "id", 255) : 0;
+            const unsigned idValue = container ? integer(entry, "id", 0xffffffU) : 0;
             size_t match = records.size();
             for (size_t n = 0; n < records.size(); ++n)
                 if (records[n].type == type && (!container || id(records[n]) == idValue)) match = n;
@@ -150,12 +150,12 @@ std::vector<intent_tlv::Record> applyLayouts(const json &j, std::vector<intent_t
     return result;
 }
 void warn_unsupported(const std::vector<intent_tlv::Record> &records,
-                      unsigned firmwareMinor, unsigned sourceMinor) {
+                      unsigned firmwareMinor, unsigned sourceMinor, unsigned sensor = 256U) {
     using namespace intent_tlv;
     for (const auto &r : records) {
         unsigned since = rsintent::recordSince(r.type);
         std::string name = "record type " + std::to_string(r.type);
-        if (!recognized(r)) {
+        if (!recognized(r, sensor)) {
             // Opaque entries retain their source version; FW decides whether to accept them.
             since = sourceMinor;
             name = "opaque " + name;
@@ -174,7 +174,13 @@ void warn_unsupported(const std::vector<intent_tlv::Record> &records,
                     name = std::string("branch ") + b.name;
                 }
             }
-            warn_unsupported(parse(r.value), firmwareMinor, sourceMinor);
+            warn_unsupported(parse(r.value), firmwareMinor, sourceMinor, r.type == rsintent::SENSOR ? id(r) : sensor);
+        } else if (r.type == rsintent::CONTROL) {
+            for (const auto &c : rsintent::controls)
+                if (c.sensor == sensor && ((unsigned(c.kind) << 16U) | c.id) == id(r)) {
+                    since = std::max<unsigned>(since, c.since);
+                    name = std::string("control ") + c.name;
+                }
         } else {
             switch (r.type) {
             case rsintent::SENSOR_ID: name = "SENSOR_ID"; break;
@@ -226,10 +232,15 @@ void warn_unreported(const std::vector<intent_tlv::Record> &records,
             LOG_WARNING("Intent: forwarding " << name << " (not reported by firmware); firmware decides acceptance");
             continue;
         }
-        std::set<unsigned> streams;
-        for (const auto &c : parse(match->value))
+        std::set<unsigned> streams, controls;
+        for (const auto &c : parse(match->value)) {
             if (c.type == rsintent::STREAM) streams.insert(id(c));
+            if (c.type == rsintent::CONTROL) controls.insert(id(c));
+        }
         for (const auto &c : parse(r.value)) {
+            if (c.type == rsintent::CONTROL && !controls.count(id(c)))
+                LOG_WARNING("Intent: forwarding control identity " << id(c)
+                            << " (not reported by firmware); firmware decides acceptance");
             if (c.type == rsintent::STREAM && !streams.count(id(c))) {
                 const auto name = containerName(c);
                 LOG_WARNING("Intent: forwarding " << name << " (not reported by firmware); firmware decides acceptance");
@@ -238,7 +249,7 @@ void warn_unreported(const std::vector<intent_tlv::Record> &records,
     }
 }
 void attachLayouts(json &j, const std::vector<intent_tlv::Record> &records, unsigned level) {
-    j["layout"] = intent_tlv::layout(records);
+    j["layout"] = intent_tlv::layout(records, level == 1U ? sensorId(j.at("sensor").get<std::string>()) : 256U);
     for (const auto &r : records) {
         if (!intent_tlv::recognized(r)) continue;
         if (level == 0 && r.type == rsintent::SENSOR) {
@@ -285,12 +296,36 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
         if (!list.is_array())
             throw std::invalid_argument("Intent: sensors must be an array");
         for (const auto &sensor : list) {
-            keys(sensor, {"sensor", "streams", "layout"});
+            keys(sensor, {"sensor", "streams", "controls", "layout"});
             const auto name = sensor.at("sensor").get<std::string>();
             const unsigned id = sensorId(name);
             if (!sensors.insert(id).second)
                 throw std::invalid_argument("Intent: invalid or duplicate sensor");
             model.deviceDeclared |= id == 0U;
+            if (sensor.contains("controls")) {
+                const auto &list = sensor.at("controls");
+                if (!list.is_array()) throw std::invalid_argument("Intent: controls must be an array");
+                for (const auto &entry : list) {
+                    keys(entry, {"id", "required_state"});
+                    const auto controlName = entry.at("id").get<std::string>();
+                    const rsintent::ControlDefinition *def = nullptr;
+                    for (const auto &c : rsintent::controls)
+                        if (c.sensor == id && controlName == c.name) def = &c;
+                    if (!def || model.controlCount == rsintent::max_controls ||
+                        rsintent::findControl(model, def->sensor, def->kind, def->id))
+                        throw std::invalid_argument("Intent: unknown or duplicate control");
+                    unsigned state = 0;
+                    const auto &value = entry.at("required_state");
+                    if (value.is_string()) {
+                        const auto text = value.get<std::string>();
+                        if (text == "ON") state = 1;
+                        else if (text != "OFF") throw std::invalid_argument("Intent: unknown control state");
+                    } else state = integer(entry, "required_state", def->max_state);
+                    if (state > def->max_state) throw std::invalid_argument("Intent: invalid control state");
+                    model.controls[model.controlCount++] = rsintent::Control{
+                        def->sensor, def->kind, static_cast<uint8_t>(state), def->id};
+                }
+            }
             const auto &streams = sensor.at("streams");
             if (!streams.is_array())
                 throw std::invalid_argument("Intent: streams must be an array");
@@ -495,6 +530,15 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
             }
             sensor["streams"].push_back(stream);
             ++emitted;
+        }
+        for (size_t i = 0; i < request.model.controlCount; ++i) {
+            const auto &c = request.model.controls[i];
+            if (c.sensor != id) continue;
+            const auto *def = rsintent::controlDefinition(c.sensor, c.kind, c.id);
+            json state = c.requiredState;
+            if (c.requiredState == 0U) state = "OFF";
+            else if (c.requiredState == 1U && def->max_state == 1U) state = "ON";
+            sensor["controls"].push_back({{"id", def->name}, {"required_state", state}});
         }
         for (const auto &r : records)
             if (r.type == rsintent::SENSOR && intent_tlv::id(r) == id)
