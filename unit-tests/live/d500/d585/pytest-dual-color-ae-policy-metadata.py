@@ -46,11 +46,13 @@ def depth_sensor(test_device):
         pass             # not open, which is the normal path
 
 
-def profile(sensor, stream_type, index=0):
-    # Color streams of a dual-color device must share a resolution, here the first Color 1 profile at FPS is enough
+def profile(sensor, stream_type, index=0, size=None):
+    # Streams of one session must share a resolution or some of them get starved
     for p in sensor.get_stream_profiles():
+        v = p.as_video_stream_profile()
         if p.stream_type() == stream_type and p.stream_index() == index and p.fps() == FPS \
-                and p.format() not in (rs.format.raw16, rs.format.yuyv):
+                and p.format() not in (rs.format.raw16, rs.format.yuyv, rs.format.y16) \
+                and (size is None or (v.width(), v.height()) == size):
             return p
     pytest.skip( f"Device publishes no {stream_type} {index} profile at {FPS} FPS" )
 
@@ -83,7 +85,9 @@ def collect_policies(sensor, profiles):
 
 
 def test_depth_and_ir_only_report_depth_priority(depth_sensor):
-    profiles = [profile( depth_sensor, rs.stream.depth ), profile( depth_sensor, rs.stream.infrared, 1 )]
+    depth = profile( depth_sensor, rs.stream.depth )
+    size = ( depth.as_video_stream_profile().width(), depth.as_video_stream_profile().height() )
+    profiles = [depth, profile( depth_sensor, rs.stream.infrared, 1, size )]
     policies = collect_policies( depth_sensor, profiles )
     assert all( v == {DEPTH_PRIORITY} for v in policies.values() ), policies
 
