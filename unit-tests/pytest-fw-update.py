@@ -132,6 +132,10 @@ def get_downgrade_counter(device):
         opcode = 0x93  # DFU_READ_CNT — reads the actual downgrade counter from flash payload header
         raw_cmd = rs.debug_protocol(device).build_command(opcode)
         counter = send_hardware_monitor_command(device, raw_cmd)
+        if len( counter ) < 2:
+            # Older FW (e.g. D405 on 5.15.1.55) replies without the counter payload
+            log.debug( f'no downgrade counter in DFU_READ_CNT reply ({len( counter )} payload bytes)' )
+            return None
         return counter[0] | (counter[1] << 8)  # uint16_t little-endian
     if product_line == "D500":
         return 0  # D500 do not have downgrade counter
@@ -384,7 +388,10 @@ def test_fw_update( request, module_device_setup, test_context_var ):
 
     downgrade_counter = get_downgrade_counter( device )
     log.debug( f'downgrade counter: {downgrade_counter}' )
-    if downgrade_counter == 0xFFFF:
+    if downgrade_counter is None:
+        log.debug( 'downgrade counter not reported by this FW, skipping reset' )
+        downgrade_counter = 0
+    elif downgrade_counter == 0xFFFF:
         log.debug( 'downgrade counter is uninitialized (0xFFFF), skipping reset' )
         downgrade_counter = 0
     elif downgrade_counter >= 19:
