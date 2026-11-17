@@ -18,7 +18,7 @@ pytestmark = [
 ]
 
 AE_POLICY = rs.frame_metadata_value.ae_policy
-AE_MODE = rs.option.depth_auto_exposure_mode
+AE_MODE = rs.option.auto_exposure_mode
 MIN_FW = rsutils.version( "7.58.45946.14332" )  # TODO: FW release that adds the AE policy metadata
 FPS = 30
 FRAMES_TO_CHECK = 15
