@@ -11,7 +11,7 @@ import pyrealsense2 as rs
 import struct
 import time
 import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
+from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -162,9 +162,8 @@ def test_standalone_lifecycle(device, stream):
         pytest.skip( "Perception lifecycle metadata checks are D585-only" )
     if stream == 'labeled_point_cloud':
         require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "labeled point cloud" )   # older FW has no LPCL stream
-    if stream == 'point_cloud':
-        skip_d585_on_gmsl( device, "no point cloud frames over GMSL" )
-        require_min_fw_version( device, rsutils.version( "7.61.47150" ), "device point cloud" )  # older FW publishes the profiles but delivers no frames
+    if stream == 'point_cloud':  # older FW publishes the profiles but delivers no frames
+        require_min_fw_version( device, rsutils.version( "7.61.47150" ), "device point cloud" )
     stream_type = getattr( rs.stream, stream )
     sensor, profile = perception( device, stream_type )
     frames = Collector()
