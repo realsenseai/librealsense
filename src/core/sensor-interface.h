@@ -9,6 +9,7 @@
 #include "supported-embedded-filters-interface.h"
 
 #include "tagged-profile.h"
+#include <src/librealsense-exception.h>
 #include <librealsense2/hpp/rs_types.hpp>
 
 #include <vector>
@@ -43,6 +44,12 @@ public:
     virtual void start( rs2_frame_callback_sptr callback ) = 0;
     virtual void stop() = 0;
     virtual void close() = 0;
+
+    // Closes only these streams while the others keep streaming
+    virtual void close_streams( const stream_profiles & )
+    {
+        throw wrong_api_call_sequence_exception( "Closing some of the streams is not supported by this sensor" );
+    }
 
     virtual bool is_streaming() const = 0;
 

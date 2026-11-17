@@ -78,6 +78,10 @@ stream_profiles record_sensor::get_stream_profiles(int tag) const
 
 void librealsense::record_sensor::open(const stream_profiles& requests)
 {
+    // The recorded stream set is fixed at the first open
+    auto synthetic = dynamic_cast< synthetic_sensor * >( &m_sensor );
+    if( synthetic && synthetic->get_raw_sensor()->supports_incremental_streams() && synthetic->is_opened() )
+        throw wrong_api_call_sequence_exception( "Streams cannot be added to a sensor while it is recorded" );
     m_sensor.open(requests);
 }
 

@@ -400,6 +400,12 @@ public:
         }
     }
 
+    // Stops delivering one pin's frames while the others keep streaming
+    void stop_callbacks( stream_profile profile ) { _dev[decode_pin( profile.pin_index )]->stop_callbacks(); }
+
+    // Each sub-device carries one pin, so a pin can be opened and closed without touching the others
+    bool has_pin_per_device() const { return pin_stride() == 1; }
+
     void close( stream_profile profile ) override
     {
         // Decode the SDK-facing pin_index to the matched sub-device native backend pin index
