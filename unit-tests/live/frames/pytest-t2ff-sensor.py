@@ -126,7 +126,7 @@ def test_first_color_frame_delay(sensor_device):
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
 
-    cs = dev.first_color_sensor()
+    cs = dev.first_depth_sensor() if 'Dual RGB' in product_name else dev.first_color_sensor()  # Dual RGB colors stream from the depth sensor
     cp = next(p for p in cs.profiles
               if p.fps() == 30
               and p.stream_type() == rs.stream.color

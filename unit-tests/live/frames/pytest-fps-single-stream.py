@@ -78,7 +78,7 @@ def test_color_fps(test_device):
 
     log.info(f"Testing color fps {product_line} device - {os_name} OS")
 
-    cs = dev.first_color_sensor()
+    cs = dev.first_depth_sensor() if 'Dual RGB' in product_name else dev.first_color_sensor()  # Dual RGB colors stream from the depth sensor
     if product_line == "D400":
         if cs.supports(rs.option.enable_auto_exposure):
             cs.set_option(rs.option.enable_auto_exposure, 1)

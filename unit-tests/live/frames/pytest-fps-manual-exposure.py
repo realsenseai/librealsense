@@ -121,7 +121,7 @@ def test_color_fps_manual_exposure(test_device):
     try:
         cs = dev.first_color_sensor()
     except RuntimeError:
-        if 'D405' in product_name or 'D401' in product_name:
+        if any(model in product_name for model in ['D405', 'D401', 'Dual RGB']):
             cs = dev.first_depth_sensor()
         elif 'D421' in product_name:
             pytest.skip(f"Device {product_name} has no color sensor")

@@ -59,7 +59,7 @@ def test_rgb_options_metadata_consistency(test_device):
         color_sensor = dev.first_color_sensor()
     except RuntimeError:
         product_name = dev.get_info(rs.camera_info.name)
-        if 'D405' in product_name or 'D401' in product_name:
+        if any(model in product_name for model in ['D405', 'D401', 'Dual RGB']):
             color_sensor = dev.first_depth_sensor()
         else:
             raise

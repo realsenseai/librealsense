@@ -76,7 +76,7 @@ def test_setting_color_options(test_device_wrapped):
     try:
         color_sensor = dev.first_color_sensor()
     except RuntimeError:
-        if 'D401' in product_name:
+        if 'D401' in product_name or 'Dual RGB' in product_name:
             color_sensor = dev.first_depth_sensor()
         elif 'D405' in product_name:
             pytest.skip("D405 default preset does not reset hue (see default_405 in presets.cpp)")
