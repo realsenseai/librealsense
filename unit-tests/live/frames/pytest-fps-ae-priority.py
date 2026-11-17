@@ -9,8 +9,9 @@ Root cause was RealTek ISP FW 3613 (DS5 5.17.3.1 - 5.17.3.10); ISP FW 3614 fixes
 
 Method:
   1. Calibrate the scene on the rig: stream with AE on and AE priority off (fps stays fixed), take the
-     median luma once AE converged. Then stream with manual exposure of half the frame period at default
+     median luma once AE converged. Then stream with manual exposure of half the frame period at minimum
      gain. If that probe is darker than the AE result, AE would need more than half a period: skip.
+     Minimum gain makes the probe a lower bound for any gain AE may pick, so the skip is conservative.
      Both values are in the same (gamma-encoded) pixel space, so no gamma model or fixed threshold is needed.
   2. Otherwise enable AE and AE priority and measure the color fps (fps_helper.measure_fps).
   3. Delivered fps must be 90-105% of the configured rate.
@@ -71,7 +72,7 @@ def _stream_luma(sensor, profile, steady_time, count_time):
 
 
 def _calibrate_scene(sensor, profile, fps):
-    """Return (AE-converged luma with fixed fps, luma at half-period manual exposure and default gain)."""
+    """Return (AE-converged luma with fixed fps, luma at half-period manual exposure and minimum gain)."""
     sensor.set_option(rs.option.enable_auto_exposure, 1)
     sensor.set_option(rs.option.auto_exposure_priority, 0)   # fps stays fixed, AE may use up to a full period
     ae_luma = _stream_luma(sensor, profile, AE_PROBE_STEADY, PROBE_COUNT)
@@ -82,7 +83,7 @@ def _calibrate_scene(sensor, profile, fps):
     sensor.set_option(rs.option.enable_auto_exposure, 0)
     sensor.set_option(rs.option.exposure, exposure)
     if sensor.supports(rs.option.gain):
-        sensor.set_option(rs.option.gain, sensor.get_option_range(rs.option.gain).default)
+        sensor.set_option(rs.option.gain, sensor.get_option_range(rs.option.gain).min)
     half_luma = _stream_luma(sensor, profile, MANUAL_PROBE_STEADY, PROBE_COUNT)
     log.info(f"Brightness calibration: AE mean pixel {ae_luma:.1f}, "
              f"manual {exposure * EXPOSURE_UNIT_USEC / 1000:.2f} msec mean pixel {half_luma:.1f}")
