@@ -397,14 +397,17 @@ namespace librealsense
                                             + offsetof( md_depth_y_normal_mode, intel_depth_control );
             auto const rgb_control_offset = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode )
                                           + offsetof( md_rgb_normal_mode, intel_rgb_control );
+            // Copied to locals: make_shared binds by reference, which would need a definition of the trait's static member
+            md_type const depth_layout = md_type_trait< md_depth_control >::type;
+            md_type const rgb_layout = md_type_trait< md_rgb_control >::type;
             uint8_t const first_policy = RS2_COLORED_IR_AUTO_EXPOSURE_DEPTH_PRIORITY;
             uint8_t const last_policy = RS2_COLORED_IR_AUTO_EXPOSURE_HYBRID;
 
             depth_sensor.register_metadata( RS2_FRAME_METADATA_AE_POLICY,
-                std::make_shared< md_trailing_byte_parser >( depth_control_offset, md_type_trait< md_depth_control >::type,
+                std::make_shared< md_trailing_byte_parser >( depth_control_offset, depth_layout,
                                                              DEPTH_AE_POLICY_OFFSET, first_policy, last_policy ) );
             depth_sensor.register_metadata( RS2_FRAME_METADATA_AE_POLICY,
-                std::make_shared< md_trailing_byte_parser >( rgb_control_offset, md_type_trait< md_rgb_control >::type,
+                std::make_shared< md_trailing_byte_parser >( rgb_control_offset, rgb_layout,
                                                              RGB_AE_POLICY_OFFSET, first_policy, last_policy ) );
         }
     }
