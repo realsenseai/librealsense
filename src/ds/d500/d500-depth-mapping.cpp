@@ -261,6 +261,7 @@ namespace librealsense
         std::string physical_port;
         if( ! perception_devs.empty() )
         {
+            _is_muxed = true;
             mapping_dev = std::make_shared< platform::multi_pins_uvc_device >( perception_devs );
             physical_port = mapping_dev->get_device_location();
             LOG_DEBUG( "Perception streams are multiplexed on " << physical_port );
@@ -1058,10 +1059,18 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         return *it;
     }
 
-    std::string d500_depth_mapping::get_depth_mapping_params() const
+    void d500_depth_mapping::throw_if_params_unsupported() const
     {
         if( ! _raw_depth_mapping_ep )
             throw not_implemented_exception( "Depth mapping params are not supported on this device" );
+        // The params are a Mapping XU control and the d4xx driver has no control for it yet
+        if( _is_muxed )
+            throw not_implemented_exception( "Depth mapping params are not supported over GMSL yet" );
+    }
+
+    std::string d500_depth_mapping::get_depth_mapping_params() const
+    {
+        throw_if_params_unsupported();
         std::lock_guard< std::mutex > lock( _depth_mapping_params_mutex );
         auto reply = read_depth_mapping_reply( *_raw_depth_mapping_ep );
         return depth_mapping_reply_field( reply, "params" ).dump();
@@ -1069,8 +1078,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
 
     void d500_depth_mapping::set_depth_mapping_params( const std::string & params_json_str ) const
     {
-        if( ! _raw_depth_mapping_ep )
-            throw not_implemented_exception( "Depth mapping params are not supported on this device" );
+        throw_if_params_unsupported();
 
         ds::depth_mapping_params_header header;
         const size_t max_json_size = ds::DEPTH_MAPPING_PARAMS_LEN - sizeof( header );

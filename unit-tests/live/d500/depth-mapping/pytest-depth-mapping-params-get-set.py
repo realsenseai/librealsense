@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D585"),
     pytest.mark.device_exclude("D585S"),  # D585S does not serve the depth mapping params
-    pytest.mark.device_type_exclude("GMSL"),  # Occupancy is a muxed slot over GMSL, with no controls of its own: the params XU is not reachable yet
+    pytest.mark.device_type_exclude("GMSL"),  # The d4xx driver has no control for the Mapping XU params yet [RSDEV-16586]
 ]
 
 

@@ -65,6 +65,9 @@ namespace librealsense
         // D5xx (mapping on MI 11, OCCG 320x256 and LPCL 640x360).
         bool _is_safety_layout = false;
         bool _is_d585s = false;
+        // Perception streams are slots multiplexed on the depth node (GMSL): no Mapping XU is reachable
+        bool _is_muxed = false;
+        void throw_if_params_unsupported() const;
         // Serializes get/set of the depth mapping params, so the GET that explains a failed set reads that set's result
         mutable std::mutex _depth_mapping_params_mutex;
         std::shared_ptr<rsutils::lazy<rs2_extrinsics>> _depth_to_depth_mapping_extrinsics;
