@@ -605,17 +605,6 @@ namespace librealsense
                 depth_sensor.register_option(RS2_OPTION_PROJECTOR_TEMPERATURE, proj_temperature);
             }
 
-            // Constructing the option probes the XU; firmware without aligned-depth support throws and we skip it.
-            try
-            {
-                _aligned_depth_option = std::make_shared< d500_enable_aligned_depth_option >( raw_depth_sensor );
-                depth_sensor.register_option( RS2_OPTION_ENABLE_ALIGNED_DEPTH, _aligned_depth_option );
-            }
-            catch( std::exception const & e )
-            {
-                LOG_DEBUG( "Align Depth is not supported by this firmware: " << e.what() );
-            }
-
             if( d5x5_dual_rgb_mode_pids.count( _pid )
                 && _fw_version >= firmware_version( "7.58.40897.13078" ) )
             {

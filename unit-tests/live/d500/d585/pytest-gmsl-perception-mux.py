@@ -4,6 +4,7 @@
 # GMSL Perception MUX: Object Detection (PD), Occupancy (OCC) and the Labeled Point Cloud (LPCL) time-share the GMSL
 # IR channel and are told apart by their metadata. Each stream is still its own sensor and opens and closes
 # independently; the camera starts the shared capture with the first and stops it with the last.
+# PD runs with OCC only: the camera refuses PD with LPCL.
 # This file covers what is specific to the MUX; the stream lifecycles and the Occupancy input rules on every
 # transport are in pytest-perception-streams.py.
 
@@ -11,6 +12,8 @@ import pytest
 import pyrealsense2 as rs
 import struct
 import time
+import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
 
@@ -191,23 +194,24 @@ def test_lpcl_refused_on_a_smaller_capture(device):
     stop( [pd] )
 
 
-def test_pd_joins_lpcl(device):
-    """PD joins a running LPCL and stops while LPCL keeps streaming. PD stops first: a Mapping stream stopping under
-    PD leaves the camera's next capture without frames; the OCC test, which runs later, covers that."""
+def test_pd_refused_with_lpcl(device):
+    """PD + LPCL is not a supported MUX combination: the camera refuses PD joining a running LPCL, which keeps streaming.
+    PD started first is refused before the camera (test_lpcl_refused_on_a_smaller_capture)."""
+    skip_d585_on_gmsl( device, "no labeled point cloud frames over GMSL" )
+    require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "PD + LPCL refusal" )   # older FW lets PD join
     pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
     frames = Collector()
-    for s, p in ( ( mapping, lpcl_profile( device ) ), ( pd, pd_profile( device ) ) ):
-        s.open( p )
-        s.start( frames )
+    mapping.open( lpcl_profile( device ) )
+    mapping.start( frames )
+    frames.wait( rs.stream.labeled_point_cloud, time.monotonic(), MIN_LPCL_FRAMES )
+    with pytest.raises( RuntimeError, match="refused to start Object Detection" ):
+        pd.open( pd_profile( device ) )
+        pd.start( frames )
+    assert mux_state( device, PD_ID )[:2] == ( 0, 0 )
     since = time.monotonic() + SWITCH_S
-    frames.wait( rs.stream.object_detection, since, MIN_PD_FRAMES )
     frames.wait( rs.stream.labeled_point_cloud, since, MIN_LPCL_FRAMES )
+    assert frames.count( rs.stream.object_detection ) == 0
     assert wait_state( device, LPCL_ID, ( 1, 1, 1 ) ) == ( 1, 1, 1 )
-    stop( [pd] )
-    since = time.monotonic() + SWITCH_S
-    frames.wait( rs.stream.labeled_point_cloud, since, MIN_LPCL_FRAMES )
-    assert frames.count( rs.stream.object_detection, since ) == 0
-    assert wait_state( device, PD_ID, ( 0, 0, 1 ) ) == ( 0, 0, 1 )
     stop( [mapping] )
     assert wait_state( device, LPCL_ID, ( 0, 0, 0 ) ) == ( 0, 0, 0 )
 

@@ -23,6 +23,9 @@ def test_connection_type_detected(test_device):
 
     if any(model in product_name for model in ['D457', 'D401']):
         assert connection_type == "GMSL", f"{product_name} should have GMSL connection, got: {connection_type}"
+    elif 'D585' in product_name:
+        # D585 is connected over USB or GMSL (MIPI on Jetson)
+        assert connection_type in ("USB", "GMSL"), f"{product_name} should have USB or GMSL connection, got: {connection_type}"
     elif any(model in product_name for model in ['D555']):
         assert connection_type == "DDS", f"{product_name} should have DDS connection, got: {connection_type}"
     else:

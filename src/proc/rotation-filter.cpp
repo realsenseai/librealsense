@@ -127,6 +127,9 @@ namespace librealsense {
         }
         float last_rotation = _last_rotation_values[stream_key];
 
+        if( _calibration.changed( f ) )
+            _source_stream_profiles.clear();
+
         // Check if we've already processed this same source profile and rotation value.
         if( _source_stream_profiles.find( stream_key ) != _source_stream_profiles.end()
             && current_source_profile.get() == _source_stream_profiles[stream_key].get() && value == last_rotation )
