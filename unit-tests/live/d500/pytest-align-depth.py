@@ -269,6 +269,7 @@ def texture_maps(dev, depth_sensor, pointclouds):
     return valid, maps
 
 
+@pytest.mark.skip(reason="color intrinsics differ between first and later reads - restore after RSDEV-16609 is solved")
 @pytest.mark.device_type_exclude("DDS")
 def test_pointcloud_follows_the_mode(test_device, depth_sensor):
     """A pointcloud that already mapped raw depth must drop that calibration once aligned depth is on,
