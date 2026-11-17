@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 class OptionBase(BaseModel):
     name: str
@@ -37,3 +37,8 @@ class OptionInfo(BaseModel):
     units: Optional[str] = None
     read_only: bool = False
     value_descriptions: Optional[dict] = None  # For enum-type options: {value: description}
+
+class FilterInfo(BaseModel):
+    """One post-processing filter; the map holding it names it"""
+    enabled: bool
+    options: List[OptionInfo]

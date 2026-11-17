@@ -118,13 +118,22 @@ class device:
             camera_info.product_id: "0123"
         }
 
+    def supports(self, info_type):
+        """By str(): "camera_info.serial_number" for this module's keys and pyrealsense2's alike
+        (pyrealsense2's own .name is shadowed by its camera_info.name member)"""
+        return any(str(k) == str(info_type) for k in self._info)
+
     def get_info(self, info_type):
-        if info_type in self._info:
-            return self._info[info_type]
+        for k, v in self._info.items():
+            if str(k) == str(info_type):
+                return v
         raise RuntimeError(f"Info {info_type} not available")
 
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
+
+    def is_metadata_enabled(self):
+        return True
 
     def is_debug_protocol(self):
         """Return True if this device exposes the RS2_EXTENSION_DEBUG extension."""
@@ -594,7 +603,7 @@ class disparity_transform:
 class debug_protocol(device):
     """Mock for the pyrealsense2 debug_protocol extension.
 
-    Inherits from device so it can be injected directly into rs_manager.devices
+    Inherits from device so it can be registered as a Camera
     and is_debug_protocol() returns True via isinstance check, mirroring the SDK
     extension model where debug_protocol IS-A device.
 

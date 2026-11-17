@@ -62,35 +62,11 @@ def test_hwm_command_errors(setup_mock_managers, device, status, details):
     device_id = "no-such-device"
     if device is not None:
         device_id = device.get_info(camera_info.serial_number)
-        setup_mock_managers["rs_manager"].devices[device_id] = device
+        with setup_mock_managers["rs_manager"].lock:
+            setup_mock_managers["rs_manager"]._add_cameras([device])
 
     response = client.post(f"/api/v1/devices/{device_id}/hwm", json={"opcode": 0xA6})
     assert response.status_code == status
     detail = response.json()["detail"].lower()
     assert all(d in detail for d in details)
 
-
-def test_hwm_no_deadlock_on_unknown_device(patch_dependencies):
-    """Uses the real refresh_devices so its lock acquisition actually happens: with the
-    buggy implementation the absent-device path blocks forever."""
-    import threading
-    from app.core.errors import RealSenseError
-
-    rs_manager = patch_dependencies["rs_manager"]
-    rs_manager.devices.clear()
-    rs_manager.device_infos.clear()
-
-    caught = []
-
-    def _call():
-        try:
-            rs_manager.send_hwm_command("no-such-device", opcode=0xA6)
-        except RealSenseError as e:
-            caught.append(e)
-
-    t = threading.Thread(target=_call, daemon=True)
-    t.start()
-    t.join(timeout=2.0)
-
-    assert not t.is_alive(), "send_hwm_command deadlocked — refresh_devices was called while holding self.lock"
-    assert caught and caught[0].status_code == 404

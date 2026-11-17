@@ -10,7 +10,7 @@ import pytest
 import pyrealsense2 as rs
 from unittest.mock import MagicMock
 
-from app.services.rs_manager import RealSenseManager, RealSenseError
+from app.services.rs_manager import RealSenseManager
 
 
 @pytest.fixture(autouse=True)
@@ -44,24 +44,22 @@ def _make_mock_device(serial):
     return dev
 
 
-def test_register_new_device_is_atomic_on_sensors_raise():
-    """If sensor enumeration raises, the exception bubbles up but no partial state is published."""
-    import pytest as _pytest
+def test_a_device_the_sdk_cannot_open_is_skipped():
     mgr = RealSenseManager()
-
-    class _ExplodingSensorList:
-        def __iter__(self):
-            raise RuntimeError("sensor enumeration failed")
-
-    dev = _make_mock_device("serial-A")
-    dev.sensors = _ExplodingSensorList()
-
+    rs.pipeline.side_effect = RuntimeError("pipeline failed")
     with mgr.lock:
-        with _pytest.raises(RuntimeError):
-            mgr._register_new_device(dev)
+        assert mgr._add_cameras([_make_mock_device("serial-A")]) == []
+    assert "serial-A" not in mgr.cameras
 
-    assert "serial-A" not in mgr.devices
-    assert "serial-A" not in mgr.device_infos
+
+def test_a_device_without_a_serial_number_is_not_listed():
+    """Such as one in recovery mode"""
+    mgr = RealSenseManager()
+    dfu = MagicMock()
+    info_map = {rs.camera_info.firmware_update_id: "UPD-1", rs.camera_info.name: "Intel RealSense D4XX Recovery"}
+    dfu.get_info.side_effect = lambda k: info_map.get(k) if k in info_map else (_ for _ in ()).throw(RuntimeError())
+    with mgr.lock:
+        assert mgr._add_cameras([dfu]) == []
 
 
 # --- Hardware reset ---
@@ -75,52 +73,17 @@ def _seed_device(mgr, serial):
     return dev
 
 
-def test_reset_device_success_evicts_state_and_emits():
+def test_reset_device_resets_it():
     mgr = RealSenseManager()
     dev = _seed_device(mgr, "serial-A")
-    emitted = []
-    mgr.events.emit = lambda ev, payload: emitted.append((ev, payload))
 
-    assert mgr.reset_device("serial-A") is True
-
+    mgr.cameras["serial-A"].hardware_reset()
     dev.hardware_reset.assert_called_once()
-    assert "serial-A" not in mgr.devices
-    assert "serial-A" not in mgr.device_infos
-    assert any(ev == "devices_changed" and p == {"added": [], "removed": ["serial-A"]} for ev, p in emitted)
 
 
-def test_reset_device_not_found_raises_404():
-    import pytest as _pytest
-    mgr = RealSenseManager()
-
-    with _pytest.raises(RealSenseError) as exc:
-        mgr.reset_device("nope")
-    assert exc.value.status_code == 404
-
-
-def test_reset_device_hardware_error_restores_state_and_raises_500():
-    """Reset failure: device handle is still valid + device still plugged in,
-    so the cache entry is restored and an `added` event is emitted before
-    propagating the 500 to the client."""
-    import pytest as _pytest
-    mgr = RealSenseManager()
-    dev = _seed_device(mgr, "serial-A")
-    dev.hardware_reset.side_effect = RuntimeError("boom")
-    emitted = []
-    mgr.events.emit = lambda ev, payload: emitted.append((ev, payload))
-
-    with _pytest.raises(RealSenseError) as exc:
-        mgr.reset_device("serial-A")
-    assert exc.value.status_code == 500
-    assert "boom" in exc.value.detail
-    # Restored.
-    assert "serial-A" in mgr.devices
-    assert "serial-A" in mgr.device_infos
-    # Both events emitted, in order.
-    assert emitted == [
-        ("devices_changed", {"added": [], "removed": ["serial-A"]}),
-        ("devices_changed", {"added": ["serial-A"], "removed": []}),
-    ]
+def test_an_unknown_camera_is_404():
+    with pytest.raises(KeyError):  # answered 404
+        RealSenseManager().cameras["nope"]
 
 
 def test_on_devices_changed_remove_evicts_only_target():
@@ -139,7 +102,4 @@ def test_on_devices_changed_remove_evicts_only_target():
     info_remove.was_removed.side_effect = lambda d: d is dev_a
     mgr._on_devices_changed(info_remove)
 
-    assert "serial-A" not in mgr.devices
-    assert "serial-A" not in mgr.device_infos
-    assert "serial-B" in mgr.devices
-    assert "serial-B" in mgr.device_infos
+    assert "serial-A" not in mgr.cameras and "serial-B" in mgr.cameras

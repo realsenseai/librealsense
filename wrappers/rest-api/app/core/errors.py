@@ -33,6 +33,14 @@ def setup_exception_handlers(app: FastAPI):
             content={"detail": exc.errors()},
         )
 
+    # A name, ID or index the path gives that is not there: a device, a sensor, an option, a filter
+    @app.exception_handler(LookupError)
+    async def not_found_handler(request: Request, exc: LookupError):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": f"Not found: {exc.args[0]}"},
+        )
+
     # pyrealsense2 raises SDK errors as RuntimeError: they are refused requests, with the SDK's own message
     @app.exception_handler(RuntimeError)
     async def sdk_exception_handler(request: Request, exc: RuntimeError):

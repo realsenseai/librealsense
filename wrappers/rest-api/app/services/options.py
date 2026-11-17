@@ -58,7 +58,7 @@ def all_options(obj) -> List[OptionInfo]:
 
 def set_option(obj, field: str, value: float) -> OptionInfo:
     """Set one option and report it as the object holds it."""
-    opt = next(o for o in obj.get_supported_options() if o.name == field)
+    opt = {o.name: o for o in obj.get_supported_options()}[field]  # an unknown one 404s
     rng = obj.get_option_range(opt)
     obj.set_option(opt, float(value))
     return _info(obj, opt, rng)
