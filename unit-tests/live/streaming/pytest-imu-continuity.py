@@ -4,7 +4,7 @@
 """
 IMU stream continuity (RSDEV-16379).
 
-Streams accel + gyro through the motion sensor for STREAM_DURATION_S and checks, per stream and
+Streams accel + gyro through the motion sensor and checks, per stream and
 independently of each other:
 
   1. Frame-number gaps      - consecutive frames must differ by exactly 1.
@@ -24,8 +24,10 @@ Thresholds (named constants below, all zero-tolerance for gaps; RSDEV-13643 acce
   TIMESTAMP_GAP_FACTOR  = 1.5     gap threshold, in nominal periods
   RATE_TOLERANCE        = 0.02    allowed relative rate error (RSDEV-13850 reference: 200.0 +/- 0.5 Hz at 200 Hz)
 
-Two variants: IMU alone, and IMU with depth + color streaming (drops in RSDEV-13850 / RSDSO-21807 depend on
-video load). Frames are consumed through sensor.start(callback) only: wait_for_frames / poll_for_frames
+Two variants: IMU alone (all IMU_RATE_PAIRS, STANDALONE_DURATION_S each), and IMU with depth + color streaming
+(drops in RSDEV-13850 / RSDSO-21807 depend on video load) on two pairs only, the highest equal accel/gyro rate the
+device supports and 200/200, VIDEO_DURATION_S each. Runtime per camera is capped at RUNTIME_BUDGET_S (asserted
+at import from the parametrization). Frames are consumed through sensor.start(callback) only: wait_for_frames / poll_for_frames
 fabricate gaps (RSDSO-21592, RSDSO-21711, RSDSO-21096). Callbacks only record, so a failure is a real loss.
 
 On Linux D400 USB, motion frame numbers are counted on the host (RSDSO-21711), so check 1 cannot catch loss
@@ -52,11 +54,14 @@ pytestmark = [
     pytest.mark.device_each("D430I"),
     pytest.mark.device_each("D585"),  # matches D585 and D585S (substring match)
     pytest.mark.context("nightly"),
-    pytest.mark.timeout(300),
+    pytest.mark.timeout(300),  # per test; the whole-file budget is RUNTIME_BUDGET_S
 ]
 
 # --- Thresholds ---
-STREAM_DURATION_S = 60
+STANDALONE_DURATION_S = 15
+VIDEO_DURATION_S = 30
+RUNTIME_BUDGET_S = 5 * 60         # per camera, including sensor open/close
+PER_RUN_OVERHEAD_S = 10           # allowance per streaming run for open/close, option restore, profile search
 MAX_FRAME_NUMBER_GAPS = 0
 MAX_TIMESTAMP_GAPS = 0
 TIMESTAMP_GAP_FACTOR = 1.5
@@ -70,6 +75,11 @@ TIMESTAMP_WRAP_MS = 2 ** 32 / 1000.0  # D400 USB raw hardware timestamps are 32-
 # based (D457 GMSL): the SDK requires equal accel and gyro fps there.
 IMU_RATE_PAIRS = [(50, 50), (100, 100), (100, 200), (200, 200), (200, 400), (63, 200), (250, 400)]
 
+# With-video variant: the highest equal accel/gyro pair the device exposes, and 200/200. When the highest is 200
+# the two coincide and the second one is skipped.
+HIGHEST_EQUAL = "highest-equal"
+VIDEO_PAIR_SELECTORS = [HIGHEST_EQUAL, 200]
+
 VIDEO_FPS = 30
 PREFERRED_DEPTH_WIDTHS = [848, 640, 1280]
 PREFERRED_COLOR_FORMATS = [rs.format.yuyv, rs.format.rgb8]
@@ -81,6 +91,19 @@ ESCAPEE_HINTS = {
     "D585 USB on Windows": "RSDEV-13643 (USB HID scheduling; RSDEV-14313 tracks Windows coverage)",
     "D400 over GMSL": "RSDSO-21807 / RSDSO-21592 (Tegra VI short-frame loss on JP6)",
 }
+
+
+def planned_streaming_time_s():
+    """Streaming seconds planned per camera, derived from the parametrization of both variants."""
+    return len(IMU_RATE_PAIRS) * STANDALONE_DURATION_S + len(VIDEO_PAIR_SELECTORS) * VIDEO_DURATION_S
+
+
+def planned_runtime_s():
+    """Planned streaming time plus the per-run open/close allowance."""
+    return planned_streaming_time_s() + (len(IMU_RATE_PAIRS) + len(VIDEO_PAIR_SELECTORS)) * PER_RUN_OVERHEAD_S
+
+
+assert planned_runtime_s() <= RUNTIME_BUDGET_S,     f"IMU continuity plan needs {planned_runtime_s()} s per camera, budget is {RUNTIME_BUDGET_S} s"
 
 
 class StreamRecord:
@@ -213,12 +236,23 @@ def _video_profiles(dev):
     return result
 
 
-def _stream_and_record(dev, accel_fps, gyro_fps, with_video):
-    """Stream for STREAM_DURATION_S and return {'accel': StreamRecord, 'gyro': StreamRecord}."""
+def _first_motion_sensor(dev):
     try:
-        motion = dev.first_motion_sensor()
+        return dev.first_motion_sensor()
     except RuntimeError:
         pytest.skip("Device has no motion sensor")
+
+
+def _highest_equal_rate(motion):
+    """Highest fps exposed for both accel and gyro, or None."""
+    rates = {s: {p.fps() for p in motion.profiles if p.stream_type() == s} for s in (rs.stream.accel, rs.stream.gyro)}
+    common = rates[rs.stream.accel] & rates[rs.stream.gyro]
+    return max(common) if common else None
+
+
+def _stream_and_record(dev, accel_fps, gyro_fps, with_video, duration_s):
+    """Stream for duration_s and return {'accel': StreamRecord, 'gyro': StreamRecord}."""
+    motion = _first_motion_sensor(dev)
 
     accel_profile = _find_profile(motion, rs.stream.accel, accel_fps, rs.format.motion_xyz32f)
     gyro_profile = _find_profile(motion, rs.stream.gyro, gyro_fps, rs.format.motion_xyz32f)
@@ -263,7 +297,7 @@ def _stream_and_record(dev, accel_fps, gyro_fps, with_video):
             started.append(sensor)
         motion.start(motion_callback)
         started.append(motion)
-        time.sleep(STREAM_DURATION_S)
+        time.sleep(duration_s)
     finally:
         # Restore while the sensor is still open: set_option on a closed sensor can throw and mask the result
         if restore_global_time is not None:
@@ -282,9 +316,8 @@ def _stream_and_record(dev, accel_fps, gyro_fps, with_video):
     return records
 
 
-def _run_continuity(test_device, accel_fps, gyro_fps, with_video):
-    dev, _ = test_device
-    records = _stream_and_record(dev, accel_fps, gyro_fps, with_video)
+def _run_continuity(dev, accel_fps, gyro_fps, with_video, duration_s):
+    records = _stream_and_record(dev, accel_fps, gyro_fps, with_video, duration_s)
 
     problems = []
     for name, fps in (("accel", accel_fps), ("gyro", gyro_fps)):
@@ -306,12 +339,20 @@ def _pair_id(pair):
 
 @pytest.mark.parametrize("accel_fps,gyro_fps", IMU_RATE_PAIRS, ids=[_pair_id(p) for p in IMU_RATE_PAIRS])
 def test_imu_continuity_standalone(test_device, accel_fps, gyro_fps):
-    _run_continuity(test_device, accel_fps, gyro_fps, with_video=False)
+    dev, _ = test_device
+    _run_continuity(dev, accel_fps, gyro_fps, with_video=False, duration_s=STANDALONE_DURATION_S)
 
 
-@pytest.mark.parametrize("accel_fps,gyro_fps", IMU_RATE_PAIRS, ids=[_pair_id(p) for p in IMU_RATE_PAIRS])
-def test_imu_continuity_with_video(test_device, accel_fps, gyro_fps):
-    _run_continuity(test_device, accel_fps, gyro_fps, with_video=True)
+@pytest.mark.parametrize("rate", VIDEO_PAIR_SELECTORS, ids=[f"accel-gyro-{r}" for r in VIDEO_PAIR_SELECTORS])
+def test_imu_continuity_with_video(test_device, rate):
+    dev, _ = test_device
+    if rate == HIGHEST_EQUAL:
+        rate = _highest_equal_rate(_first_motion_sensor(dev))
+        if rate is None:
+            pytest.skip("No accel/gyro rate common to both streams")
+        if rate == 200:
+            pytest.skip("Highest equal rate is 200, covered by the 200/200 case")
+    _run_continuity(dev, rate, rate, with_video=True, duration_s=VIDEO_DURATION_S)
 
 
 # --- Helper checks (no device needed) ---
@@ -340,3 +381,9 @@ def test_timestamp_gaps_still_flag_rollback():
     ts[10:] = [t - 100.0 for t in ts[10:]]  # clock steps back 100 ms
     gaps = find_timestamp_gaps(ts, 200)
     assert len(gaps) == 1 and gaps[0][1] < 0
+
+
+def test_runtime_budget_fits():
+    assert planned_runtime_s() <= RUNTIME_BUDGET_S
+    log.info("Planned streaming %d s, with open/close allowance %d s, budget %d s",
+             planned_streaming_time_s(), planned_runtime_s(), RUNTIME_BUDGET_S)
