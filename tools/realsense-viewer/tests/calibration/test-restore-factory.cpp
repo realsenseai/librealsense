@@ -18,7 +18,11 @@ using calib_table = rs2::calibration_table;
 struct factory_calibration_restore
 {
     rs2::auto_calibrated_device dev;
-    ~factory_calibration_restore() { try { dev.reset_to_factory_calibration(); } catch( ... ) {} }
+    ~factory_calibration_restore()
+    {
+        try { dev.reset_to_factory_calibration(); }
+        catch( std::exception const & e ) { fprintf( stderr, "factory calibration reset failed: %s\n", e.what() ); }
+    }
 };
 
 }  // namespace
@@ -36,7 +40,10 @@ VIEWER_TEST( "calibration", "restore_factory" )
     auto it = std::find_if( test.device_models.begin(), test.device_models.end(),
                             [&]( auto const & m ) { return is_d500( m->dev ); } );
     if( it == test.device_models.end() )
-        return;   // the restore button of this window is a D500 feature
+    {
+        test.imgui->LogInfo( "no D500 device, nothing to restore" );   // D500-only window
+        return;
+    }
     auto & model = **it;
 
     auto dev = model.dev.as< rs2::auto_calibrated_device >();

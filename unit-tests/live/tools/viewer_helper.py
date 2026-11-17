@@ -45,7 +45,7 @@ def run_viewer_tests( test_filter=None ):
     if test_filter:
         cmd += ['-r', test_filter]
     log.debug( 'running: %s', ' '.join( cmd ) )
-    # Cap the child below the per-test pytest.mark.timeout(400) above so the subprocess
+    # Cap the child below the callers' pytest.mark.timeout (400) so the subprocess
     # is reaped here rather than leaked when the outer test thread is killed.
     child_timeout = 340
     p = subprocess.Popen( cmd,
