@@ -22,6 +22,7 @@ struct fake_hid : platform::hid_device
 {
     bool fail_open = false;
     bool fail_start = false;
+    bool report_during_start = false;
     platform::hid_callback callback;
 
     void register_profiles( const std::vector< platform::hid_profile > & ) override {}
@@ -33,9 +34,14 @@ struct fake_hid : platform::hid_device
     void close() override {}
     void start_capture( platform::hid_callback cb ) override
     {
-        if( fail_start )
-            throw std::runtime_error( "start failed" );
         callback = std::move(cb);
+        if( report_during_start )
+            report( "Accel" );
+        if( fail_start )
+        {
+            callback = {};
+            throw std::runtime_error( "start failed" );
+        }
     }
     void stop_capture() override { callback = {}; }
     std::vector< platform::hid_sensor > get_sensors() override { return {}; }
@@ -145,6 +151,11 @@ TEST_CASE( "Active HID accel does not hide silent gyro and restarts reset timeou
         CHECK( f.frames == 65 );
         f.timeouts.clear();
     }
+    std::this_thread::sleep_for( milliseconds(5200) );
+    {
+        std::lock_guard< std::mutex > lock( f.mutex );
+        CHECK( f.timeouts.empty() );
+    }
     f.start();
     std::this_thread::sleep_for( milliseconds(1200) );
     f.sensor->stop();
@@ -161,10 +172,14 @@ TEST_CASE( "HID open and start failures allow retry in the same sensor", "[hid][
     f.backend->fail_open = false;
     f.sensor->open( { f.profiles.front() } );
     f.backend->fail_start = true;
+    f.backend->report_during_start = true;
     CHECK_THROWS( f.start() );
     CHECK_FALSE( f.sensor->is_streaming() );
     f.backend->fail_start = false;
     f.start();
+    CHECK( f.frames == 0 );
+    f.backend->report( "Accel" );
+    CHECK( f.frames == 1 );
     std::unique_lock< std::mutex > lock( f.mutex );
     REQUIRE( f.cv.wait_for( lock, seconds(8), [&] { return ! f.timeouts.empty(); } ) );
     REQUIRE( f.timeouts.size() == 1 );

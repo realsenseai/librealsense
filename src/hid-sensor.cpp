@@ -230,6 +230,14 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
             auto timestamp_reader = _hid_iio_timestamp_reader.get();
             static const std::string custom_sensor_name = "custom";
             auto && sensor_name = sensor_data.sensor.name;
+            // A backend may deliver a report during event registration. Do not
+            // take the configure lock held by start(), including its rollback.
+            if( ! this->is_streaming() )
+            {
+                LOG_INFO( "HID Frame received when Streaming is not active," << sensor_name << ",Arrived,"
+                                                                           << std::fixed << system_time );
+                return;
+            }
             {
                 std::lock_guard< std::mutex > lock( _frame_timeout_mutex );
                 auto sensor = _last_frame_times.find( sensor_name );
@@ -259,14 +267,6 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
 
                 is_custom_sensor = true;
                 timestamp_reader = _custom_hid_timestamp_reader.get();
-            }
-
-            if( ! this->is_streaming() )
-            {
-                auto stream_type = request->get_stream_type();
-                LOG_INFO( "HID Frame received when Streaming is not active," << get_string( stream_type ) << ",Arrived,"
-                                                                             << std::fixed << system_time );
-                return;
             }
 
             const auto && fr = generate_frame_from_data( sensor_data.fo,
