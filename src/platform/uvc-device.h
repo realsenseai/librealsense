@@ -372,12 +372,16 @@ public:
     }
 
 
+    // Starts only the pins not streaming yet, so pins can be added to a streaming device
     void stream_on( std::function< void( const notification & n ) > error_handler
                     = []( const notification & n ) {} ) override
     {
         for( auto & elem : _configured_indexes )
         {
+            if( _streaming_indexes.count( elem ) )
+                continue;
             _dev[elem]->stream_on( error_handler );
+            _streaming_indexes.insert( elem );
         }
     }
     void start_callbacks() override
@@ -401,6 +405,7 @@ public:
         // Decode the SDK-facing pin_index to the matched sub-device native backend pin index
         auto dev_index = decode_pin( profile.pin_index );
         _configured_indexes.erase( dev_index );
+        _streaming_indexes.erase( dev_index );
         _dev[dev_index]->close( profile ); // Might throw, keep after erase()
     }
 
@@ -557,6 +562,7 @@ private:
 
     std::vector< std::shared_ptr< uvc_device > > _dev;
     std::set< uint32_t > _configured_indexes;
+    std::set< uint32_t > _streaming_indexes;
     mutable uint32_t _pin_stride = 0;
 };
 
