@@ -27,8 +27,8 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
-    // TODO: bump to the FW release that adds the AE policy frame metadata
     static const firmware_version MIN_FW_COLORED_IR_AE_POLICY( "7.58.45946.14332" );
+    static const firmware_version MIN_FW_AE_POLICY_METADATA_GMSL( "7.62.0.0" );
 
     // Image and calibration encodings published by the color pins.
     // The 16-bit raw can have several spellings: RW16 over USB (V4L2 passes it through, WMF normalizes it to BYR2)
@@ -389,7 +389,7 @@ namespace librealsense
 
         // The FW appends the applied AE policy (1-3, 0 = n/a) after the known structs of each layout, on USB and GMSL alike.
         // Offsets are from the start of the metadata blob.
-        if( _fw_version >= MIN_FW_COLORED_IR_AE_POLICY )
+        if( _fw_version >= ( _is_mipi_device ? MIN_FW_AE_POLICY_METADATA_GMSL : MIN_FW_COLORED_IR_AE_POLICY ) )
         {
             static constexpr unsigned long long DEPTH_AE_POLICY_OFFSET = 236;
             static constexpr unsigned long long RGB_AE_POLICY_OFFSET = metadata_raw_mode_offset + sizeof( md_rgb_normal_mode );

@@ -19,7 +19,8 @@ pytestmark = [
 
 AE_POLICY = rs.frame_metadata_value.ae_policy
 AE_MODE = rs.option.auto_exposure_mode
-MIN_FW = rsutils.version( "7.58.45946.14332" )  # TODO: FW release that adds the AE policy metadata
+MIN_FW_USB = rsutils.version( "7.58.45946.14332" )
+MIN_FW_GMSL = rsutils.version( "7.62.0.0" )
 FPS = 30
 FRAMES_TO_CHECK = 15
 SETTLE_FRAMES = 5
@@ -35,7 +36,8 @@ AUTO = int( rs.colored_ir_auto_exposure_mode.auto )
 def depth_sensor(test_device):
     # Depth, IR and both color streams all live on the depth sensor of a dual-color device
     dev, _ = test_device
-    require_min_fw_version( dev, MIN_FW, "AE policy frame metadata" )
+    is_gmsl = dev.get_info( rs.camera_info.connection_type ) == "GMSL"
+    require_min_fw_version( dev, MIN_FW_GMSL if is_gmsl else MIN_FW_USB, "AE policy frame metadata" )
     sensor = dev.first_depth_sensor()
     original = sensor.get_option( AE_MODE )
     yield sensor
