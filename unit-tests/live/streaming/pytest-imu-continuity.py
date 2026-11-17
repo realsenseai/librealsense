@@ -62,6 +62,7 @@ MAX_TIMESTAMP_GAPS = 0
 TIMESTAMP_GAP_FACTOR = 1.5
 RATE_TOLERANCE = 0.02
 MIN_FRAMES_PER_STREAM = 10
+TIMESTAMP_WRAP_MS = 2 ** 32 / 1000.0  # D400 USB raw hardware timestamps are 32-bit microseconds (~71.6 min)
 
 # (accel fps, gyro fps) pairs, chosen so every rate of D400 USB/GMSL (accel 50/63/100/200/250,
 # gyro 50/100/200/400) and D585 (accel 100/200, gyro 200/400) is covered at least once.
@@ -110,11 +111,14 @@ def count_frame_number_gaps(frame_numbers):
 
 
 def find_timestamp_gaps(timestamps_ms, fps, factor=TIMESTAMP_GAP_FACTOR):
-    """Return [(index, delta_ms, estimated_missing_samples)] for every delta above factor * period or below 0."""
+    """Return [(index, delta_ms, estimated_missing_samples)] for every delta above factor * period or below 0.
+    A backward delta of more than half the 32-bit range is a counter wrap, not a rollback: it is unwrapped first."""
     period_ms = 1000.0 / fps
     gaps = []
     for i in range(1, len(timestamps_ms)):
         delta = timestamps_ms[i] - timestamps_ms[i - 1]
+        if delta < -TIMESTAMP_WRAP_MS / 2:
+            delta += TIMESTAMP_WRAP_MS
         if delta > factor * period_ms or delta < 0:
             gaps.append((i, delta, max(round(delta / period_ms) - 1, 1)))
     return gaps
@@ -308,3 +312,31 @@ def test_imu_continuity_standalone(test_device, accel_fps, gyro_fps):
 @pytest.mark.parametrize("accel_fps,gyro_fps", IMU_RATE_PAIRS, ids=[_pair_id(p) for p in IMU_RATE_PAIRS])
 def test_imu_continuity_with_video(test_device, accel_fps, gyro_fps):
     _run_continuity(test_device, accel_fps, gyro_fps, with_video=True)
+
+
+# --- Helper checks (no device needed) ---
+
+def _wrapped_us_sequence(fps, start_us, count):
+    """Raw 32-bit-microsecond timestamps, in ms, at a steady rate, wrapping at 2^32 us."""
+    period_us = 1_000_000 / fps
+    return [((start_us + i * period_us) % 2 ** 32) / 1000.0 for i in range(count)]
+
+
+def test_timestamp_gaps_ignore_counter_wrap():
+    ts = _wrapped_us_sequence(200, 2 ** 32 - 50 * 5000, 100)
+    assert min(b - a for a, b in zip(ts, ts[1:])) < 0, "sequence must cross the wrap"
+    assert find_timestamp_gaps(ts, 200) == []
+
+
+def test_timestamp_gaps_detect_loss_across_wrap():
+    ts = _wrapped_us_sequence(200, 2 ** 32 - 50 * 5000, 100)
+    del ts[50:53]  # three samples lost right at the wrap
+    gaps = find_timestamp_gaps(ts, 200)
+    assert len(gaps) == 1 and gaps[0][2] == 3
+
+
+def test_timestamp_gaps_still_flag_rollback():
+    ts = [i * 5.0 for i in range(20)]
+    ts[10:] = [t - 100.0 for t in ts[10:]]  # clock steps back 100 ms
+    gaps = find_timestamp_gaps(ts, 200)
+    assert len(gaps) == 1 and gaps[0][1] < 0
