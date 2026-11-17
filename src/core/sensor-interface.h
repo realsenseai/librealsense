@@ -51,6 +51,12 @@ public:
         throw wrong_api_call_sequence_exception( "Closing some of the streams is not supported by this sensor" );
     }
 
+    // The streams running on the camera for this sensor, including those activated on behalf of other streams
+    virtual stream_profiles get_sensor_active_streams() const
+    {
+        throw not_implemented_exception( "Active stream read-back is not supported by this sensor" );
+    }
+
     virtual bool is_streaming() const = 0;
 
     virtual rs2_notifications_callback_sptr get_notifications_callback() const = 0;

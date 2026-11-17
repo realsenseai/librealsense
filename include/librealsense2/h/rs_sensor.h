@@ -255,6 +255,17 @@ void rs2_open_multiple(rs2_sensor* device, const rs2_stream_profile** profiles, 
 void rs2_close(const rs2_sensor* sensor, rs2_error** error);
 
 /**
+* close only the given streams of an open or streaming sensor, while its other streams keep streaming
+* supported by sensors that also let rs2_open / rs2_open_multiple add streams to an open or streaming sensor
+* closing every open stream stops and closes the sensor
+* \param[in] sensor     RealSense sensor
+* \param[in] profiles   open stream profiles to close
+* \param[in] count      number of stream profiles to close
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_close_multiple(const rs2_sensor* sensor, const rs2_stream_profile** profiles, int count, rs2_error** error);
+
+/**
 * start streaming from specified configured sensor
 * \param[in] sensor  RealSense device
 * \param[in] on_frame function pointer to register as per-frame callback
@@ -379,6 +390,14 @@ void rs2_delete_embedded_filter_list(rs2_embedded_filter_list* embedded_filter_l
 * \return            list of stream profiles that given subdevice is currently streaming, should be released by rs2_delete_profiles_list
 */
 rs2_stream_profile_list* rs2_get_active_streams(rs2_sensor* sensor, rs2_error** error);
+
+/**
+* check which of the sensor's streams run on the camera; on sensors whose camera reports it, this includes streams activated on behalf of another stream
+* \param[in] sensor  input RealSense subdevice
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return            list of stream profiles running on the camera for this sensor, should be released by rs2_delete_profiles_list
+*/
+rs2_stream_profile_list* rs2_get_sensor_active_streams(const rs2_sensor* sensor, rs2_error** error);
 
 /**
 * Get pointer to specific stream profile
