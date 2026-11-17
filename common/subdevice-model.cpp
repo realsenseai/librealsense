@@ -270,6 +270,8 @@ namespace rs2
         // "starts out 'started'" disagrees with the constructor in src/dispatcher.cpp.)
         _set_dispatcher->start();
         supported_options = s->get_supported_options();
+        for (auto&& dev_sensor : dev.query_sensors())
+            safety_camera |= dev_sensor.is<safety_sensor>();
         restore_processing_block("colorizer", depth_colorizer);
         restore_processing_block("yuy2rgb", yuy2rgb);
         restore_processing_block("m420_to_rgb", m420_to_rgb);

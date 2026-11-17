@@ -766,28 +766,12 @@ namespace rs2
             }
             left += 80;
 
-            if (show_safety_zones_3d)
-            {
-                bool active = true;
-                if (big_button(&active, win, left, 0, textual_icons::draw_polygon,
+            auto lpc_stream = streams.find(last_labeled_points.get_profile().unique_id());
+            if (lpc_stream != streams.end() && lpc_stream->second.dev && lpc_stream->second.dev->safety_camera
+                && big_button(&show_safety_zones_3d, win, left, 0, textual_icons::draw_polygon,
                     "S. Zones", false, true,
                     "Show/hide Safety Zones"))
-                {
-                    show_safety_zones_3d = false;
-                    config_file::instance().set(configurations::viewer::show_safety_zones_3d, show_safety_zones_3d);
-                }
-            }
-            else
-            {
-                bool active = false;
-                if (big_button(&active, win, left, 0, textual_icons::draw_polygon,
-                    "S. Zones", false, true,
-                    "Show/hide Safety Zones"))
-                {
-                    show_safety_zones_3d = true;
-                    config_file::instance().set(configurations::viewer::show_safety_zones_3d, show_safety_zones_3d);
-                }
-            }
+                config_file::instance().set(configurations::viewer::show_safety_zones_3d, show_safety_zones_3d);
         }
 
 
