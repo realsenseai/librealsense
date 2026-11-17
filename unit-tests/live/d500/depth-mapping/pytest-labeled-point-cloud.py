@@ -13,6 +13,7 @@ import time
 import numpy as np
 import pyrealsense2 as rs
 from pytest_check import check
+from rspy.pytest.device_helpers import skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ def collect( sensor, profile, count ):
 
 def test_lpcl_streams_well_formed_frames( lpcl ):
     dev, sensor, profile = lpcl
+    skip_d585_on_gmsl( dev, "no labeled point cloud frames over GMSL" )
     vsp = profile.as_video_stream_profile()
     frames, errors = collect( sensor, profile, FRAMES_TO_CHECK )
 

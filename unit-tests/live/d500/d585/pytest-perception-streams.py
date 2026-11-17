@@ -11,7 +11,7 @@ import pyrealsense2 as rs
 import struct
 import time
 import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
 
@@ -160,6 +160,8 @@ def test_standalone_lifecycle(device, stream):
     """Runs with no other capture, resumes after stop, and a second session starts after the first one closed."""
     if "D555" in device.get_info( rs.camera_info.name ):
         pytest.skip( "Perception lifecycle metadata checks are D585-only" )
+    if stream in ( 'labeled_point_cloud', 'point_cloud' ):
+        skip_d585_on_gmsl( device, f"no {stream} frames over GMSL" )
     if stream == 'point_cloud':  # older FW publishes the profiles but delivers no frames
         require_min_fw_version( device, rsutils.version( "7.61.47150" ), "device point cloud" )
     stream_type = getattr( rs.stream, stream )
