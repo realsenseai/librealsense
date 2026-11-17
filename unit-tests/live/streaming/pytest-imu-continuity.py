@@ -25,6 +25,10 @@ Two variants: IMU alone, and IMU with depth + color streaming (drops in RSDEV-13
 video load). Frames are consumed through sensor.start(callback) only: wait_for_frames / poll_for_frames
 fabricate gaps (RSDSO-21592, RSDSO-21711, RSDSO-21096). Callbacks only record, so a failure is a real loss.
 
+On Linux D400 USB, motion frame numbers are counted on the host (RSDSO-21711), so check 1 cannot catch loss
+there and check 2 is the real detector. Stock kernels without the HID metadata patches fall back to system_time
+and fail with the domain message.
+
 Expected to fail on the known regressions: D585 over GMSL without IMU pair batching (RSDEV-13850), Windows
 D585 USB HID scheduling (RSDEV-13643), sequential drops of 10-26 on D457/D430 GMSL at 50-400 Hz (RSDSO-21807).
 """
