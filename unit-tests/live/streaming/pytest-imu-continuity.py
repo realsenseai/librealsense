@@ -8,7 +8,9 @@ Streams accel + gyro through the motion sensor for STREAM_DURATION_S and checks,
 independently of each other:
 
   1. Frame-number gaps      - consecutive frames must differ by exactly 1.
-  2. Hardware-timestamp gaps - a delta above TIMESTAMP_GAP_FACTOR nominal periods is a gap; the number of
+  2. Hardware-timestamp gaps - every motion frame must report rs.timestamp_domain.hardware_clock (a frame that
+                               fell back to system_time carries host arrival time, which would make this check
+                               meaningless, so it fails explicitly); a delta above TIMESTAMP_GAP_FACTOR nominal periods is a gap; the number of
                                missing samples in it is estimated as round(delta / period) - 1.
                                (RSDEV-13643: timestamps can jump while frame numbers stay continuous.)
   3. Measured rate          - (frames - 1) / arrival span, within RATE_TOLERANCE of the requested rate.
@@ -78,11 +80,13 @@ class StreamRecord:
     def __init__(self):
         self.frame_numbers = []
         self.timestamps_ms = []
+        self.domains = []
         self.arrival_s = []
 
     def add(self, frame):
         self.frame_numbers.append(frame.get_frame_number())
         self.timestamps_ms.append(frame.get_timestamp())
+        self.domains.append(frame.get_frame_timestamp_domain())
         self.arrival_s.append(time.perf_counter())
 
 
@@ -122,7 +126,14 @@ def evaluate_stream(name, rec, fps):
     if fn_gaps > MAX_FRAME_NUMBER_GAPS:
         problems.append(f"{name}@{fps}: {fn_gaps} missing frame numbers (max {MAX_FRAME_NUMBER_GAPS})")
 
-    ts_gaps = find_timestamp_gaps(rec.timestamps_ms, fps)
+    # Without a hardware clock the timestamps are host arrival times: report that instead of fake gaps
+    non_hw = [d for d in rec.domains if d != rs.timestamp_domain.hardware_clock]
+    if non_hw:
+        problems.append(f"{name}@{fps}: {len(non_hw)}/{len(rec.domains)} frames not in hardware_clock domain "
+                        f"({', '.join(sorted({str(d) for d in non_hw}))}); timestamp-gap check is not meaningful")
+        ts_gaps = []
+    else:
+        ts_gaps = find_timestamp_gaps(rec.timestamps_ms, fps)
     if len(ts_gaps) > MAX_TIMESTAMP_GAPS:
         missing = sum(g[2] for g in ts_gaps)
         worst = max(ts_gaps, key=lambda g: g[1])
