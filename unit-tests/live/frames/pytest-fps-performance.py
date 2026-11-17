@@ -1566,13 +1566,9 @@ def coverage_tier(request):
     return tier
 
 
-@pytest.fixture
-def fps_rates_tier(coverage_tier):
-    """Coverage tier for the *_fps_rates tests; on weekly they are covered by the *_configurations tests,
-    which stream every supported profile, so they skip."""
-    if coverage_tier == TIER_FULL:
-        pytest.skip("Covered by the *_configurations tests on weekly")
-    return coverage_tier
+# On weekly the *_configurations tests stream every supported profile, which covers every *_fps_rates case
+covered_on_weekly = pytest.mark.skipif("'weekly' in config.getoption('--context').split()",
+                                       reason="Covered by the *_configurations tests on weekly")
 
 
 # ============================================================================
@@ -1726,30 +1722,32 @@ def test_multistream_configurations(settled_device, coverage_tier):
             assert False, "Multi-stream test failed - no configurations found"
 
 
+@covered_on_weekly
 @pytest.mark.timeout(14400)
-def test_depth_fps_rates(settled_device, fps_rates_tier):
+def test_depth_fps_rates(settled_device, coverage_tier):
     """Test depth FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device
     product_line = dev.get_info(rs.camera_info.product_line)
 
     depth_tests_passed, depth_results = check_stream_fps_accuracy_comprehensive(
         dev, "depth", check_depth_fps_accuracy, get_supported_depth_fps_rates,
-        max_fps_rates=TIER_FPS_CAP[fps_rates_tier]
+        max_fps_rates=TIER_FPS_CAP[coverage_tier]
     )
 
     if depth_results:
         print_fps_test_summary("depth", [r['fps_rate'] for r in depth_results], depth_results, depth_tests_passed, product_line)
 
 
+@covered_on_weekly
 @pytest.mark.timeout(14400)
-def test_color_fps_rates(settled_device, fps_rates_tier):
+def test_color_fps_rates(settled_device, coverage_tier):
     """Test color/RGB FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device
     product_line = dev.get_info(rs.camera_info.product_line)
 
     color_tests_passed, color_results = check_stream_fps_accuracy_comprehensive(
         dev, "color", check_color_fps_accuracy, get_supported_color_fps_rates,
-        max_fps_rates=TIER_FPS_CAP[fps_rates_tier]
+        max_fps_rates=TIER_FPS_CAP[coverage_tier]
     )
 
     if color_results:
@@ -1765,15 +1763,16 @@ def test_color_fps_rates(settled_device, fps_rates_tier):
             assert False, "Color sensor expected but no FPS rates found"
 
 
+@covered_on_weekly
 @pytest.mark.timeout(14400)
-def test_ir_fps_rates(settled_device, fps_rates_tier):
+def test_ir_fps_rates(settled_device, coverage_tier):
     """Test IR FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device
     product_line = dev.get_info(rs.camera_info.product_line)
 
     ir_tests_passed, ir_results = check_stream_fps_accuracy_comprehensive(
         dev, "IR", check_ir_fps_accuracy, get_supported_ir_fps_rates,
-        max_fps_rates=TIER_FPS_CAP[fps_rates_tier]
+        max_fps_rates=TIER_FPS_CAP[coverage_tier]
     )
 
     if ir_results:
