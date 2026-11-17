@@ -8,12 +8,13 @@ Escapee RSDSO-21982: with auto_exposure_priority on, D436 color dropped to 15 fp
 Root cause was RealTek ISP FW 3613 (DS5 5.17.3.1 - 5.17.3.10); ISP FW 3614 fixes it.
 
 Method:
-  1. Calibrate the unit of the actual_exposure frame metadata (manual exposure, known value).
-  2. Enable auto exposure and AE priority, stream color at 30 / 60 fps.
-  3. Read the exposure from per-frame metadata. If it is not below the frame period the scene is
-     too dark to tell a legitimate AE-priority fps drop from the bug: skip (never pass).
-  4. Otherwise delivered fps must be 90-105% of the configured rate.
+  1. Brightness probe: manual exposure of half the frame period at default gain. If the image is
+     darker than BRIGHT_LUMA_MIN, AE would legitimately need more than a frame period: skip (never pass).
+  2. Otherwise enable auto exposure and AE priority, stream color at 30 / 60 fps.
+  3. Delivered fps must be 90-105% of the configured rate.
 
+The brightness is read from image pixels: the actual_exposure frame metadata only echoes the last
+exposure the host set (FW does not update it when AE changes exposure), so it cannot gate the scene.
 Needs a bright scene; a dark rig always skips.
 """
 
@@ -21,6 +22,7 @@ import logging
 import statistics
 import time
 
+import numpy as np
 import pytest
 import pyrealsense2 as rs
 
@@ -34,11 +36,11 @@ pytestmark = [
 TIME_FOR_STEADY_STATE = 3.0   # let AE converge after start
 TIME_TO_COUNT_FRAMES = 6.0
 FPS_MIN_RATIO, FPS_MAX_RATIO = 0.90, 1.05
-CALIBRATION_EXPOSURE = 50     # color exposure option units, 100 usec each (5 msec)
-EXPOSURE_PERCENTILE = 0.95    # "exposure below frame period" is judged on this percentile
-
-# Exposure scale is learned from the camera, as it must match what the metadata really reports.
-_us_per_md_unit_cache = {}
+EXPOSURE_UNIT_USEC = 100      # color exposure option units
+BRIGHT_LUMA_MIN = 60          # mean pixel (0-255) at half-period exposure; AE target is ~mid-grey, so
+                              # reaching it then needs about one frame period at most
+PROBE_STEADY, PROBE_COUNT = 1.5, 2.0
+LUMA_SAMPLE_STRIDE = 97       # sample every Nth byte, keeps the frame callback cheap
 
 
 def _get_color_profile(sensor, fps):
@@ -48,19 +50,17 @@ def _get_color_profile(sensor, fps):
     return next((p for p in profiles if p.format() == rs.format.rgb8), profiles[0] if profiles else None)
 
 
-def _stream(sensor, profile, steady_time, count_time):
-    """Stream the profile; return (measured fps, [actual_exposure metadata of the counted frames],
-    number of counted frames without the metadata)."""
-    state = {'counting': False, 'frames': 0, 'no_md': 0, 'exposures': []}
+def _stream(sensor, profile, steady_time, count_time, sample_luma=False):
+    """Stream the profile; return (measured fps, sampled mean pixel value of the counted frames)."""
+    state = {'counting': False, 'frames': 0, 'lumas': []}
 
     def on_frame(frame):
         if not state['counting']:
             return
         state['frames'] += 1
-        if frame.supports_frame_metadata(rs.frame_metadata_value.actual_exposure):
-            state['exposures'].append(frame.get_frame_metadata(rs.frame_metadata_value.actual_exposure))
-        else:
-            state['no_md'] += 1
+        if sample_luma:
+            data = np.asanyarray(frame.get_data()).reshape(-1)
+            state['lumas'].append(float(data[::LUMA_SAMPLE_STRIDE].mean()))
 
     sensor.open(profile)
     try:
@@ -76,34 +76,24 @@ def _stream(sensor, profile, steady_time, count_time):
             sensor.stop()
     finally:
         sensor.close()
-    return state['frames'] / elapsed, state['exposures'], state['no_md']
+    return state['frames'] / elapsed, state['lumas']
 
 
-def _calibrate_exposure_unit(dev, sensor, profile):
-    """Return usec per actual_exposure metadata unit, learned with a manual exposure of known value."""
-    sn = dev.get_info(rs.camera_info.serial_number)
-    if sn in _us_per_md_unit_cache:
-        return _us_per_md_unit_cache[sn]
-
-    sensor.set_option(rs.option.enable_auto_exposure, 0)
+def _probe_scene_luma(sensor, profile, fps):
+    """Median mean-pixel value with manual exposure of half the frame period at default gain."""
     exp_range = sensor.get_option_range(rs.option.exposure)
-    set_value = min(max(CALIBRATION_EXPOSURE, exp_range.min), exp_range.max)
-    sensor.set_option(rs.option.exposure, set_value)
-    _, exposures, no_md = _stream(sensor, profile, 1.0, 2.0)
-    if not exposures:
-        pytest.skip("Color frames carry no actual_exposure metadata, cannot tell if the scene is bright")
-    md_value = statistics.median(exposures)
-    ratio = md_value / set_value
-    log.debug(f"Calibration: exposure option {set_value}, metadata median {md_value}, ratio {ratio:.2f}")
-    if 0.8 <= ratio <= 1.2:
-        us_per_unit = 100.0   # same unit as the option (100 usec)
-    elif 80 <= ratio <= 120:
-        us_per_unit = 1.0     # metadata reports usec
-    else:
-        pytest.skip(f"actual_exposure metadata ({md_value}) does not follow the exposure option ({set_value}), "
-                    f"cannot interpret its unit")
-    _us_per_md_unit_cache[sn] = us_per_unit
-    return us_per_unit
+    half_period_units = 0.5e6 / fps / EXPOSURE_UNIT_USEC
+    exposure = min(max(half_period_units, exp_range.min), exp_range.max)
+    sensor.set_option(rs.option.enable_auto_exposure, 0)
+    sensor.set_option(rs.option.exposure, exposure)
+    if sensor.supports(rs.option.gain):
+        sensor.set_option(rs.option.gain, sensor.get_option_range(rs.option.gain).default)
+    _, lumas = _stream(sensor, profile, PROBE_STEADY, PROBE_COUNT, sample_luma=True)
+    if not lumas:
+        pytest.skip("Brightness probe received no color frames, cannot tell if the scene is bright")
+    luma = statistics.median(lumas)
+    log.info(f"Brightness probe: exposure {exposure * EXPOSURE_UNIT_USEC / 1000:.2f} msec, mean pixel {luma:.1f}")
+    return luma
 
 
 @pytest.mark.parametrize("fps", [30, 60])
@@ -122,30 +112,27 @@ def test_color_fps_with_ae_priority(test_device, fps):
 
     orig_ae = cs.get_option(rs.option.enable_auto_exposure)
     orig_priority = cs.get_option(rs.option.auto_exposure_priority)
+    orig_exposure = cs.get_option(rs.option.exposure)
+    orig_gain = cs.get_option(rs.option.gain) if cs.supports(rs.option.gain) else None
     try:
-        us_per_unit = _calibrate_exposure_unit(dev, cs, profile)
+        luma = _probe_scene_luma(cs, profile, fps)
+        if luma < BRIGHT_LUMA_MIN:
+            pytest.skip(f"Scene too dark: mean pixel {luma:.1f} < {BRIGHT_LUMA_MIN} at half-frame-period exposure, "
+                        f"an AE-priority fps drop at {fps} fps would be legitimate")
 
         cs.set_option(rs.option.enable_auto_exposure, 1)
         cs.set_option(rs.option.auto_exposure_priority, 1)
-        measured_fps, exposures, no_md = _stream(cs, profile, TIME_FOR_STEADY_STATE, TIME_TO_COUNT_FRAMES)
+        measured_fps, _ = _stream(cs, profile, TIME_FOR_STEADY_STATE, TIME_TO_COUNT_FRAMES)
     finally:
+        cs.set_option(rs.option.enable_auto_exposure, 0)
+        cs.set_option(rs.option.exposure, orig_exposure)
+        if orig_gain is not None:
+            cs.set_option(rs.option.gain, orig_gain)
         cs.set_option(rs.option.auto_exposure_priority, orig_priority)
         cs.set_option(rs.option.enable_auto_exposure, orig_ae)
 
-    if not exposures:
-        pytest.skip("Color frames carry no actual_exposure metadata, cannot tell if the scene is bright")
-    exposures_us = sorted(e * us_per_unit for e in exposures)
-    exposure_us = exposures_us[min(int(len(exposures_us) * EXPOSURE_PERCENTILE), len(exposures_us) - 1)]
-    frame_period_us = 1e6 / fps
-    log.info(f"Requested {fps} fps, measured {measured_fps:.1f} fps, "
-             f"exposure p{int(EXPOSURE_PERCENTILE * 100)} {exposure_us / 1000:.2f} msec "
-             f"(frame period {frame_period_us / 1000:.2f} msec), {no_md} frames without metadata")
-
-    if exposure_us >= frame_period_us:
-        pytest.skip(f"Scene too dark: exposure {exposure_us / 1000:.2f} msec is not below the "
-                    f"{frame_period_us / 1000:.2f} msec frame period, an fps drop would be legitimate")
-
+    log.info(f"Requested {fps} fps, measured {measured_fps:.1f} fps, scene mean pixel {luma:.1f}")
     low, high = fps * FPS_MIN_RATIO, fps * FPS_MAX_RATIO
     assert low <= measured_fps <= high, (
-        f"Color {fps} fps with AE priority on, exposure {exposure_us / 1000:.2f} msec below frame period: "
+        f"Color {fps} fps with AE priority on in a bright scene (mean pixel {luma:.1f}): "
         f"got {measured_fps:.1f} fps, expected {low:.1f}-{high:.1f}")
