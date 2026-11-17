@@ -16,8 +16,8 @@ Method:
   2. Otherwise enable AE and AE priority and measure the color fps (fps_helper.measure_fps).
   3. Delivered fps must be 90-105% of the configured rate.
 
-The brightness is read from image pixels: the actual_exposure frame metadata only echoes the last
-exposure the host set (FW does not update it when AE changes exposure), so it cannot gate the scene.
+The brightness is read from image pixels, not from actual_exposure frame metadata, which may only
+echo the exposure the host set rather than the one AE chose (RSDSO-21982), so it cannot gate the scene.
 Needs a bright scene; a dark rig always skips.
 """
 
@@ -37,8 +37,6 @@ pytestmark = [
     pytest.mark.context("nightly"),
 ]
 
-fps_helper.TIME_FOR_STEADY_STATE = 3.0   # let AE converge after start
-fps_helper.TIME_TO_COUNT_FRAMES = 6.0
 FPS_MIN_RATIO, FPS_MAX_RATIO = 0.90, 1.05
 EXPOSURE_UNIT_USEC = 100      # color exposure option units
 AE_PROBE_STEADY, MANUAL_PROBE_STEADY, PROBE_COUNT = 3.0, 1.5, 2.0
@@ -66,9 +64,10 @@ def _stream_luma(sensor, profile, steady_time, count_time):
             sensor.stop()
     finally:
         sensor.close()
-    if not state['lumas']:
-        pytest.skip("Brightness probe received no color frames, cannot tell if the scene is bright")
-    return statistics.median(state['lumas'])
+    lumas = state['lumas']
+    assert lumas, "Brightness probe received no color frames: the color stream is not delivering"
+    log.debug(f"Mean pixel over {len(lumas)} frames: first {lumas[0]:.1f}, last {lumas[-1]:.1f}")
+    return statistics.median(lumas)
 
 
 def _calibrate_scene(sensor, profile, fps):
@@ -105,6 +104,8 @@ def test_color_fps_with_ae_priority(test_device, fps):
     if profile is None:
         pytest.skip(f"{product_name} has no rgb8 color profile at {fps} fps")
 
+    fps_helper.TIME_FOR_STEADY_STATE = 3.0   # let AE converge after start; module globals leak across tests
+    fps_helper.TIME_TO_COUNT_FRAMES = 6.0
     orig_ae = cs.get_option(rs.option.enable_auto_exposure)
     orig_priority = cs.get_option(rs.option.auto_exposure_priority)
     orig_exposure = cs.get_option(rs.option.exposure)
