@@ -26,14 +26,14 @@ pytestmark = [
     pytest.mark.device_each("D585"),
     pytest.mark.device_each("D585S"),
     pytest.mark.priority(1),
-    pytest.mark.timeout(1600),
+    pytest.mark.timeout(2700),  # a recovery flash plus the update flash, each up to FW_TOOL_TIMEOUT
     pytest.mark.skipif(bool(os.environ.get('GITHUB_ACTIONS')), reason="not runnable on GHA"),
 ]
 
 
 # A FW tool that never returns blocks the whole pytest session, and if pytest is then killed the
 # tool survives as an orphan whose CWD pins the workspace directory (undeletable on Windows).
-FW_TOOL_TIMEOUT = 600  # seconds; a USB flash takes ~50s, a GMSL/MIPI one ~385s
+FW_TOOL_TIMEOUT = 1200  # seconds; a USB flash takes ~50s, a GMSL one up to ~815s (D585)
 
 
 def abs_fw_path( path ):
@@ -132,6 +132,10 @@ def get_downgrade_counter(device):
         opcode = 0x93  # DFU_READ_CNT — reads the actual downgrade counter from flash payload header
         raw_cmd = rs.debug_protocol(device).build_command(opcode)
         counter = send_hardware_monitor_command(device, raw_cmd)
+        if len( counter ) < 2:
+            # Older FW (e.g. D405 on 5.15.1.55) replies without the counter payload
+            log.debug( f'no downgrade counter in DFU_READ_CNT reply ({len( counter )} payload bytes)' )
+            return None
         return counter[0] | (counter[1] << 8)  # uint16_t little-endian
     if product_line == "D500":
         return 0  # D500 do not have downgrade counter
@@ -384,7 +388,10 @@ def test_fw_update( request, module_device_setup, test_context_var ):
 
     downgrade_counter = get_downgrade_counter( device )
     log.debug( f'downgrade counter: {downgrade_counter}' )
-    if downgrade_counter == 0xFFFF:
+    if downgrade_counter is None:
+        log.debug( 'downgrade counter not reported by this FW, skipping reset' )
+        downgrade_counter = 0
+    elif downgrade_counter == 0xFFFF:
         log.debug( 'downgrade counter is uninitialized (0xFFFF), skipping reset' )
         downgrade_counter = 0
     elif downgrade_counter >= 19:

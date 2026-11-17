@@ -208,7 +208,7 @@ jobs:
         run: |
           echo "Install LibRealSense pre-installed packages requirements"
           sudo apt-get update
-          sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev at
+          sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev
 
       - name: "Download minimal CMake"
         run: |

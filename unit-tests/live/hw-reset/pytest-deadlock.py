@@ -12,8 +12,9 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.context("nightly"),
-    # The deadlock causes this test to time out but we don't want to wait the full 200 seconds
-    pytest.mark.timeout(12),
+    # The deadlock causes this test to time out but we don't want to wait the full 200 seconds.
+    # Every connected device is reset (about 3s each on GMSL) and then we sleep 6s, so allow for that.
+    pytest.mark.timeout(20),
 ]
 
 

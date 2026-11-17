@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 import pyrealsense2 as rs
 from pytest_check import check
+from rspy.pytest.device_helpers import skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
 
@@ -39,12 +40,17 @@ def set_align_depth(sensor, value):
     time.sleep(MODE_SETTLE_TIME)
 
 
-def depth_profile(sensor):
-    """The raw depth profile. A device may expose a device-aligned depth stream too, whose topic only
-    exists while the mode is on, so 'the first depth profile' is not good enough here.
+def raw_depth_profiles(sensor):
+    """The raw depth profiles, the default one first. A device may expose a device-aligned depth stream too, whose
+    topic only exists while the mode is on, so 'the first depth profile' is not good enough here.
     Aligned depth streams at up to 30 fps, so faster profiles are left out."""
     depth = [p for p in sensor.profiles if p.stream_type() == rs.stream.depth and p.fps() <= 30]
-    return next((p for p in depth if p.stream_name() == "Depth"), depth[0]).as_video_stream_profile()
+    raw = [p for p in depth if p.stream_name() == "Depth"] or depth
+    return [p.as_video_stream_profile() for p in sorted(raw, key=lambda p: not p.is_default())]
+
+
+def depth_profile(sensor):
+    return raw_depth_profiles(sensor)[0]
 
 
 def color_profiles(dev):
@@ -54,15 +60,52 @@ def color_profiles(dev):
             for p in s.profiles if p.stream_type() == rs.stream.color]
 
 
-def grab_frame(sensor, profile):
+def depth_and_color(dev, sensor):
+    """A depth profile and the color profile to stream next to it. GMSL firmware starts aligned depth only when color
+    is set to the same size and fps in YUYV or NV12 - checked even while color is not streaming - so tests stream such
+    a pair. Only GMSL needs it: elsewhere, without such a pair, any color at the depth fps does, and without one or
+    a dedicated color sensor, depth streams alone (None)."""
+    colors = color_profiles(dev)
+    if not colors:
+        return depth_profile(sensor), None
+    for depth in raw_depth_profiles(sensor):
+        color = next((c for c in colors if c.format() in (rs.format.yuyv, rs.format.nv12)
+                      and (c.width(), c.height(), c.fps()) == (depth.width(), depth.height(), depth.fps())), None)
+        if color:
+            return depth, color
+    if dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "GMSL":
+        pytest.fail("no YUYV or NV12 color profile matching a depth profile in size and fps, which GMSL requires")
+    depth = depth_profile(sensor)
+    return depth, next((c for c in colors if c.fps() == depth.fps()), None)
+
+
+def grab_frames(dev, depth_sensor, depth, color):
+    """Streams depth, and color when given, once; returns the first depth frame and the first color frame (or None).
+    Texture coordinates come from calibration alone, so the two need not be a synced pair."""
+    color_sensor = next(s for s in dev.sensors if s.is_color_sensor()) if color else None
+    streams = [(depth_sensor, depth)] + ([(color_sensor, color)] if color else [])
     queue = rs.frame_queue(10)
-    sensor.open(profile)
-    sensor.start(queue)
+    opened, started = [], []
     try:
-        return queue.wait_for_frame(MAX_TIME_TO_WAIT_FOR_FRAMES * 1000)
-    finally:
-        sensor.stop()
-        sensor.close()
+        for sensor, profile in streams:
+            sensor.open(profile)
+            opened.append(sensor)
+        for sensor in opened:
+            sensor.start(queue)
+            started.append(sensor)
+        frames = {}
+        deadline = time.time() + MAX_TIME_TO_WAIT_FOR_FRAMES
+        while len(frames) < len(streams):
+            assert time.time() < deadline, f"no frame of {[p.stream_name() for _, p in streams if p.stream_type() not in frames]}"
+            arrived, f = queue.try_wait_for_frame(100)
+            if arrived:
+                frames.setdefault(f.profile.stream_type(), f)
+        return frames[rs.stream.depth].as_depth_frame(), frames.get(rs.stream.color)
+    finally:  # only what got opened and started, so a failure leaves nothing streaming for the next test
+        for sensor in started:
+            sensor.stop()
+        for sensor in opened:
+            sensor.close()
         time.sleep(MODE_SETTLE_TIME)  # the device rejects enabling the mode right after a stream closes
 
 
@@ -78,18 +121,19 @@ def test_option_defaults(depth_sensor):
     check.equal(depth_sensor.get_option(rs.option.enable_aligned_depth), 1)
 
 
-def test_profile_invariance(depth_sensor):
+def test_profile_invariance(test_device, depth_sensor):
     """Enabling aligned depth keeps the depth profile - and the frames - unchanged in size and format."""
-    profile = depth_profile(depth_sensor)
+    dev, _ = test_device
+    profile, color = depth_and_color(dev, depth_sensor)
     raw = (profile.width(), profile.height(), profile.fps(), profile.format())
-    raw_frame = grab_frame(depth_sensor, profile)
+    raw_frame, _ = grab_frames(dev, depth_sensor, profile, color)
     assert raw_frame
 
     set_align_depth(depth_sensor, 1)
 
-    profile = depth_profile(depth_sensor)
+    profile, color = depth_and_color(dev, depth_sensor)
     check.equal((profile.width(), profile.height(), profile.fps(), profile.format()), raw)
-    aligned_frame = grab_frame(depth_sensor, profile)
+    aligned_frame, _ = grab_frames(dev, depth_sensor, profile, color)
     assert aligned_frame
     check.equal(aligned_frame.as_video_frame().get_data_size(), raw_frame.as_video_frame().get_data_size())
 
@@ -213,37 +257,17 @@ def test_mode_change_is_published_as_calibration_change(test_device, depth_senso
 def texture_maps(dev, depth_sensor, pointclouds):
     """Streams depth and color once and maps the same depth frame with each pointcloud, returning which depth
     pixels are valid and each pointcloud's texture coordinates."""
-    color_sensor = next(s for s in dev.sensors if s.is_color_sensor())
-    depth = depth_profile(depth_sensor)
-    color = next((p for p in color_profiles(dev) if p.fps() == depth.fps()), None)
+    depth, color = depth_and_color(dev, depth_sensor)
     if color is None:
-        pytest.skip("no color profile at the depth frame rate")
-
-    sync = rs.syncer()
-    depth_sensor.open(depth)
-    color_sensor.open(color)
-    depth_sensor.start(sync)
-    color_sensor.start(sync)
-    try:
-        deadline = time.time() + MAX_TIME_TO_WAIT_FOR_FRAMES
-        while True:
-            frames = sync.wait_for_frames(MAX_TIME_TO_WAIT_FOR_FRAMES * 1000)
-            if frames.get_depth_frame() and frames.get_color_frame():
-                break
-            assert time.time() < deadline, "no frameset with both depth and color"
-        maps = []
-        for pc in pointclouds:
-            pc.map_to(frames.get_color_frame())
-            points = pc.calculate(frames.get_depth_frame())
-            valid = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)[:, 2] > 0
-            maps.append(np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2))
-        return valid, maps
-    finally:
-        depth_sensor.stop()
-        color_sensor.stop()
-        depth_sensor.close()
-        color_sensor.close()
-        time.sleep(MODE_SETTLE_TIME)  # the device rejects enabling the mode right after a stream closes
+        pytest.skip("no color profile to texture the pointcloud with")
+    depth_frame, color_frame = grab_frames(dev, depth_sensor, depth, color)
+    maps = []
+    for pc in pointclouds:
+        pc.map_to(color_frame)
+        points = pc.calculate(depth_frame)
+        valid = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)[:, 2] > 0
+        maps.append(np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2))
+    return valid, maps
 
 
 @pytest.mark.device_type_exclude("DDS")
@@ -251,9 +275,7 @@ def test_pointcloud_follows_the_mode(test_device, depth_sensor):
     """A pointcloud that already mapped raw depth must drop that calibration once aligned depth is on,
     and texture the same depth frame exactly as a new pointcloud does."""
     dev, _ = test_device
-    if not color_profiles(dev):
-        pytest.skip("device has no dedicated color sensor")
-
+    skip_d585_on_gmsl(dev, "color intrinsics differ between first and later reads - restore after RSDEV-16609 is solved")
     kept = rs.pointcloud()
     texture_maps(dev, depth_sensor, [kept])
 

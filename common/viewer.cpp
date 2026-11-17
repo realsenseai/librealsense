@@ -766,28 +766,12 @@ namespace rs2
             }
             left += 80;
 
-            if (show_safety_zones_3d)
-            {
-                bool active = true;
-                if (big_button(&active, win, left, 0, textual_icons::draw_polygon,
+            auto lpc_stream = streams.find(last_labeled_points.get_profile().unique_id());
+            if (lpc_stream != streams.end() && lpc_stream->second.dev && lpc_stream->second.dev->safety_camera
+                && big_button(&show_safety_zones_3d, win, left, 0, textual_icons::draw_polygon,
                     "S. Zones", false, true,
                     "Show/hide Safety Zones"))
-                {
-                    show_safety_zones_3d = false;
-                    config_file::instance().set(configurations::viewer::show_safety_zones_3d, show_safety_zones_3d);
-                }
-            }
-            else
-            {
-                bool active = false;
-                if (big_button(&active, win, left, 0, textual_icons::draw_polygon,
-                    "S. Zones", false, true,
-                    "Show/hide Safety Zones"))
-                {
-                    show_safety_zones_3d = true;
-                    config_file::instance().set(configurations::viewer::show_safety_zones_3d, show_safety_zones_3d);
-                }
-            }
+                config_file::instance().set(configurations::viewer::show_safety_zones_3d, show_safety_zones_3d);
         }
 
 
@@ -804,9 +788,16 @@ namespace rs2
         if (directory_exists("/etc/udev/rules.d") || directory_exists("/lib/udev/rules.d/"))
         {
             const std::string udev_rules_man("/etc/udev/rules.d/99-realsense-libusb.rules");
-            const std::string udev_rules_deb("/lib/udev/rules.d/60-librealsense2-udev-rules.rules");
+            std::string udev_rules_deb("/lib/udev/rules.d/99-realsense-libusb.rules");
             std::ifstream f_man(udev_rules_man);
             std::ifstream f_deb(udev_rules_deb);
+            if (!f_deb.good())
+            {
+                // Debian packages before the D555 IMU fix installed the rules under this name
+                udev_rules_deb = "/lib/udev/rules.d/60-librealsense2-udev-rules.rules";
+                f_deb.clear();
+                f_deb.open(udev_rules_deb);
+            }
 
             std::string message = "UDEV-Rules permissions configuration \n for RealSense devices.`\n"
                         "Missing/outdated UDEV-Rules will cause 'Permissions Denied' errors\nunless the application is running under 'sudo' (not recommended)\n"

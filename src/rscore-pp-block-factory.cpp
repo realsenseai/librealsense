@@ -12,6 +12,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/temporal-filter.h"
 #include "proc/threshold.h"
+#include "proc/dual-rgb-rectify-filter.h"
 
 #include <rsutils/string/nocase.h>
 #include <rsutils/json.h>
@@ -48,6 +49,8 @@ rscore_pp_block_factory::create_pp_block( std::string const & name, rsutils::jso
         return std::make_shared< temporal_filter >();
     if( rsutils::string::nocase_equal( name, "Hole Filling Filter" ) )
         return std::make_shared< hole_filling_filter >();
+    if( rsutils::string::nocase_equal( name, "RGB Rectification" ) )  // D401/D405 dual-RGB
+        return std::make_shared< dual_rgb_rectify_filter >();
 
     return {};
 }

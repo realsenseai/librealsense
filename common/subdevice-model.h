@@ -180,7 +180,10 @@ namespace rs2
 
         std::shared_ptr<sensor> s;
         device dev;
+        bool safety_camera = false;  // the device has a safety sensor; its mapping-stream metadata carries the safety zones
         std::shared_ptr< atomic_objects_in_frame > detected_objects;
+        // The device's detection overlay (what the boxes on its color stream read); falls back to this sensor's own
+        std::shared_ptr< atomic_objects_in_frame > overlay_objects() const;
 
         std::map< rs2_option, option_model > options_metadata;
         std::string options_filter;  // live search text filtering the Controls option list by name
