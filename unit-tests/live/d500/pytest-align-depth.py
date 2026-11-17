@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 import pyrealsense2 as rs
 from pytest_check import check
+from rspy.pytest.device_helpers import skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
 
@@ -269,12 +270,12 @@ def texture_maps(dev, depth_sensor, pointclouds):
     return valid, maps
 
 
-@pytest.mark.skip(reason="color intrinsics differ between first and later reads - restore after RSDEV-16609 is solved")
 @pytest.mark.device_type_exclude("DDS")
 def test_pointcloud_follows_the_mode(test_device, depth_sensor):
     """A pointcloud that already mapped raw depth must drop that calibration once aligned depth is on,
     and texture the same depth frame exactly as a new pointcloud does."""
     dev, _ = test_device
+    skip_d585_on_gmsl(dev, "color intrinsics differ between first and later reads - restore after RSDEV-16609 is solved")
     kept = rs.pointcloud()
     texture_maps(dev, depth_sensor, [kept])
 
