@@ -26,14 +26,14 @@ pytestmark = [
     pytest.mark.device_each("D585"),
     pytest.mark.device_each("D585S"),
     pytest.mark.priority(1),
-    pytest.mark.timeout(1600),
+    pytest.mark.timeout(2700),  # a recovery flash plus the update flash, each up to FW_TOOL_TIMEOUT
     pytest.mark.skipif(bool(os.environ.get('GITHUB_ACTIONS')), reason="not runnable on GHA"),
 ]
 
 
 # A FW tool that never returns blocks the whole pytest session, and if pytest is then killed the
 # tool survives as an orphan whose CWD pins the workspace directory (undeletable on Windows).
-FW_TOOL_TIMEOUT = 600  # seconds; a USB flash takes ~50s, a GMSL/MIPI one ~385s
+FW_TOOL_TIMEOUT = 1200  # seconds; a USB flash takes ~50s, a GMSL one up to ~815s (D585)
 
 
 def abs_fw_path( path ):
