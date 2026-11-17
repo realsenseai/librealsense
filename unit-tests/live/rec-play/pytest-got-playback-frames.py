@@ -61,14 +61,18 @@ def streaming( picks, sink ):
     sensors = {}
     for s, p in picks:
         sensors.setdefault( s.get_info( rs.camera_info.name ), ( s, [] ) )[1].append( p )
-    for s, profiles in sensors.values():
-        s.open( profiles )
-        s.start( sink )
+    opened, started = [], []
     try:
+        for s, profiles in sensors.values():
+            s.open( profiles )
+            opened.append( s )
+            s.start( sink )
+            started.append( s )
         yield
-    finally:
-        for s, _ in sensors.values():
+    finally:  # undo only what succeeded, so a failed open/start doesn't leave another sensor streaming
+        for s in started:
             s.stop()
+        for s in opened:
             s.close()
 
 
