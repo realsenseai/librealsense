@@ -12,6 +12,8 @@ each module asked for.
 
 from rspy import log
 
+_switched = set()   # cameras switched away from the dedicated sensor this session, restored by restore_all()
+
 MODES = { 'dedicated_sensor': 0, 'dual_rgb': 1 }
 SUFFIX = '-dual-rgb'
 
@@ -32,6 +34,35 @@ def switchable_to( pattern ):
              if 'DUAL RGB' in p and p in DUAL_RGB_NAMES.get( devices.get( sn ).name, '' ).upper() and can_toggle( devices.get( sn ) ) ]
 
 
+def real_serial( serial ):
+    """the camera serial of a test instance value (a list or any non-twin value is returned as is)"""
+    return split( serial )[0] if isinstance( serial, str ) else serial
+
+
+def extra_instances( serial, exclude_patterns ):
+    """:return: the extra test instances of a camera -- one in dual RGB, unless an exclude pattern (device_exclude marker or
+    --exclude-device) covers its dual RGB name"""
+    from rspy import devices
+    device = devices.get( serial )
+    if not device or not can_toggle( device ):
+        return []
+    name = dual_rgb_name( device ).upper()
+    return [] if any( p.strip( '*' ).upper() in name for p in exclude_patterns ) else [serial + SUFFIX]
+
+
+def test_id( serial ):
+    """the readable part of a test instance id, e.g. 'D585 Proto Dual RGB-<serial>-dual-rgb'"""
+    from rspy import devices
+    real, mode = split( serial )
+    device = devices.get( real )
+    return f'{dual_rgb_name( device ) if mode == "dual_rgb" else device.name}-{serial}' if device else serial
+
+
+def runs_last( serial ):
+    """True for the test instances that run at the end of the session, after every dedicated sensor one"""
+    return isinstance( serial, str ) and split( serial )[1] == 'dual_rgb'
+
+
 def _option():
     import pyrealsense2 as rs
     return getattr( rs.option, 'sensors_config_mode', None )
@@ -50,6 +81,32 @@ def dual_rgb_name( device ):
 def can_toggle( device ):
     """True if this rspy.devices.Device is a D585 that can switch between dedicated sensor and dual RGB"""
     return device.name in DUAL_RGB_NAMES and _supports_switch( device )
+
+
+def setup( serial ):
+    """Put the camera of this test instance into its configuration (the camera must be enabled)"""
+    real, mode = split( serial ) if isinstance( serial, str ) else ( serial, 'dedicated_sensor' )
+    from rspy import devices
+    device = devices.get( real ) if isinstance( real, str ) else None
+    if device and can_toggle( device ):
+        if mode == 'dual_rgb':
+            _switched.add( real )   # before the switch: a failed one still gets restored
+        ensure( real, mode )
+    elif mode == 'dual_rgb':
+        raise RuntimeError( 'sensors_config_mode is not supported' )
+
+
+def restore_all():
+    """Put every camera switched this session back to the dedicated sensor, so the next job finds it as usual.
+    Call once at session end"""
+    from rspy import devices
+    for sn in sorted( _switched ):
+        try:
+            devices.enable_only( [sn] )
+            ensure( sn, 'dedicated_sensor' )
+        except Exception as e:
+            log.warning( f'{sn}: failed to restore the dedicated sensor configuration: {e}' )
+    _switched.clear()
 
 
 def adopt_dedicated_sensor_names():

@@ -439,21 +439,7 @@ def pytest_collection_modifyitems(session, config, items):
         config.hook.pytest_deselected(items=[item for item in items if item not in included])
         items[:] = included
     filter_and_sort_items(config, items)
-    items.sort(key=lambda item: _item_mode(item) == 'dual_rgb')   # the dual RGB runs come last: one switch to dual RGB, one back
-
-
-def _item_mode(item):
-    """'dedicated_sensor' or 'dual_rgb' -- the configuration a parametrized device test instance runs its camera in"""
-    cs = getattr(item, 'callspec', None)
-    serial = cs.params.get('_test_device_serial') if cs else None
-    return d585_config.split(serial)[1] if isinstance(serial, str) else 'dedicated_sensor'
-
-
-def _is_last_dual_rgb_module(request, serial):
-    """True if this module holds the last dual RGB instance of the camera (the dual RGB runs are contiguous at the end)"""
-    last = [item for item in request.session.items if getattr(item, 'callspec', None)
-            and item.callspec.params.get('_test_device_serial') == serial][-1]
-    return last.path == request.path
+    items.sort(key=lambda item: d585_config.runs_last(getattr(getattr(item, 'callspec', None), 'params', {}).get('_test_device_serial')))
 
 
 def _emit_test_header(nodeid):
@@ -650,6 +636,7 @@ def session_setup_teardown(request):
         print("-I- Pytest Session Ending")
         print(f"-I- {'=' * 80}")
         try:
+            d585_config.restore_all()
             _cleanup_devices()
         except Exception as e:
             print(f"-W- Error during cleanup: {e}")
@@ -832,9 +819,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     they get their port powered only because this fixture runs automatically for every
     device-marked module.
     """
-    serial_number, mode = _test_device_serial, 'dedicated_sensor'
-    if isinstance(serial_number, str):
-        serial_number, mode = d585_config.split(serial_number)
+    serial_number = d585_config.real_serial(_test_device_serial)
 
     if serial_number is None:
         log.debug(f"Module {request.node.name} has no device requirements")
@@ -938,23 +923,14 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
             log.warning(f"Cleanup after failed enable raised: {cleanup_err}")
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
 
-    # A D585 that can switch between dedicated sensor and dual RGB runs each module in the mode it was selected for
     try:
-        if device and d585_config.can_toggle(device):
-            d585_config.ensure(serial_number, mode)
-        elif mode == 'dual_rgb':
-            raise RuntimeError("sensors_config_mode is not supported")
+        d585_config.setup(_test_device_serial)
     except Exception as e:
         _emit_test_header(item_id)
         _teardown([serial_number])
-        pytest.fail(f"Failed to switch {serial_number} to {mode}: {e}")
+        pytest.fail(f"Failed to set up {_test_device_serial}: {e}")
 
     yield serial_number
-    if mode == 'dual_rgb' and _is_last_dual_rgb_module(request, _test_device_serial):
-        try:
-            d585_config.can_toggle(device) and d585_config.ensure(serial_number, 'dedicated_sensor')
-        except Exception as e:
-            log.warning(f"Failed to switch {serial_number} back to dedicated sensor: {e}")
     _teardown([serial_number])
 
 

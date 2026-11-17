@@ -105,11 +105,28 @@ def test_ensure_fails_when_the_camera_does_not_come_back( monkeypatch, lab ):
         d585_config.ensure( '541', 'dual_rgb' )
 
 
-def test_every_switchable_camera_gets_a_dual_rgb_twin_unless_the_test_excludes_dual_rgb( lab ):
-    from types import SimpleNamespace
-    from rspy.pytest.device_helpers import _dual_rgb_twin
-    exclude = lambda pattern: SimpleNamespace( name = 'device_exclude', args = (pattern,) )
-    assert _dual_rgb_twin( '541', [] ) == '541-dual-rgb'
-    assert _dual_rgb_twin( '541', [exclude( 'Dual RGB' )] ) is None
-    assert _dual_rgb_twin( '541', [exclude( 'D585S' )] ) == '541-dual-rgb'
-    assert _dual_rgb_twin( '353', [] ) is None and _dual_rgb_twin( '207', [] ) is None
+def test_every_switchable_camera_gets_a_dual_rgb_instance_unless_an_exclude_pattern_covers_it( lab ):
+    assert d585_config.extra_instances( '541', [] ) == ['541-dual-rgb']
+    assert d585_config.extra_instances( '541', ['Dual RGB'] ) == []        # device_exclude marker or --exclude-device
+    assert d585_config.extra_instances( '541', ['D585S'] ) == ['541-dual-rgb']
+    assert d585_config.extra_instances( '353', [] ) == [] and d585_config.extra_instances( '207', [] ) == []
+
+
+def test_every_switched_camera_is_restored_at_session_end( monkeypatch, lab ):
+    monkeypatch.setattr( dev, 'hw_reset', lambda sns, **kw: True, raising = False )
+    monkeypatch.setattr( dev, 'enable_only', lambda sns, **kw: None, raising = False )
+    d585_config.setup( '541-dual-rgb' )
+    assert d585_config.current( lab['541'].handle ) == 'dual_rgb'
+    d585_config.restore_all()
+    assert d585_config.current( lab['541'].handle ) == 'dedicated_sensor'
+    d585_config.restore_all()      # nothing left to restore
+
+
+def test_a_failed_switch_is_still_restored_at_session_end( monkeypatch, lab ):
+    monkeypatch.setattr( dev, 'hw_reset', lambda sns, **kw: False, raising = False )
+    monkeypatch.setattr( dev, 'enable_only', lambda sns, **kw: None, raising = False )
+    with pytest.raises( RuntimeError ):
+        d585_config.setup( '541-dual-rgb' )
+    monkeypatch.setattr( dev, 'hw_reset', lambda sns, **kw: True, raising = False )
+    d585_config.restore_all()
+    assert d585_config.current( lab['541'].handle ) == 'dedicated_sensor'
