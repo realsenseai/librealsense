@@ -118,7 +118,9 @@ namespace rs2
     static bool draw_detection_distance_combo( option_model & opt_model, std::string & error_message,
                                                notifications_model & model )
     {
-        auto & objects = opt_model.dev->detected_objects;
+        // The overlay state is the device's (shared by its color subdevice), not this sensor's own: on D500 the
+        // control sits on the Perception sensor while the boxes are drawn on the RGB stream
+        auto const objects = opt_model.dev->overlay_objects();
         if( ! objects )
             return false;
 
@@ -197,12 +199,13 @@ namespace rs2
             }
 
             auto distance_opt = options_metadata.find( RS2_OPTION_DETECTION_DISTANCE );
-            if( distance_opt != options_metadata.end() && detected_objects )
+            auto const overlay = overlay_objects();
+            if( distance_opt != options_metadata.end() && overlay )
             {
                 distance_opt->second.custom_draw_method = draw_detection_distance_combo;
                 // Start from the camera's control; a repopulate keeps Application, the one choice the control can't show
-                detected_objects->distance_source
-                    = follow_detection_distance_control( detected_objects->distance_source,
+                overlay->distance_source
+                    = follow_detection_distance_control( overlay->distance_source,
                                                          distance_opt->second.value_as_float() );
             }
 
@@ -696,6 +699,14 @@ namespace rs2
         }
         _opt_base_label = ss.str();
         populate_options(_opt_base_label.c_str(), &_options_invalidated, error_message);
+    }
+
+    std::shared_ptr< atomic_objects_in_frame > subdevice_model::overlay_objects() const
+    {
+        if( dev_model )
+            if( auto device_objects = dev_model->get_detected_objects() )
+                return device_objects;
+        return detected_objects;
     }
 
     subdevice_model::~subdevice_model()
@@ -2481,12 +2492,13 @@ namespace rs2
         // so the overlay matches the camera even with the panel collapsed. While a combo write is pending,
         // value_as_float() returns the requested value, so this doesn't undo the user's choice. A recording's control
         // is fixed, so there only the combo sets the source.
-        if( detected_objects && ! dev.is< playback >() )
+        if( ! dev.is< playback >() )
         {
             auto it = options_metadata.find( RS2_OPTION_DETECTION_DISTANCE );
-            if( it != options_metadata.end() && it->second.supported )
-                detected_objects->distance_source
-                    = follow_detection_distance_control( detected_objects->distance_source, it->second.value_as_float() );
+            auto const overlay = overlay_objects();
+            if( overlay && it != options_metadata.end() && it->second.supported )
+                overlay->distance_source
+                    = follow_detection_distance_control( overlay->distance_source, it->second.value_as_float() );
         }
 
         if (!user_writing && _options_invalidated)
