@@ -1512,6 +1512,7 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_SEGMENTATION_MODE] = "0 - segmentation not applied, otherwise the mode applied";
         descriptions[RS2_FRAME_METADATA_SEGMENTATION_CLASSES] = "Bitmask of the segmentation classes applied";
         descriptions[RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL] = "0 - occlusion removal off, 1 - on";
+        descriptions[RS2_FRAME_METADATA_AE_POLICY] = "AE policy applied by the FW: 1 - depth priority, 2 - color priority, 3 - hybrid";
 
         meanings =
         {
