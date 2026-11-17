@@ -25,6 +25,14 @@ def split_cli_patterns(patterns):
     return out
 
 
+def _exclude_patterns(markers, cli_excludes):
+    """device_exclude marker patterns followed by the (already split) --exclude-device ones"""
+    patterns = [m.args[0] for m in markers if m.name == 'device_exclude' and m.args]
+    for pat in patterns:
+        log.debug(f"Excluding devices matching pattern: {pat}")
+    return patterns + list(cli_excludes)
+
+
 def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
     """Build a ``passes(sn) -> bool`` callable that applies all three filter layers.
 
@@ -45,10 +53,7 @@ def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
     cli_excludes = split_cli_patterns(cli_excludes)
 
     # --- exclusion set ---
-    exclude_patterns = [m.args[0] for m in markers if m.name == 'device_exclude' and m.args]
-    for pat in exclude_patterns:
-        log.debug(f"Excluding devices matching pattern: {pat}")
-    exclude_patterns.extend(cli_excludes)
+    exclude_patterns = _exclude_patterns(markers, cli_excludes)
     excluded_sns: set = set()
     for pattern in exclude_patterns:
         excluded_sns.update(devices.by_spec(pattern, []))
@@ -165,17 +170,6 @@ def _product_line_of(product):
     return None
 
 
-def _dual_rgb_twin(sn, markers):
-    """'<sn>-dual-rgb' when the camera can switch to dual RGB and no device_exclude marker covers its dual RGB name, else None"""
-    device = devices.get(sn)
-    if not d585_config.can_toggle(device):
-        return None
-    dual_rgb = d585_config.dual_rgb_name(device).upper()
-    if any(m.name == 'device_exclude' and m.args and m.args[0].upper() in dual_rgb for m in markers):
-        return None
-    return sn + d585_config.SUFFIX
-
-
 def resolve_device_each_serials(metafunc):
     """Expand @device_each and @device markers into parametrized test instances.
 
@@ -237,11 +231,11 @@ def resolve_device_each_serials(metafunc):
 
     all_serials = []
     passes = _build_sn_filter(all_markers, cli_includes, cli_excludes)
+    exclude_patterns = _exclude_patterns(all_markers, split_cli_patterns(cli_excludes))
 
-    def add_with_twin(sn, with_dedicated_sensor=True):
-        """a camera that can switch to dual RGB gets a second, dual RGB instance (the same camera) after its dedicated sensor one"""
-        twin = _dual_rgb_twin(sn, all_markers)
-        for serial in ([sn] if with_dedicated_sensor else []) + ([twin] if twin else []):
+    def add_with_extras(sn, with_base=True):
+        """a camera with extra configurations gets an instance per configuration (the same camera) after its base one"""
+        for serial in ([sn] if with_base else []) + d585_config.extra_instances(sn, exclude_patterns):
             if serial not in all_serials:
                 all_serials.append(serial)
 
@@ -249,10 +243,10 @@ def resolve_device_each_serials(metafunc):
         for pattern in marker.args:
             for sn in devices.by_spec(pattern, []):
                 if passes(sn):
-                    add_with_twin(sn)
-            for sn in d585_config.switchable_to(pattern):   # a "Dual RGB" pattern selects only the dual RGB instance
+                    add_with_extras(sn)
+            for sn in d585_config.switchable_to(pattern):   # a pattern naming only the extra configuration selects only that instance
                 if passes(sn):
-                    add_with_twin(sn, with_dedicated_sensor=False)
+                    add_with_extras(sn, with_base=False)
 
     # Each single-spec ``device()`` marker independently contributes one parametrized
     # instance (the first matching device, or a sentinel if none).  Multiple stacked
@@ -273,7 +267,7 @@ def resolve_device_each_serials(metafunc):
                 found_sn = sn
                 break
         if found_sn is not None:
-            add_with_twin(found_sn)
+            add_with_extras(found_sn)
         elif had_raw_match or _pattern_excluded(pattern, cli_excludes):
             # Excluded on the CLI (e.g. the map-check reported it missing): a skip,
             # not an unattributed failure, even though nothing of that pattern enumerated
@@ -301,11 +295,7 @@ def resolve_device_each_serials(metafunc):
                 return f"MISSING-{sn[len(_MISSING_SENTINEL_PREFIX):]}"
             if sn.startswith(_SKIP_SENTINEL_PREFIX):
                 return f"SKIP-{sn[len(_SKIP_SENTINEL_PREFIX):]}"
-            real_sn, mode = d585_config.split(sn)
-            dev = devices.get(real_sn)
-            if not dev:
-                return sn
-            return f"{d585_config.dual_rgb_name(dev)}-{sn}" if mode == 'dual_rgb' else f"{dev.name}-{sn}"
+            return d585_config.test_id(sn)
 
         ids = [_serial_id(sn) for sn in all_serials]
         metafunc.fixturenames.append('_test_device_serial')
