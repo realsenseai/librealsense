@@ -10,10 +10,13 @@ independently of each other:
   1. Frame-number gaps      - consecutive frames must differ by exactly 1.
   2. Hardware-timestamp gaps - every motion frame must report rs.timestamp_domain.hardware_clock (a frame that
                                fell back to system_time carries host arrival time, which would make this check
-                               meaningless, so it fails explicitly); a delta above TIMESTAMP_GAP_FACTOR nominal periods is a gap; the number of
-                               missing samples in it is estimated as round(delta / period) - 1.
+                               meaningless, so it fails explicitly); a delta above TIMESTAMP_GAP_FACTOR nominal
+                               periods, or a backward delta (clock rollback), is a gap; the number of missing
+                               samples in it is estimated as round(delta / period) - 1.
                                (RSDEV-13643: timestamps can jump while frame numbers stay continuous.)
-  3. Measured rate          - (frames - 1) / arrival span, within RATE_TOLERANCE of the requested rate.
+  3. Measured rate          - (frames - 1) / arrival span must not fall below the requested rate by more than
+                               RATE_TOLERANCE. A faster stream loses nothing and is only logged (D457 GMSL
+                               delivers gyro at 100 Hz when 50 is requested).
 
 Thresholds (named constants below, all zero-tolerance for gaps; RSDEV-13643 acceptance is zero):
   MAX_FRAME_NUMBER_GAPS = 0       missing frame numbers per stream
@@ -62,7 +65,8 @@ MIN_FRAMES_PER_STREAM = 10
 
 # (accel fps, gyro fps) pairs, chosen so every rate of D400 USB/GMSL (accel 50/63/100/200/250,
 # gyro 50/100/200/400) and D585 (accel 100/200, gyro 200/400) is covered at least once.
-# Pairs the device does not expose are skipped.
+# Pairs the device does not expose are skipped, and so are unequal pairs on devices whose motion sensor is UVC
+# based (D457 GMSL): the SDK requires equal accel and gyro fps there.
 IMU_RATE_PAIRS = [(50, 50), (100, 100), (100, 200), (200, 200), (200, 400), (63, 200), (250, 400)]
 
 VIDEO_FPS = 30
@@ -79,7 +83,8 @@ ESCAPEE_HINTS = {
 
 
 class StreamRecord:
-    """Per-stream capture. list.append is atomic, so callbacks need no lock."""
+    """Per-stream capture. Each instance is written from a single callback path (one stream type, one thread),
+    so add() needs no lock."""
 
     def __init__(self):
         self.frame_numbers = []
@@ -105,12 +110,12 @@ def count_frame_number_gaps(frame_numbers):
 
 
 def find_timestamp_gaps(timestamps_ms, fps, factor=TIMESTAMP_GAP_FACTOR):
-    """Return [(index, delta_ms, estimated_missing_samples)] for every delta above factor * period."""
+    """Return [(index, delta_ms, estimated_missing_samples)] for every delta above factor * period or below 0."""
     period_ms = 1000.0 / fps
     gaps = []
     for i in range(1, len(timestamps_ms)):
         delta = timestamps_ms[i] - timestamps_ms[i - 1]
-        if delta > factor * period_ms:
+        if delta > factor * period_ms or delta < 0:
             gaps.append((i, delta, max(round(delta / period_ms) - 1, 1)))
     return gaps
 
@@ -140,13 +145,16 @@ def evaluate_stream(name, rec, fps):
         ts_gaps = find_timestamp_gaps(rec.timestamps_ms, fps)
     if len(ts_gaps) > MAX_TIMESTAMP_GAPS:
         missing = sum(g[2] for g in ts_gaps)
-        worst = max(ts_gaps, key=lambda g: g[1])
+        worst = max(ts_gaps, key=lambda g: abs(g[1]))
         problems.append(f"{name}@{fps}: {len(ts_gaps)} timestamp gaps (~{missing} samples, worst {worst[1]:.1f} ms "
                         f"at frame #{rec.frame_numbers[worst[0]]}; max {MAX_TIMESTAMP_GAPS})")
 
     rate = measured_rate_hz(rec.arrival_s)
-    if abs(rate - fps) > RATE_TOLERANCE * fps:
-        problems.append(f"{name}@{fps}: measured {rate:.2f} Hz, allowed {fps} +/- {RATE_TOLERANCE * 100:.0f}%")
+    if rate < fps * (1 - RATE_TOLERANCE):
+        problems.append(f"{name}@{fps}: measured {rate:.2f} Hz, at least {fps * (1 - RATE_TOLERANCE):.2f} Hz expected "
+                        f"(-{RATE_TOLERANCE * 100:.0f}%)")
+    elif rate > fps * (1 + RATE_TOLERANCE):
+        log.warning("%s@%d: measured %.2f Hz, faster than requested (no loss)", name, fps, rate)
     return problems
 
 
@@ -230,26 +238,39 @@ def _stream_and_record(dev, accel_fps, gyro_fps, with_video):
 
     # Raw device timestamps rather than the host-mapped global time
     restore_global_time = None
-    if motion.supports(rs.option.global_time_enabled):
-        restore_global_time = motion.get_option(rs.option.global_time_enabled)
-        motion.set_option(rs.option.global_time_enabled, 0)
-
+    opened = []
     started = []
     try:
+        if motion.supports(rs.option.global_time_enabled):
+            restore_global_time = motion.get_option(rs.option.global_time_enabled)
+            motion.set_option(rs.option.global_time_enabled, 0)
+        try:
+            motion.open([accel_profile, gyro_profile])
+        except RuntimeError as e:
+            if "to be equal for this device" in str(e):
+                pytest.skip(f"accel {accel_fps} / gyro {gyro_fps}: this device needs equal accel and gyro fps")
+            raise
+        opened.append(motion)
         for sensor, profile in video:
             sensor.open([profile])
-            started.append(sensor)
+            opened.append(sensor)
+        for sensor, _ in video:
             sensor.start(video_callback)
-        motion.open([accel_profile, gyro_profile])
-        started.append(motion)
+            started.append(sensor)
         motion.start(motion_callback)
+        started.append(motion)
         time.sleep(STREAM_DURATION_S)
     finally:
+        # Restore while the sensor is still open: set_option on a closed sensor can throw and mask the result
+        if restore_global_time is not None:
+            try:
+                motion.set_option(rs.option.global_time_enabled, restore_global_time)
+            except Exception as e:
+                log.warning("Could not restore global_time_enabled: %s", e)
         for sensor in reversed(started):
             sensor.stop()
+        for sensor in reversed(opened):
             sensor.close()
-        if restore_global_time is not None:
-            motion.set_option(rs.option.global_time_enabled, restore_global_time)
 
     if with_video:
         log.info("Video frames received during the run: %d", video_frames[0])
