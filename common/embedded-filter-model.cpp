@@ -249,6 +249,7 @@ namespace rs2
                                     std::string & error_message,
                                     const std::function< bool() > & draw_fields,
                                     const std::function< void( T & ) > & sanitize,
+                                    const std::function< void( const T & ) > & sync_enabled,
                                     const std::function< void( T & ) > & before_commit )
         {
             editor.extra_width = extra_width;
@@ -267,7 +268,14 @@ namespace rs2
 
             ImVec2 frame_max( frame_min.x + frame_width, ImGui::GetCursorScreenPos().y );
             editor.end_frame_and_maybe_commit( filter, id, error_message, frame_min, frame_max, any_field_active, hold_commit,
-                                               before_commit );
+                                               [&]( T & v )
+                                               {
+                                                   // A reset sends the FW defaults untouched; the toggle just follows them
+                                                   if( editor.commit_is_reset() )
+                                                       sync_enabled( v );
+                                                   else
+                                                       before_commit( v );
+                                               } );
 
             if( ! enabled )
                 ImGui::PopStyleVar();
@@ -321,11 +329,12 @@ namespace rs2
     void embedded_filter_model::draw_decimation_filter_dpp_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP;
+        auto sync_enabled = [this]( const rs2_decimation_filter_dpp_config & v ) { _enabled = v.enabled != 0; };
         if( ! _decimation_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message,
-                [this]( const rs2_decimation_filter_dpp_config & v )
+                [&]( const rs2_decimation_filter_dpp_config & v )
                 {
                     print_decimation_filter_dpp_config( v );
-                    _enabled = v.enabled != 0;
+                    sync_enabled( v );
                 } ) )
             return;
         sanitize_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
@@ -336,14 +345,9 @@ namespace rs2
         draw_composite_editor< rs2_decimation_filter_dpp_config, rs2_decimation_filter_dpp_range >(
             _decimation_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_decimation_filter_dpp_fields( error_message ); },
-            sanitize_decimation_filter_dpp_config,
+            sanitize_decimation_filter_dpp_config, sync_enabled,
             [this]( rs2_decimation_filter_dpp_config & v )
             {
-                if( _decimation_filter_dpp_editor.commit_is_reset )
-                {
-                    _enabled = v.enabled != 0;
-                    return;
-                }
                 v.enabled = 1;
                 _enabled = true;
             } );
@@ -374,11 +378,12 @@ namespace rs2
     void embedded_filter_model::draw_temporal_filter_dpp_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP;
+        auto sync_enabled = [this]( const rs2_temporal_filter_dpp_config & v ) { _enabled = v.enabled != 0; };
         if( ! _temporal_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message,
-                [this]( const rs2_temporal_filter_dpp_config & v )
+                [&]( const rs2_temporal_filter_dpp_config & v )
                 {
                     print_temporal_filter_dpp_config( v );
-                    _enabled = v.enabled != 0;
+                    sync_enabled( v );
                 } ) )
             return;
         sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
@@ -386,14 +391,9 @@ namespace rs2
         draw_composite_editor< rs2_temporal_filter_dpp_config, rs2_temporal_filter_dpp_range >(
             _temporal_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_temporal_filter_dpp_fields( error_message ); },
-            sanitize_temporal_filter_dpp_config,
+            sanitize_temporal_filter_dpp_config, sync_enabled,
             [this]( rs2_temporal_filter_dpp_config & v )
             {
-                if( _temporal_filter_dpp_editor.commit_is_reset )
-                {
-                    _enabled = v.enabled != 0;
-                    return;
-                }
                 v.enabled = 1;
                 _enabled = true;
             } );
@@ -476,10 +476,11 @@ namespace rs2
     {
         const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
         // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
-        auto on_read = [this]( const rs2_icr_control & v )
+        auto sync_enabled = [this]( const rs2_icr_control & v ) { _enabled = v.mode != RS2_ICR_MODE_OFF; };
+        auto on_read = [&]( const rs2_icr_control & v )
         {
             print_icr_control( v );
-            _enabled = v.mode != RS2_ICR_MODE_OFF;
+            sync_enabled( v );
         };
         if( ! _icr_editor.ensure_initialized( _embedded_filter, id, error_message, on_read ) )
             return;
@@ -488,14 +489,9 @@ namespace rs2
         draw_composite_editor< rs2_icr_control, rs2_icr_control_range >(
             _icr_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_icr_fields( error_message ); },
-            [this]( rs2_icr_control & v ) { sanitize_icr( v ); },
+            [this]( rs2_icr_control & v ) { sanitize_icr( v ); }, sync_enabled,
             [this]( rs2_icr_control & v )
             {
-                if( _icr_editor.commit_is_reset )
-                {
-                    _enabled = v.mode != RS2_ICR_MODE_OFF;
-                    return;
-                }
                 if( v.mode == RS2_ICR_MODE_OFF )
                     v.mode = _icr_last_active_mode;
                 _enabled = true;
