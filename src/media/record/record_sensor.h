@@ -42,6 +42,8 @@ namespace librealsense
         stream_profiles get_stream_profiles(int tag = profile_tag::PROFILE_TAG_ANY) const override;
         void open(const stream_profiles& requests) override;
         void close() override;
+        void close_streams( const stream_profiles & profiles ) override { m_sensor.close_streams( profiles ); }
+        stream_profiles get_sensor_active_streams() const override { return m_sensor.get_sensor_active_streams(); }
         option& get_option(rs2_option id) override;
         const option& get_option(rs2_option id) const override;
         const std::string& get_info(rs2_camera_info info) const override;
@@ -84,7 +86,7 @@ namespace librealsense
         void unhook_sensor_callbacks();
         void enable_sensor_options_recording();
         void disable_sensor_options_recording();
-        void wrap_streams();
+        void wrap_streams( const stream_profiles & streams );
 
     private /*members*/:
 

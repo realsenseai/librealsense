@@ -78,10 +78,13 @@ stream_profiles record_sensor::get_stream_profiles(int tag) const
 
 void librealsense::record_sensor::open(const stream_profiles& requests)
 {
-    // The recorded stream set is fixed at the first open
+    // A stream added while recording starts delivering at once: write its header before its first frame
     auto synthetic = dynamic_cast< synthetic_sensor * >( &m_sensor );
-    if( synthetic && synthetic->get_raw_sensor()->supports_incremental_streams() && synthetic->is_opened() )
-        throw wrong_api_call_sequence_exception( "Streams cannot be added to a sensor while it is recorded" );
+    if( m_is_recording && synthetic && synthetic->get_raw_sensor()->supports_incremental_streams() )
+    {
+        std::lock_guard< std::mutex > lock( m_mutex );
+        wrap_streams( requests );
+    }
     m_sensor.open(requests);
 }
 
@@ -300,7 +303,7 @@ void record_sensor::enable_sensor_hooks()
     if (m_is_sensor_hooked)
         return;
     hook_sensor_callbacks();
-    wrap_streams();
+    wrap_streams( m_sensor.get_active_streams() );
     m_is_sensor_hooked = true;
 }
 void record_sensor::disable_sensor_hooks()
@@ -412,9 +415,8 @@ void record_sensor::disable_sensor_options_recording()
         option.enable_recording([](const librealsense::option& snapshot) {});
     }
 }
-void record_sensor::wrap_streams()
+void record_sensor::wrap_streams( const stream_profiles & streams )
 {
-    auto streams = m_sensor.get_active_streams();
     for (auto stream : streams)
     {
         auto id = stream->get_unique_id();
