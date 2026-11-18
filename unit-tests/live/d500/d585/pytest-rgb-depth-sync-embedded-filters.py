@@ -101,7 +101,7 @@ def test_rgb_depth_sync( test_device, filter_setup ):
             if i < WARMUP_FRAMESETS:
                 continue
             framesets += 1
-            depth, color = fs.get_depth_frame(), fs.get_color_frame()
+            depth, color = fs.get_depth_frame(), fs.first_or_default( rs.stream.color )  # dual RGB: color has index 1
             if not depth or not color:
                 continue
             for f in ( depth, color ):
