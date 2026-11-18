@@ -1,15 +1,15 @@
 {
   "upstream_repository": "https://github.com/RealSenseAI-Internal/Software_D5x5_Constrains_Library",
-  "upstream_commit": "9a9f1c23e2890a07da2a3fe74b0b1264f3db580f",
+  "upstream_commit": "28067787f10879ec9ec5dc69aae06d3ea3443840",
   "upstream_directory": "intent",
-  "dictionary_sha256": "f07ab3511bb2c16c11f5e1788c8d9768d41f5878f2dc2ead20d5647e54c230ad",
+  "dictionary_sha256": "dc42de855af6a26a7cdeff9d9b05912a6af1edb3576f6e266972aaf5aa18a123",
   "major": 1,
   "minor": 0,
   "patch": 0,
   "consumer": "sdk",
   "files": {
-    "IntentDictionary.h": "79d24a90defc33c4a3c316807c86c319cb98c700856ddd58d1c84447c344a7fd",
-    "IntentProtocol.cpp": "60ca1ff3f5163cd2228a0e76ae9205b79c058164c2efd54424f97f2fbb3b5c74",
+    "IntentDictionary.h": "407341b8ec83bc7027eb44534c8206a2f8678a7bd4707df291cd33e0dfb097f6",
+    "IntentProtocol.cpp": "9b622ba4dfc86e9e50bab5b02bb1c11dc56641799cc139abf2c4bfe9ede8c334",
     "IntentProtocol.h": "2c197e46aa40cf3fae229bf55fb5f5e4dc9f9144676234178a0d5d090676a4ba",
     "IntentStatus.h": "9b43a9def155621d79feebaf1784ce0214ffa3c5030daa7871f5402cd317ce59",
     "rs_intent_tlv.h": "16a30c09db4e59b098a365ff8511f04dc99d7229207f8fb082eb8b7d87001170"

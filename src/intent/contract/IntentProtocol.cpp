@@ -43,12 +43,21 @@ Stream nativeStream(const Stream &stream, bool gmsl) {
         result.branch = b.native_branch;
         break;
     }
+    bool branchSpecific = false;
+    for (const auto &f : branch_native_formats) if (f.branch == stream.branch) {
+        branchSpecific = true;
+        if (f.format == stream.format) {
+            result.format = gmsl ? f.native_gmsl : f.native;
+            return result;
+        }
+    }
+    // An unlisted format on a branch with explicit carriers stays invalid;
+    // never turn it into a valid-looking native profile through a fallback.
+    if (branchSpecific) return result;
     for (const auto &f : sdk_formats) if (f.format == stream.format) {
         result.format = gmsl ? f.native_gmsl : f.native;
         break;
     }
-    if (result.branch == 4U)
-        result.format = stream.format == 0x20363159U ? 0x49363159U : 0x20493859U;
     return result;
 }
 const Stream *find(const Model &m, uint8_t b) {
@@ -68,9 +77,9 @@ struct Record {
     size_t length, start, value, next;
 };
 bool next(const uint8_t *data, size_t &cursor, size_t end, Record &r) {
+    r.start = cursor;
     if (cursor > end || end - cursor < 4U)
         return false;
-    r.start = cursor;
     r.type = data[cursor];
     r.flags = data[cursor + 1U];
     r.length = read16(data + cursor + 2U);
@@ -430,46 +439,76 @@ Model defaultModel(uint16_t sku) {
     return m;
 }
 Error capabilities(uint16_t sku, uint8_t *data, size_t size, CapabilityFilter filter, void *context) {
-    if (!data || size != wire_size || defaultModel(sku).count == 0U) return Error(INVALID);
-    uint8_t packet[wire_size] = {};
-    packet[0] = static_cast<uint8_t>(major);
-    packet[1] = static_cast<uint8_t>(minor);
-    packet[2] = static_cast<uint8_t>(patch);
-    packet[3] = 1U;
-    write16(packet + 4, sku);
+    if (!data || size != wire_size) return Error(INVALID);
+    bool knownSku = false;
+    for (const auto &b : branches) knownSku |= b.sku == sku;
+    if (!knownSku) return Error(INVALID);
+
+    // Retain only filter decisions, not a 1 KB packet or a Model. Preflight
+    // every section before publishing, and invoke each filter exactly once.
+    uint8_t selected[(sizeof(formats) / sizeof(formats[0]) + 7U) / 8U] = {};
+    size_t needed = 16U + sizeof(supported_records) + sizeof(stream_attributes);
+    for (const auto &sensor : sensors) {
+        bool present = sensor.id == 0U;
+        for (const auto &b : branches) present |= b.sku == sku && b.sensor == sensor.id;
+        if (present) needed += 2U;
+    }
+    for (const auto &b : branches) {
+        if (b.sku != sku) continue;
+        if (needed > size || size - needed < 4U)
+            return Error(INVALID, b.sensor, b.id, 0, 0, PARSE_CAPACITY);
+        needed += 4U;
+        unsigned count = 0U;
+        for (size_t i = 0; i < sizeof(formats) / sizeof(formats[0]); ++i) {
+            const auto &f = formats[i];
+            if (f.branch != b.id || (filter && !filter(b.id, f.format, context))) continue;
+            if (size - needed < 4U || count == 255U)
+                return Error(INVALID, b.sensor, b.id, 0, 0, PARSE_CAPACITY);
+            needed += 4U;
+            ++count;
+            selected[i / 8U] |= static_cast<uint8_t>(1U << (i % 8U));
+        }
+    }
+    if (needed > size) return Error(INVALID, 0, 0, 0, 0, PARSE_CAPACITY);
+
+    memset(data, 0, size);
+    data[0] = static_cast<uint8_t>(major);
+    data[1] = static_cast<uint8_t>(minor);
+    data[2] = static_cast<uint8_t>(patch);
+    data[3] = 1U;
+    write16(data + 4, sku);
     size_t pos = 16U;
-    for (const auto record : supported_records) packet[pos++] = record;
-    packet[8] = static_cast<uint8_t>(sizeof(supported_records));
-    for (const auto attribute : stream_attributes) packet[pos++] = attribute;
-    packet[9] = static_cast<uint8_t>(sizeof(stream_attributes));
+    for (const auto record : supported_records) data[pos++] = record;
+    data[8] = static_cast<uint8_t>(sizeof(supported_records));
+    for (const auto attribute : stream_attributes) data[pos++] = attribute;
+    data[9] = static_cast<uint8_t>(sizeof(stream_attributes));
     for (const auto &sensor : sensors) {
         bool present = sensor.id == 0U;
         for (const auto &b : branches) present |= b.sku == sku && b.sensor == sensor.id;
         if (present) {
-            packet[pos++] = sensor.id;
-            packet[pos++] = sensor.since;
-            ++packet[10];
+            data[pos++] = sensor.id;
+            data[pos++] = sensor.since;
+            ++data[10];
         }
     }
     for (const auto &b : branches) {
         if (b.sku != sku) continue;
-        if (pos + 4U > size) return Error(INVALID, b.sensor, b.id, 0, 0, PARSE_CAPACITY);
         const size_t entry = pos;
-        packet[pos++] = b.sensor;
-        packet[pos++] = b.id;
-        packet[pos++] = 0U;
-        packet[pos++] = b.since;
-        for (const auto &f : formats) {
-            if (f.branch != b.id || (filter && !filter(b.id, f.format, context))) continue;
-            if (pos + 4U > size) return Error(INVALID, b.sensor, b.id, 0, 0, PARSE_CAPACITY);
-            write32(packet + pos, f.format);
+        data[pos++] = b.sensor;
+        data[pos++] = b.id;
+        data[pos++] = 0U;
+        data[pos++] = b.since;
+        for (size_t i = 0; i < sizeof(formats) / sizeof(formats[0]); ++i) {
+            const auto &f = formats[i];
+            if (f.branch != b.id || !(selected[i / 8U] & (1U << (i % 8U)))) continue;
+            write32(data + pos, f.format);
             pos += 4U;
-            ++packet[entry + 2U];
+            ++data[entry + 2U];
         }
-        ++packet[11];
+        ++data[11];
     }
-    write16(packet + 6, static_cast<uint16_t>(pos));
-    memcpy(data, packet, size);
+    write16(data + 6, static_cast<uint16_t>(pos));
     return Error();
 }
+
 } // namespace rsintent
