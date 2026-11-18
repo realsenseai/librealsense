@@ -1,6 +1,6 @@
 {
   "upstream_repository": "https://github.com/RealSenseAI-Internal/Software_D5x5_Constrains_Library",
-  "upstream_commit": "28067787f10879ec9ec5dc69aae06d3ea3443840",
+  "upstream_commit": "5916b821aa9cccdd16a89ccab237c44adfb0e837",
   "upstream_directory": "intent",
   "dictionary_sha256": "dc42de855af6a26a7cdeff9d9b05912a6af1edb3576f6e266972aaf5aa18a123",
   "major": 1,
