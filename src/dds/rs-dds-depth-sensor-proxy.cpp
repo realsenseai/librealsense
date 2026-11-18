@@ -6,6 +6,7 @@
 
 #include <realdds/topics/dds-topic-names.h>
 #include <src/dds/rs-dds-embedded-filter.h>
+#include <src/proc/embedded-filter-base.h>
 #include <src/device.h>
 
 #include <src/stream.h>
@@ -120,6 +121,9 @@ embedded_filters dds_depth_sensor_proxy::get_supported_embedded_filters() const
 
 void dds_depth_sensor_proxy::add_embedded_filter(std::shared_ptr< embedded_filter_interface > embedded_filter)
 {
+    // No sensor-side polling here (DDS reads are served from a local cache): the filter watches its own composites
+    if( auto base = std::dynamic_pointer_cast< embedded_filter_base >( embedded_filter ) )
+        base->watch_own_composite_options();
     _embedded_filters.insert(std::make_pair(embedded_filter->get_type(), embedded_filter));
 }
 

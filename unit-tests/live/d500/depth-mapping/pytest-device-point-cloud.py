@@ -61,7 +61,7 @@ def collect( sensor, profile, count ):
 
 
 def test_pcl_frames( pcl ):
-    _, sensor, profile = pcl
+    dev, sensor, profile = pcl
     vsp = profile.as_video_stream_profile()
     frames = collect( sensor, profile, FRAMES_TO_CHECK )
     check.equal( len( frames ), FRAMES_TO_CHECK )

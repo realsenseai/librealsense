@@ -23,6 +23,7 @@
 #include <src/ds/features/temporal-filter-feature.h>
 #include <src/ds/features/icr-filter-feature.h>
 
+#include "proc/embedded-filter-base.h"
 #include "proc/depth-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
@@ -270,6 +271,18 @@ namespace librealsense
         if (_depth_units < 0)
             _depth_units = get_option(RS2_OPTION_DEPTH_UNITS).query();
         return _depth_units;
+    }
+
+    void d500_depth_sensor::add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter )
+    {
+        // The filter's composite options are read by this sensor's watcher: one thread, one bulk-operation scope
+        if( auto base = std::dynamic_pointer_cast< embedded_filter_base >( filter ) )
+        {
+            for( auto id : base->get_supported_composite_options() )
+                register_composite_option_to_update( id, base->get_composite_option_handler( id ) );
+            base->use_sensor_watcher( get_options_watcher() );
+        }
+        _embedded_filters.push_back( std::move( filter ) );
     }
 
     void d500_depth_sensor::set_depth_scale( float val )
@@ -603,17 +616,6 @@ namespace librealsense
                                                                                   d500_xu_id::PROJECTOR_TEMPERATURE,
                                                                                   "Projector Temperature");
                 depth_sensor.register_option(RS2_OPTION_PROJECTOR_TEMPERATURE, proj_temperature);
-            }
-
-            // Constructing the option probes the XU; firmware without aligned-depth support throws and we skip it.
-            try
-            {
-                _aligned_depth_option = std::make_shared< d500_enable_aligned_depth_option >( raw_depth_sensor );
-                depth_sensor.register_option( RS2_OPTION_ENABLE_ALIGNED_DEPTH, _aligned_depth_option );
-            }
-            catch( std::exception const & e )
-            {
-                LOG_DEBUG( "Align Depth is not supported by this firmware: " << e.what() );
             }
 
             if( d5x5_dual_rgb_mode_pids.count( _pid )

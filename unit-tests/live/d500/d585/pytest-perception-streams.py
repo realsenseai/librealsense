@@ -1,9 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Perception streams on D585, over USB and GMSL, in 2C and 3C.
-# Object Detection (PD), Occupancy and the (Labeled) Point Cloud run on their own, with no Depth or Color capture. The camera builds Occupancy
-# from Depth at 640x360 or 1280x720 at the Occupancy rate; Occupancy started first fixes that source at 640x360.
+# Perception streams on D555/D585, over USB and GMSL, in 2C and 3C.
+# Object Detection (PD), Occupancy, LPCL and Point Cloud run without host Depth or Color capture.
+# With graph-rebuild firmware, Occupancy/LPCL can share any native Depth size at the Mapping frame rate.
 # The SDK rejects the depth sensor combinations the camera would refuse or starve before the camera is touched.
 
 import pytest
@@ -17,7 +17,8 @@ log = logging.getLogger(__name__)
 
 
 pytestmark = [
-    pytest.mark.device_each( "D585" ),
+    pytest.mark.device_each( "D555", "D585" ),
+    pytest.mark.device_type_exclude( "DDS" ),   # SDK admission rules are USB/GMSL-only
     pytest.mark.device_exclude( "D585S" ),   # the safety SKU has no perception sensor
     pytest.mark.context( "nightly" ),
 ]
@@ -37,6 +38,10 @@ MD = rs.frame_metadata_value
 def device(test_device):
     dev, _ = test_device
     yield dev
+    close_sensors( dev )
+
+
+def close_sensors(dev):
     for s in dev.query_sensors():        # never hand the next test an open sensor
         for close in ( s.stop, s.close ):
             try:
@@ -142,10 +147,10 @@ def stop(sensor):
     sensor.close()
 
 
-def rejected(sensor, profiles, frames):
+def rejected(sensor, profiles, frames, match=None):
     """True when the SDK refuses the start quickly, before the camera is involved."""
     begin = time.monotonic()
-    with pytest.raises( RuntimeError ):
+    with pytest.raises( RuntimeError, match=match ):
         start( sensor, profiles, frames )
     return time.monotonic() - begin < SDK_REJECT_S
 
@@ -153,6 +158,10 @@ def rejected(sensor, profiles, frames):
 @pytest.mark.parametrize( 'stream', ['object_detection', 'occupancy', 'labeled_point_cloud', 'point_cloud'] )
 def test_standalone_lifecycle(device, stream):
     """Runs with no other capture, resumes after stop, and a second session starts after the first one closed."""
+    if "D555" in device.get_info( rs.camera_info.name ):
+        pytest.skip( "Perception lifecycle metadata checks are D585-only" )
+    if stream == 'labeled_point_cloud':
+        require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "labeled point cloud" )   # older FW has no LPCL stream
     if stream == 'point_cloud':  # older FW publishes the profiles but delivers no frames
         require_min_fw_version( device, rsutils.version( "7.61.47150" ), "device point cloud" )
     stream_type = getattr( rs.stream, stream )
@@ -171,6 +180,8 @@ def test_standalone_lifecycle(device, stream):
 
 
 def test_pd_and_occ_standalone(device):
+    if "D555" in device.get_info( rs.camera_info.name ):
+        pytest.skip( "Concurrent PD/Occupancy lifecycle checks are D585-only" )
     pd, pd_profile = perception( device, rs.stream.object_detection )
     occ, occ_profile = perception( device, rs.stream.occupancy )
     frames = Collector()
@@ -182,76 +193,105 @@ def test_pd_and_occ_standalone(device):
     stop( pd )
 
 
-@pytest.mark.parametrize( 'source, allowed', [
-    ( ( 640, 360, 30 ), True ),
-    ( ( 1280, 720, 30 ), True ),
-    ( ( 848, 480, 30 ), False ),
+# Both start orders must accept every native source, with either segmentation state.
+DEPTH_SOURCES = [( 640, 360, 30 ), ( 1280, 720, 30 ), ( 848, 480, 30 ),
+                 ( 640, 480, 30 ), ( 1280, 960, 30 ), ( 480, 270, 30 ), ( 424, 240, 30 )]
+
+
+@pytest.fixture(params=[(stream, segmented) for stream in ('occupancy', 'labeled_point_cloud')
+                       for segmented in (0, 1)],
+                ids=['occupancy-seg-off', 'occupancy-seg-on', 'lpcl-seg-off', 'lpcl-seg-on'])
+def mapping(device, request):
+    require_min_fw_version( device, rsutils.version("7.61.47181"), "Mapping graph rebuild" )
+    stream, segmented = request.param
+    sensor, profile = perception( device, getattr( rs.stream, stream ) )
+    option = rs.option.occupancy_grid_segmentation if stream == 'occupancy' else rs.option.lpcl_segmentation
+    original = sensor.get_option( option ) if sensor.supports( option ) else None
+    if original is None and (stream == 'labeled_point_cloud' or segmented):
+        pytest.skip( "No Mapping segmentation control" )
+    try:
+        if original is not None:
+            sensor.set_option( option, segmented )
+        yield sensor, profile
+    finally:
+        # These controls are writable only before streaming, including after a failed test.
+        close_sensors( device )
+        if original is not None:
+            sensor.set_option( option, original )
+
+
+@pytest.mark.parametrize( 'source, allowed', [(source, True) for source in DEPTH_SOURCES] + [
     ( ( 640, 360, 15 ), False ),
-] )
-def test_occ_after_depth(device, source, allowed):
-    """With Depth running, Occupancy starts only when Depth can feed it."""
-    occ, occ_profile = perception( device, rs.stream.occupancy )
+], ids=[f"{w}x{h}" for w, h, _ in DEPTH_SOURCES] + ['rate-mismatch'] )
+def test_occ_after_depth(device, mapping, source, allowed):
+    """With Depth running, Occupancy/LPCL accepts native sizes only at its frame rate."""
+    occ, occ_profile = mapping
+    stream_type = occ_profile.stream_type()
     stereo, frames = device.first_depth_sensor(), Collector()
     frames.wait( rs.stream.depth, start( stereo, [depth( device, *source )], frames ) )
     if allowed:
         since = start( occ, occ_profile, frames )
-        frames.wait( rs.stream.occupancy, since )
+        frames.wait( stream_type, since )
         frames.wait( rs.stream.depth, since )
         stop( occ )
     else:
-        assert rejected( occ, occ_profile, frames )
-        frames.wait( rs.stream.depth, time.monotonic(), MIN_FRAMES[rs.stream.depth] // 2 )   # Depth unaffected
+        assert rejected( occ, occ_profile, frames, match=r"needs Depth at 30 fps" )
+    frames.wait( rs.stream.depth, time.monotonic(), MIN_FRAMES[rs.stream.depth] // 2 )   # Depth unaffected
     stop( stereo )
 
 
-@pytest.mark.parametrize( 'join', ['depth 640x360', 'depth 1280x720', 'depth 640x360@15', 'depth+ir 640x360'] )
-def test_depth_joins_occ(device, join):
-    """Occupancy started alone fixes its Depth source at 640x360: only that Depth, alone, can join it."""
-    occ, occ_profile = perception( device, rs.stream.occupancy )
+@pytest.mark.parametrize( 'source, with_ir, allowed', [(source, False, True) for source in DEPTH_SOURCES] + [
+    ( ( 640, 360, 15 ), False, False ),
+    ( ( 640, 360, 30 ), True, False ),
+], ids=[f"{w}x{h}" for w, h, _ in DEPTH_SOURCES] + ['rate-mismatch', 'depth+ir'] )
+def test_depth_joins_occ(device, mapping, source, with_ir, allowed):
+    """Native Depth alone can join either Mapping stream; rate mismatch and Depth+IR are SDK refusals."""
+    occ, occ_profile = mapping
+    stream_type = occ_profile.stream_type()
     stereo, frames = device.first_depth_sensor(), Collector()
-    requests = { 'depth 640x360': lambda: [depth( device, 640, 360 )],
-                 'depth 1280x720': lambda: [depth( device, 1280, 720 )],
-                 'depth 640x360@15': lambda: [depth( device, 640, 360, 15 )],
-                 'depth+ir 640x360': lambda: [depth( device, 640, 360 ),
-                                              stereo_profile( device, rs.stream.infrared, rs.format.y8, 640, 360, index=1 )] }[join]()
-    frames.wait( rs.stream.occupancy, start( occ, occ_profile, frames ) )
-    if join == 'depth 640x360':
+    requests = [depth( device, *source )]
+    if with_ir:
+        requests.append( stereo_profile( device, rs.stream.infrared, rs.format.y8, *source, index=1 ) )
+    frames.wait( stream_type, start( occ, occ_profile, frames ) )
+    if allowed:
         since = start( stereo, requests, frames )
         frames.wait( rs.stream.depth, since )
-        frames.wait( rs.stream.occupancy, since )
-        stop( stereo )   # Occupancy keeps its own Depth source
+        frames.wait( stream_type, since )
+        stop( stereo )   # Mapping keeps its own Depth source
     else:
-        assert rejected( stereo, requests, frames )
-    frames.wait( rs.stream.occupancy, time.monotonic() )
+        message = "Depth can start only alone" if with_ir else r"Depth must run at 30 fps.*Select that frame rate or stop the .* stream\."
+        assert rejected( stereo, requests, frames, match=message )
+    frames.wait( stream_type, time.monotonic() )
     stop( occ )
 
 
-def test_colors_and_occ_2c(device):
-    """2C colors stream from the depth sensor: they cannot join Occupancy, nor feed it without Depth."""
+def test_colors_and_occ_2c(device, mapping):
+    """2C colors cannot join Mapping, nor feed it without Depth."""
     if not is_2c( device ):
         pytest.skip( "3C colors stream from their own sensor" )
-    occ, occ_profile = perception( device, rs.stream.occupancy )
+    occ, occ_profile = mapping
+    stream_type = occ_profile.stream_type()
     stereo, frames = device.first_depth_sensor(), Collector()
-    frames.wait( rs.stream.occupancy, start( occ, occ_profile, frames ) )
-    assert rejected( stereo, colors( device ), frames )
+    frames.wait( stream_type, start( occ, occ_profile, frames ) )
+    assert rejected( stereo, colors( device ), frames, match="Color cannot start while" )
     stop( occ )
     frames.wait( rs.stream.color, start( stereo, colors( device ), frames ) )
-    assert rejected( occ, occ_profile, frames )
+    assert rejected( occ, occ_profile, frames, match="needs Depth at" )
     stop( stereo )
 
 
-def test_depth_and_colors_then_occ_2c(device):
-    """Over GMSL Occupancy joins running Depth and colors; over USB the colors would stop, so the SDK refuses it."""
+def test_depth_and_colors_then_occ_2c(device, mapping):
+    """Over GMSL Mapping joins Depth and colors; over USB preserve the SDK refusal for the shared sensor."""
     if not is_2c( device ):
         pytest.skip( "3C colors stream from their own sensor" )
-    occ, occ_profile = perception( device, rs.stream.occupancy )
+    occ, occ_profile = mapping
     stereo, frames = device.first_depth_sensor(), Collector()
     frames.wait( rs.stream.color, start( stereo, [depth( device, 640, 360 )] + colors( device ), frames ) )
     if not is_gmsl( device ):
-        assert rejected( occ, occ_profile, frames )
+        assert rejected( occ, occ_profile, frames, match="cannot start while the depth sensor streams color" )
     else:
         since = start( occ, occ_profile, frames )
-        for stream_type in ( rs.stream.occupancy, rs.stream.depth, rs.stream.color ):
+        for stream_type in ( occ_profile.stream_type(), rs.stream.depth, rs.stream.color ):
             frames.wait( stream_type, since )
         stop( occ )
     stop( stereo )
