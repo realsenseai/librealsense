@@ -4,7 +4,7 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "f07ab3511bb2c16c11f5e1788c8d9768d41f5878f2dc2ead20d5647e54c230ad";
+static const char dictionary_sha256[] = "dc42de855af6a26a7cdeff9d9b05912a6af1edb3576f6e266972aaf5aa18a123";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
@@ -342,6 +342,13 @@ static const FormatDefinition formats[] = {
     {11U, 0x20203859U},
     {12U, 0x20203859U},
     {13U, 0x465a5958U},
+};
+struct BranchNativeFormatDefinition { uint8_t branch; uint32_t format, native, native_gmsl; };
+static const BranchNativeFormatDefinition branch_native_formats[] = {
+    {2U, 0x20363159U, 0x49363159U, 0x49363159U},
+    {2U, 0x20203859U, 0x20493859U, 0x20493859U},
+    {3U, 0x20363159U, 0x49363159U, 0x49363159U},
+    {3U, 0x20203859U, 0x20493859U, 0x20493859U},
 };
 struct SdkFormatDefinition { const char* name; uint32_t format, native, native_gmsl; };
 static const SdkFormatDefinition sdk_formats[] = {
