@@ -20,8 +20,13 @@ options_watcher::options_watcher( std::chrono::milliseconds update_interval )
 
 options_watcher::~options_watcher()
 {
-    _destructing = true;
-    stop();
+    {
+        std::lock_guard< std::mutex > lock( _mutex );  // so the updater cannot miss it between its check and its wait
+        _destructing = true;
+    }
+    _stopping.notify_all();
+    if( _updater.joinable() )
+        _updater.join();
 }
 
 void options_watcher::register_option( rs2_option id, std::shared_ptr< option > option )
@@ -53,8 +58,7 @@ void options_watcher::unregister_option( rs2_option id )
         _options.erase( id );
     }
 
-    if( should_stop() )
-        stop();
+    _stopping.notify_all();  // the updater goes idle if this was the last option
 }
 
 rsutils::subscription options_watcher::subscribe( callback && cb )
@@ -90,87 +94,48 @@ bool options_watcher::should_stop() const
 
 void options_watcher::start()
 {
-    if( _running.exchange( true ) ) // Already started; the exchange lets only one of concurrent calls spawn the thread
-        return;
-
-    if( _updater.joinable() ) // A previous thread exited after the last unsubscribe
-        _updater.join();
-
-    _updater = std::thread( [this]() {
-        {
-            // The baseline poll must not touch the device while paused (reset, FW update)
-            std::unique_lock< std::mutex > lock( _mutex );
-            _stopping.wait( lock, [this] { return should_stop() || ! _paused.load(); } );
-        }
-        options_and_values options;
-        composite_options_and_values composites;
-        update( options, composites );
-        // A subscribe that arrived after the loop decided to exit saw _running and did not start a thread: resume here
-        do
-        {
-            thread_loop();
-            _running = false;
-        } while( should_start() && ! _running.exchange( true ) );
-    } );
-}
-
-void options_watcher::stop()
-{
+    // The updater lives as long as the watcher, idling while there is nothing to poll
+    std::lock_guard< std::mutex > lock( _mutex );
+    if( ! _updater.joinable() )
+        _updater = std::thread( [this]() { thread_loop(); } );
     _stopping.notify_all();
-    if( _updater.joinable() )
-    {
-        try
-        {
-            _updater.join();
-        }
-        catch( ... )
-        {
-            // Nothing to do on error
-        }
-    }
 }
 
 void options_watcher::thread_loop()
 {
-    while( !should_stop() )
+    while( ! _destructing )
     {
         {
-            std::unique_lock<std::mutex> lock( _mutex );
-            // 1. Block while paused
-            _stopping.wait( lock, [this]
-            {
-                return should_stop() || !_paused.load();
-            });
-            if (should_stop())
-                break;
-
-            // 2. Periodic wait
-            _stopping.wait_for( lock, _update_interval, [this]
-            {
-                return should_stop() || _paused.load();
-            });
-            // Checking for stop conditions after sleep.
-            if( should_stop() )
-                break;
-
-            // If still paused, go back to waiting
-            // this check is needed - do not remove because:
-            // 1. predicate may not be true even if wait_for woke up
-            // 2. spurious waking may happen (mostly in linux)
-            // 3. the paused flag may become true between the wait_for and here
-            if( _paused.load() )
-                continue;
+            // Idle until there is something to poll and the device is free to be queried (not in reset or FW update)
+            std::unique_lock< std::mutex > lock( _mutex );
+            _stopping.wait( lock, [this] { return _destructing || ( ! should_stop() && ! _paused.load() ); } );
         }
+        if( _destructing )
+            break;
 
+        // A fresh baseline after each idle period, so changes made while nobody was subscribed are not reported
         options_and_values updated_options;
         composite_options_and_values updated_composites;
         update( updated_options, updated_composites );
 
-        // Checking stop conditions after update, if stop requested no need to notify.
-        if( should_stop() )
-            break;
+        while( ! should_stop() && ! _paused.load() )
+        {
+            {
+                std::unique_lock< std::mutex > lock( _mutex );
+                _stopping.wait_for( lock, _update_interval, [this] { return should_stop() || _paused.load(); } );
+            }
+            // Spurious wakeups and a pause that began after the wait are covered by the loop condition
+            if( should_stop() || _paused.load() )
+                break;
 
-        notify( updated_options, updated_composites );
+            update( updated_options, updated_composites );
+
+            // Checking stop conditions after update, if stop requested no need to notify.
+            if( should_stop() )
+                break;
+
+            notify( updated_options, updated_composites );
+        }
     }
 }
 
@@ -187,7 +152,7 @@ options_watcher::options_and_values options_watcher::update_options()
 
     std::lock_guard< std::mutex > lock( _mutex );
 
-    if( should_stop() )
+    if( should_stop() || _paused.load() )  // a pause can land between the caller's check and this lock
         return updated_options;
 
     for( auto & opt : _options )
@@ -231,7 +196,7 @@ options_watcher::composite_options_and_values options_watcher::update_composite_
 
     for( auto & opt : _composite_options )
     {
-        if( should_stop() )
+        if( should_stop() || _paused.load() )
             break;
         try
         {
