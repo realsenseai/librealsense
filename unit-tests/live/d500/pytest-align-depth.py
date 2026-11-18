@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D585S"),  # no device-side alignment on this model
+    pytest.mark.requires(option=rs.option.enable_aligned_depth),
 ]
 
 
@@ -25,8 +26,6 @@ def depth_sensor(test_device):
     """The depth sensor, with aligned depth restored to off when the test ends."""
     dev, _ = test_device
     sensor = dev.first_depth_sensor()
-    if not sensor.supports(rs.option.enable_aligned_depth):
-        pytest.skip("device-side aligned depth is not supported by this firmware")
     set_align_depth(sensor, 0)  # each test starts from raw depth, whatever the previous one left behind
     yield sensor
     try:

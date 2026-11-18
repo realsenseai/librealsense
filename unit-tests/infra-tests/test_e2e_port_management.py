@@ -94,6 +94,14 @@ class TestDevicePortManagement:
         assert_outcomes(out, skipped=1)
         assert len(tracking["enable_only_calls"]) == 0
 
+    def test_unmet_requires_skips_without_enabling(self):
+        """requires(fw=) below the camera's minimum → skip that camera before its port is powered;
+        the cameras that meet it (or have no minimum listed) are enabled and run."""
+        rc, out, tracking = run_e2e("pytest-requires.py")
+        assert_outcomes(out, passed=2, skipped=1)
+        assert "D455 FW 7.61.47150.17821 is below the required 7.62" in tracking["logs"]["pytest-requires_D455-111.log"]
+        assert sorted(c['serials'][0] for c in tracking["enable_only_calls"]) == ['222', '777']
+
     def test_device_each_no_match_still_collected(self):
         """@device_each('D999') with no match: test is parametrized with a SKIP
         sentinel and skipped — even if the test body doesn't consume any device

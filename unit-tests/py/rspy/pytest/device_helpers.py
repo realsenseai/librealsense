@@ -394,6 +394,56 @@ def is_d585_on_gmsl(dev):
         and dev.get_info(rs.camera_info.connection_type) == "GMSL"
 
 
+REQUIRES_FLAGS = ('fw', 'option', 'sensor')
+
+
+def parse_fw_version(text):
+    """'7.62', '7.62.40621' or '7.62.40621.11153' -> (7, 62, 40621, 11153); missing parts are 0."""
+    parts = str(text).split('.')
+    if not 2 <= len(parts) <= 4 or not all(p.isdigit() for p in parts):
+        raise ValueError(f"FW version {text!r} is not like 7.62 or 7.62.40621.11153")
+    return tuple(int(p) for p in parts) + (0,) * (4 - len(parts))
+
+
+def check_fw_requirement(fw):
+    """Raise ValueError on an unparsable ``requires(fw=)`` version, or on a key an earlier key always matches first."""
+    keys = list(fw) if isinstance(fw, dict) else []
+    for version in (fw.values() if isinstance(fw, dict) else [fw]):
+        if version is not None:   # None: no minimum for that spec
+            parse_fw_version(version)
+    for i, key in enumerate(keys):
+        first = next((k for k in keys[:i] if k.upper() in key.upper() or _pattern_excluded(key, [k])), None)
+        if first:
+            raise ValueError(f"fw key {key!r} never applies: {first!r} before it matches first")
+
+
+def unmet_requirement(device, requires_markers):
+    """Why the device fails the ``requires`` markers, or None; reads its last-enumerated handle, so FW flashed earlier counts."""
+    if not requires_markers or not device:
+        return None
+    import pyrealsense2 as rs
+    dev = device.handle
+    if dev.is_in_recovery_mode() or not dev.supports(rs.camera_info.firmware_version):
+        return None
+    fw = dev.get_info(rs.camera_info.firmware_version)
+    sensors = dev.query_sensors()
+    sensor_names = [s.get_info(rs.camera_info.name) for s in sensors]
+    for marker in requires_markers:
+        min_fw = marker.kwargs.get('fw')
+        if isinstance(min_fw, dict):
+            min_fw = next((v for spec, v in min_fw.items() if device.serial_number in devices.by_spec(spec, [])), None)
+        if min_fw and parse_fw_version(fw) < parse_fw_version(min_fw):
+            return f"{device.name} FW {fw} is below the required {min_fw}"
+        options = marker.kwargs.get('option', [])
+        options = options if isinstance(options, (list, tuple)) else [options]
+        if options and not any(s.supports(o) for s in sensors for o in options):
+            return f"{device.name} has no {' or '.join(map(str, options))} option"
+        sensor = marker.kwargs.get('sensor')
+        if sensor and sensor not in sensor_names:
+            return f"{device.name} has no {sensor} sensor"
+    return None
+
+
 def skip_d585_on_gmsl(dev, reason):
     """Skip the test when the device is a D585 connected over GMSL.
 

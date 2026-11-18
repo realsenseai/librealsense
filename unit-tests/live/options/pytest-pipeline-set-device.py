@@ -12,6 +12,7 @@ pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_type_exclude("DDS"),  # USB-focused: DDS advertises the option through a separate transport
     pytest.mark.skipif(platform.machine() == "aarch64", reason="D455 not available on CI Jetson"),
+    pytest.mark.requires(option=rs.option.gyro_sensitivity),
 ]
 
 gyro_sensitivity_value = 4.0
@@ -20,8 +21,6 @@ gyro_sensitivity_value = 4.0
 def test_pipeline_set_device(test_device):
     dev, ctx = test_device
     motion_sensor = dev.first_motion_sensor()
-    if not motion_sensor.supports(rs.option.gyro_sensitivity):
-        pytest.skip("Gyro Sensitivity option not supported on this device/FW")
     pipe = rs.pipeline(ctx)
     pipe.set_device(dev)
 

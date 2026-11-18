@@ -9,8 +9,6 @@ import time
 
 import pytest
 import pyrealsense2 as rs
-import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version
 from pytest_check import check
 import logging
 log = logging.getLogger(__name__)
@@ -20,6 +18,7 @@ pytestmark = [
     pytest.mark.device_each( "D555" ),
     pytest.mark.device_type( "DDS" ),
     pytest.mark.context( "nightly" ),
+    pytest.mark.requires( fw="7.62" ),   # 8-parameter ICR control; older FW may lack the filter, from 7.62 a missing one is an error
 ]
 
 
@@ -30,17 +29,8 @@ CLOSE_RANGE_METADATA_BIT = 1 << 5
 RATIO_INDEX_DEFAULT = 1.0    # choices ["1","2","4"], default "2" -> index 1
 SHIFT_DEFAULT      = 0.0
 
-# Minimum FW with the 8-parameter Improved Close Range control, for every device. Below it the filter may not be
-# exposed and get_embedded_filter() throws rather than returning a falsy value, so we skip up front; from it on, a
-# missing filter is an error.
-MIN_FW = rsutils.version( 7, 62, 0, 0 )
-
 # Pick a depth profile that the close-range merge actually exercises on D555.
 DEPTH_W, DEPTH_H, DEPTH_FPS = 640, 360, 30
-
-
-def _skip_if_fw_below_minimum( dev ):
-    require_min_fw_version( dev, MIN_FW, "Improved Close Range 8-parameter control" )
 
 
 ICR = rs.composite_option_id.icr_control
@@ -49,7 +39,6 @@ ICR = rs.composite_option_id.icr_control
 def _get_close_range_filter( test_device, composite=None ):
     """composite: True/False skips unless the FW exposes the icr_control / scalar form; None accepts both"""
     dev, _ = test_device
-    _skip_if_fw_below_minimum( dev )
     depth_sensor = dev.first_depth_sensor()
     f = depth_sensor.get_embedded_filter( rs.embedded_filter_type.improved_close_range_depth )
     if composite is not None and _is_composite( f ) != composite:
@@ -96,7 +85,6 @@ def test_close_range_filter_present( test_device ):
 
 def test_close_range_dedicated_getter( test_device ):
     dev, _ = test_device
-    _skip_if_fw_below_minimum( dev )
     embedded_filter = dev.first_depth_sensor().get_embedded_close_range_filter()
     assert embedded_filter, "get_embedded_close_range_filter() returned an invalid filter"
     assert isinstance( embedded_filter, rs.embedded_close_range_filter )
