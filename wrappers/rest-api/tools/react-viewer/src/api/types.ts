@@ -98,17 +98,24 @@ export function profilesAt(
 export type WireOption = Required<Omit<OptionInfo, 'option_id'>>
 export type OptionMap = Record<string, WireOption>
 
-export interface OptionInfo {
-  option_id: string
-  description?: string
-  current_value: number | boolean | string
-  default_value: number | boolean | string
+/** An advanced-mode field as the API sends it: the SDK gives these only a value, a minimum and a maximum */
+export interface WireAdvancedControl {
+  current_value: number
   min_value: number
   max_value: number
+  integer: boolean // an int field, which JSON can't tell from a float
+}
+
+export interface OptionInfo {
+  option_id: string  // the key it came under
+  description?: string  // these four: none for advanced-mode controls
+  default_value?: number | boolean | string
   step?: number
-  units?: string
+  value_descriptions?: Record<string, string>  // each value's label, as far as the SDK has them
+  current_value: number | boolean | string
+  min_value: number
+  max_value: number
   read_only: boolean
-  value_descriptions?: Record<string, string>  // For enum-type options: {value: description}
 }
 
 // A sensor's post-processing filters, keyed by name. Filters share option names

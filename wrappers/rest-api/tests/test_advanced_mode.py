@@ -101,13 +101,13 @@ def test_reports_a_field_with_its_range(device_for):
     groups = advanced_mode.controls(device_for(_FakeAM()))
     assert "deepSeaSecondPeakThreshold" in groups["depth_control"]
     o = _by_field(groups)["deepSeaSecondPeakThreshold"]
-    assert (o.current_value, o.min_value, o.max_value, o.step) == (325, 0, 1023, 1)
+    assert (o.current_value, o.min_value, o.max_value, o.integer) == (325, 0, 1023, True)
 
 
 def test_field_without_range_reports_value_for_min_and_max(device_for):
     o = _by_field(advanced_mode.controls(device_for(_FakeAM())))["lambdaAD"]
     assert (o.current_value, o.min_value, o.max_value) == (800.0, 800.0, 800.0)
-    assert o.step is None  # a float field states no step
+    assert not o.integer
 
 
 def test_reports_every_group_the_device_has(device_for):

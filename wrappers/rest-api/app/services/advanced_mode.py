@@ -1,24 +1,16 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""RS400 advanced-mode controls, flattened into OptionInfo objects."""
+"""RS400 advanced-mode controls, each field as an AdvancedControl."""
 
 import pyrealsense2 as rs
 from typing import Dict
 
-from app.models.option import OptionInfo
+from app.models.option import AdvancedControl
 
 
-def control(value, minimum, maximum) -> OptionInfo:
-    return OptionInfo(
-        current_value=value,
-        default_value=value,  # advanced mode exposes no per-field default
-        min_value=minimum,
-        max_value=maximum,
-        # JSON loses the difference between 10 and 10.0, so an integer field says so
-        # through its step. The SDK states no step for the others.
-        step=1 if isinstance(value, int) else None,
-    )
+def control(value, minimum, maximum) -> AdvancedControl:
+    return AdvancedControl(current_value=value, min_value=minimum, max_value=maximum, integer=isinstance(value, int))
 
 
 def status(dev) -> Dict[str, bool]:
@@ -39,10 +31,10 @@ def toggle(dev, enable: bool) -> None:
     rs.rs400_advanced_mode(dev).toggle_advanced_mode(enable)
 
 
-def controls(dev) -> Dict[str, Dict[str, OptionInfo]]:
+def controls(dev) -> Dict[str, Dict[str, AdvancedControl]]:
     """Every advanced-mode control the device has, by field, keyed by the group the writes go to."""
     groups = rs.rs400_advanced_mode(dev).get_all_controls()
-    by_group: Dict[str, Dict[str, OptionInfo]] = {}
+    by_group: Dict[str, Dict[str, AdvancedControl]] = {}
     for group in groups.keys():
         values, mins, maxes = groups[group]
         by_group[group] = {f: control(values[f], mins[f], maxes[f]) for f in values.keys()}

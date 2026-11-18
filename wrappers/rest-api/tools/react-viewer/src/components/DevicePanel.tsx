@@ -645,7 +645,7 @@ function SensorPanel({
         await setControlEnabled(deviceId, key, group.default_enabled!)
       }
       for (const option of group.options.filter(isModified)) {
-        await setControl(deviceId, key, option.option_id, option.default_value)
+        await setControl(deviceId, key, option.option_id, option.default_value!)
       }
     }
   }
@@ -979,9 +979,9 @@ function ControlSection({
   )
 }
 
-/** Whether a writable control sits away from the default the device reports for it. */
+/** Whether a writable control sits away from the default the device reports for it, if it reports one. */
 function isModified(option: OptionInfo): boolean {
-  return !option.read_only && option.current_value !== option.default_value
+  return !option.read_only && option.default_value !== undefined && option.current_value !== option.default_value
 }
 
 interface OptionControlProps {
@@ -1007,10 +1007,10 @@ function OptionControl({ option, onSet }: OptionControlProps) {
   }
 
   const handleRestoreDefault = async () => {
-    await handleChange(option.default_value)
+    await handleChange(option.default_value!)
   }
 
-  const isModified = localValue !== option.default_value
+  const isModified = option.default_value !== undefined && localValue !== option.default_value
   // A dropdown only makes sense when every value the option accepts has a label; the
   // backend reports the labels the SDK has, which for a slider is a leading few or none.
   const labelCount = Object.keys(option.value_descriptions || {}).length
@@ -1038,7 +1038,6 @@ function OptionControl({ option, onSet }: OptionControlProps) {
           {optionLabel(option.option_id)}
         </label>
         <div className="flex items-center gap-1">
-          {option.units && <span className="text-rs-muted">{option.units}</span>}
           {!option.read_only && isModified && (
             <button
               onClick={handleRestoreDefault}

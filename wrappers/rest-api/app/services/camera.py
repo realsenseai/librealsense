@@ -7,7 +7,7 @@ from typing import Dict, List
 import pyrealsense2 as rs
 
 from app.models.hwm import HwmRequest
-from app.models.option import OptionInfo
+from app.models.option import AdvancedControl, OptionInfo
 from app.models.sensor import StreamProfile
 from app.models.stream import Extrinsics, StreamConfig, StreamExtrinsics
 from app.services import advanced_mode, options
@@ -93,13 +93,13 @@ class Camera:
     def set_advanced_mode(self, enable: bool) -> None:
         advanced_mode.toggle(self.dev, enable)
 
-    def advanced_controls(self) -> Dict[str, Dict[str, OptionInfo]]:
+    def advanced_controls(self) -> Dict[str, Dict[str, AdvancedControl]]:
         return advanced_mode.controls(self.dev)
 
-    def advanced_group(self, group: str) -> Dict[str, OptionInfo]:
+    def advanced_group(self, group: str) -> Dict[str, AdvancedControl]:
         return self.advanced_controls()[group]
 
-    def advanced_control(self, group: str, field: str) -> OptionInfo:
+    def advanced_control(self, group: str, field: str) -> AdvancedControl:
         return self.advanced_group(group)[field]
 
     def set_advanced_control(self, group: str, field: str, value: float) -> None:

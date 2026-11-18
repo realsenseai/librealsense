@@ -307,11 +307,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
 
   toggleAdvancedMode: async (deviceId: string, enable: boolean) => {
     try {
-      // Restarts the device on the backend; wait, then refresh device + sensors + status.
+      // The device resets: devices_changed drops it and brings it back, which reloads it as a new one
       await apiClient.setAdvancedMode(deviceId, enable)
-      await get().fetchDevices(true)
-      await get().fetchSensors(deviceId)
-      await get().fetchDeviceControls(deviceId)
     } catch (error) {
       set({ error: `Failed to ${enable ? 'enable' : 'disable'} advanced mode: ${error instanceof Error ? error.message : 'unknown error'}` })
     }

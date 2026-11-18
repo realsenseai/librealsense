@@ -69,7 +69,6 @@ export const mockDepthOptions: OptionInfo[] = [
     min_value: 1,
     max_value: 165000,
     step: 1,
-    units: 'μs',
     read_only: false,
   },
   {
@@ -90,7 +89,6 @@ export const mockDepthOptions: OptionInfo[] = [
     min_value: 0,
     max_value: 360,
     step: 30,
-    units: 'mW',
     read_only: false,
   },
 ]
@@ -130,7 +128,6 @@ export const mockColorOptions: OptionInfo[] = [
     min_value: 1,
     max_value: 10000,
     step: 1,
-    units: 'μs',
     read_only: false,
   },
   {
