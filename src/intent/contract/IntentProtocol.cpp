@@ -139,21 +139,29 @@ Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &
     s.sensor = sensor;
     s.enabled = true;
     size_t identityCursor = parent.value;
-    bool identityFound = false;
+    // Discover only the first identity. The ordered validation pass, not this
+    // scan, decides errors for known streams (including later duplicates).
     while (identityCursor < parent.value + parent.length) {
         Record identity = {};
         if (!next(data, identityCursor, parent.value + parent.length, identity))
-            return bad(identity, PARSE_BOUNDS, sensor);
+            break;
         if (identity.type == BRANCH_ID) {
-            if (identityFound) return bad(identity, PARSE_DUPLICATE, sensor);
-            if (identity.length != 1U || (identity.flags & 2U))
-                return bad(identity, PARSE_SHAPE, sensor);
-            s.branch = data[identity.value];
-            if (!s.branch) return bad(parent, PARSE_VALUE, sensor);
-            identityFound = true;
+            if (identity.length == 1U && !(identity.flags & 2U))
+                s.branch = data[identity.value];
+            break;
         }
     }
-    if (identityFound && !knownBranch(s.branch)) return Error();
+    if (s.branch && !knownBranch(s.branch)) {
+        // Unknown streams remain opaque, but must have valid TLV structure
+        // and one unambiguous identity, as before.
+        while (identityCursor < parent.value + parent.length) {
+            Record child = {};
+            if (!next(data, identityCursor, parent.value + parent.length, child))
+                return bad(child, PARSE_BOUNDS, sensor);
+            if (child.type == BRANCH_ID) return bad(child, PARSE_DUPLICATE, sensor);
+        }
+        return Error();
+    }
     unsigned seen = 0U;
     size_t pos = parent.value;
     const size_t end = pos + parent.length;
@@ -179,6 +187,7 @@ Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &
         switch (r.type) {
         case BRANCH_ID:
             s.branch = data[r.value];
+            if (!s.branch) return bad(parent, PARSE_VALUE, sensor);
             break;
         case FORMAT:
             s.format = read32(data + r.value);
@@ -204,8 +213,6 @@ Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &
     if (seen != (s.enabled ? 31U : 33U))
         return Error(INCOMPLETE, sensor, s.branch, static_cast<uint16_t>(parent.start), 0U,
                      PARSE_MISSING);
-    if (s.branch == 0U)
-        return bad(parent, PARSE_VALUE, sensor, s.branch);
     return Error();
 }
 void header(uint8_t *p, uint8_t type, uint8_t flags, uint16_t length) {
