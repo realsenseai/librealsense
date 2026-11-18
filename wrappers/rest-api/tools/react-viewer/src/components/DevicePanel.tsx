@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MutableRefObject, ReactElement } from 'react'
 import { useAppStore } from '../store'
-import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
-import { SECTIONS, firmwareStatus, optionLabel } from '../api/types'
+import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState } from '../api/types'
+import { SECTIONS, firmwareStatus, isStreaming, optionLabel } from '../api/types'
 import {
   applyFormat, applyFps, applyResolution, applyToggle, withStream,
   formatOptions, fpsOptions, resolutionOptions, sharedFps, type Selection,
@@ -136,8 +136,7 @@ export function DevicePanel() {
     error,
     clearError,
     updateStreamConfig,
-    updateSensorConfig,
-    startSensorStreaming,
+startSensorStreaming,
     stopSensorStreaming,
     checkFirmwareUpdates,
     updateFirmwareFromFile,
@@ -321,9 +320,8 @@ export function DevicePanel() {
                 onToggle={() => toggleDeviceActive(device)}
                 onReset={() => resetDevice(device.device_id)}
                 onUpdateStreamConfig={(config) => updateStreamConfig(device.device_id, config)}
-                onUpdateSensorConfig={(sensorId, config) => updateSensorConfig(device.device_id, sensorId, config)}
-                onStartSensorStreaming={(sensorId) => startSensorStreaming(device.device_id, sensorId)}
-                onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
+onStartSensorStreaming={(sensorIndex) => startSensorStreaming(device.device_id, sensorIndex)}
+                onStopSensorStreaming={(sensorIndex) => stopSensorStreaming(device.device_id, sensorIndex)}
                 onCheckFirmwareUpdates={() => handleCheckFirmwareUpdates(device.device_id)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
@@ -359,9 +357,8 @@ interface DeviceCardProps {
   onToggle: () => void
   onReset: () => void
   onUpdateStreamConfig: (config: StreamConfig) => void
-  onUpdateSensorConfig: (sensorId: string, config: Partial<SensorConfig>) => void
-  onStartSensorStreaming: (sensorId: string) => void
-  onStopSensorStreaming: (sensorId: string) => void
+  onStartSensorStreaming: (sensorIndex: number) => void
+  onStopSensorStreaming: (sensorIndex: number) => void
   onCheckFirmwareUpdates: () => void
   onUpdateFirmwareFromFile: (file: File) => void
   onToggleAdvancedMode: (enable: boolean) => void
@@ -374,7 +371,6 @@ function DeviceCard({
   onToggle,
   onReset,
   onUpdateStreamConfig,
-  onUpdateSensorConfig,
   onStartSensorStreaming,
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
@@ -385,22 +381,21 @@ function DeviceCard({
   const [showMenu, setShowMenu] = useState(false)
   const fwPicker = useFilePicker(onUpdateFirmwareFromFile, '.bin')
 
-  const isActive = deviceState?.isActive || false
+  const isActive = !!deviceState
   const isLoading = deviceState?.isLoading || false
-  const isStreaming = deviceState?.isStreaming || false
+  const streaming = !!deviceState && isStreaming(deviceState)
   const sensors = deviceState?.sensors || []
   const controls = deviceState?.controls || {}
   const streamConfigs = deviceState?.streamConfigs || []
-  const sensorConfigs = deviceState?.sensorConfigs || {}
-  const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
+const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
 
   // Group stream configs by sensor
   const streamsBySensor: Record<string, StreamConfig[]> = {}
   for (const config of streamConfigs) {
-    if (!streamsBySensor[config.sensor_id]) {
-      streamsBySensor[config.sensor_id] = []
+    if (!streamsBySensor[config.sensor_index]) {
+      streamsBySensor[config.sensor_index] = []
     }
-    streamsBySensor[config.sensor_id].push(config)
+    streamsBySensor[config.sensor_index].push(config)
   }
 
   const handleCheckFirmwareUpdates = () => {
@@ -429,7 +424,7 @@ function DeviceCard({
             <p className="text-sm text-rs-muted truncate nums">S/N: {device.serial_number}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
-            {isStreaming && (
+            {streaming && (
               <span className="w-2 h-2 bg-rs-ok rounded-full animate-pulse" title="Streaming" />
             )}
             {isLoading && (
@@ -500,10 +495,10 @@ function DeviceCard({
                         }}
                         // Toggling either way restarts the device, so the C++ viewer keeps this
                         // item disabled while streaming (device-model.cpp) - do the same here.
-                        disabled={isStreaming}
-                        title={isStreaming ? 'Disabled while streaming' : undefined}
+                        disabled={streaming}
+                        title={streaming ? 'Disabled while streaming' : undefined}
                         className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
-                          isStreaming
+                          streaming
                             ? 'text-rs-dim cursor-not-allowed'
                             : 'text-rs-text hover:bg-rs-border/60'
                         }`}
@@ -522,9 +517,9 @@ function DeviceCard({
                         // file input lives outside the menu and persists.
                         setTimeout(() => fwPicker.open(), 0)
                       }}
-                      disabled={isStreaming}
+                      disabled={streaming}
                       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
-                        isStreaming
+                        streaming
                           ? 'text-rs-dim cursor-not-allowed'
                           : 'text-rs-text hover:bg-rs-border/60'
                       }`}
@@ -540,9 +535,9 @@ function DeviceCard({
                         setShowMenu(false)
                         onReset()
                       }}
-                      disabled={isStreaming}
+                      disabled={streaming}
                       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
-                        isStreaming ? 'text-rs-dim cursor-not-allowed' : 'text-rs-err hover:bg-rs-err/10'
+                        streaming ? 'text-rs-dim cursor-not-allowed' : 'text-rs-err hover:bg-rs-err/10'
                       }`}
                     >
                       <RefreshCcw className="w-4 h-4" />
@@ -556,10 +551,10 @@ function DeviceCard({
             {/* Toggle switch */}
             <button
               onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              disabled={isLoading || isStreaming}
+              disabled={isLoading || streaming}
               className={`relative w-10 h-5 rounded-full transition-colors ${
                 isActive ? 'bg-rs-blue' : 'bg-rs-border'
-              } ${isLoading || isStreaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
+              } ${isLoading || streaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
               title={isActive ? 'Deactivate device' : 'Activate device'}
             >
               <span
@@ -599,17 +594,15 @@ function DeviceCard({
         <div className="border-t border-rs-border p-3 space-y-1.5">
           {sensors.map((sensor) => (
             <SensorPanel
-              key={sensor.sensor_id}
+              key={sensor.sensor_index}
               deviceId={device.device_id}
               sensor={sensor}
-              groups={Object.entries(controls).filter(([, g]) => g.sensorId === sensor.sensor_id)}
-              streams={streamsBySensor[sensor.sensor_id] || []}
-              sensorConfig={sensorConfigs[sensor.sensor_id]}
-              status={sensorStreamingStatus[sensor.sensor_id]}
+              groups={Object.entries(controls).filter(([, g]) => g.sensorIndex === sensor.sensor_index)}
+              streams={streamsBySensor[sensor.sensor_index] || []}
+status={sensorStreamingStatus[sensor.sensor_index]}
               onUpdateStreamConfig={onUpdateStreamConfig}
-              onUpdateSensorConfig={onUpdateSensorConfig}
-              onStartStreaming={() => onStartSensorStreaming(sensor.sensor_id)}
-              onStopStreaming={() => onStopSensorStreaming(sensor.sensor_id)}
+onStartStreaming={() => onStartSensorStreaming(sensor.sensor_index)}
+              onStopStreaming={() => onStopSensorStreaming(sensor.sensor_index)}
             />
           ))}
         </div>
@@ -624,10 +617,8 @@ interface SensorPanelProps {
   /** The sensor's control groups, each with the key its writes go to. */
   groups: [string, ControlGroup][]
   streams: StreamConfig[]
-  sensorConfig?: SensorConfig
   status?: { is_streaming: boolean; pendingOp?: string | null; error?: string | null }
   onUpdateStreamConfig: (config: StreamConfig) => void
-  onUpdateSensorConfig: (sensorId: string, config: Partial<SensorConfig>) => void
   onStartStreaming: () => void
   onStopStreaming: () => void
 }
@@ -637,11 +628,11 @@ interface SensorPanelProps {
  * C++ viewer draws a sensor (device-model.cpp) rather than listing every sensor twice.
  */
 function SensorPanel({
-  deviceId, sensor, groups, streams, sensorConfig, status,
-  onUpdateStreamConfig, onUpdateSensorConfig, onStartStreaming, onStopStreaming,
+  deviceId, sensor, groups, streams, status,
+  onUpdateStreamConfig, onStartStreaming, onStopStreaming,
 }: SensorPanelProps) {
   const { setControl, setControlEnabled, setPostProcessing, deviceStates } = useAppStore()
-  const postProcessing = deviceStates[deviceId]?.postProcessing?.[sensor.sensor_id] !== false
+  const postProcessing = deviceStates[deviceId]?.postProcessing?.[sensor.sensor_index] !== false
   // The search covers this sensor's controls, so it lives with them, as in the C++ viewer.
   const [searchQuery, setSearchQuery] = useState('')
   const searching = searchQuery.trim().length > 0
@@ -667,13 +658,13 @@ function SensorPanel({
   const modifiedCount = groups.flatMap(([, g]) => g.options).filter(isModified).length
 
   // Every change goes through streamSelection, which keeps the pick and moves the rest onto real SDK profiles
-  const profiles = sensor.supported_stream_profiles
-  const sel: Selection | undefined = sensorConfig && { ...sensorConfig, streams }
+  const profiles = sensor.stream_profiles
+  // A shared resolution/fps is each stream's: the first enabled one's, written to all on change
+  const first = streams.find(c => c.enable) ?? streams[0]
+  const sel: Selection | undefined = first && { resolution: first.resolution, framerate: first.framerate, streams }
   const shared = sharedFps(profiles)
-  const commit = (next: Selection) => {
-    next.streams.forEach(onUpdateStreamConfig)
-    onUpdateSensorConfig(sensor.sensor_id, { resolution: next.resolution, framerate: next.framerate })
-  }
+  const commit = (next: Selection) => next.streams.forEach(c => onUpdateStreamConfig(
+    shared ? { ...c, resolution: next.resolution, framerate: next.framerate } : c))
 
   return (
     <Collapsible
@@ -751,7 +742,7 @@ function SensorPanel({
             <div className="space-y-1">
               {sel && streams.map((config) => (
                 <StreamConfigItem
-                  key={`${config.sensor_id}-${config.stream_type}`}
+                  key={`${config.sensor_index}-${config.stream_type}`}
                   config={config}
                   formats={formatOptions(profiles, config.stream_type)}
                   fpsChoices={fpsOptions(profiles, config.stream_type)}
@@ -787,7 +778,7 @@ function SensorPanel({
               // Post-processing is the one section the viewer can bypass wholesale.
               sectionSwitch={title === 'Post-Processing' ? {
                 enabled: postProcessing,
-                onToggle: () => setPostProcessing(deviceId, sensor.sensor_id, !postProcessing),
+                onToggle: () => setPostProcessing(deviceId, sensor.sensor_index, !postProcessing),
               } : undefined}
               searchQuery={searchQuery}
               onSet={(key, optionId, value) => setControl(deviceId, key, optionId, value)}

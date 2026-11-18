@@ -66,16 +66,13 @@ class TestRealSenseAPIIntegration:
         assert len(sensors) > 0
 
         sensor = sensors[0]
-        assert sensor.sensor_id is not None
+        assert sensor.sensor_index is not None
         assert sensor.name is not None
-        assert sensor.type is not None
-        assert isinstance(sensor.supported_stream_profiles, list)
-        assert isinstance(sensor.options, list)
+        assert isinstance(sensor.stream_profiles, list)
 
-        retrieved_sensor = real_rs_manager.cameras[device_id].sensors[0].info()
-        assert retrieved_sensor.sensor_id == sensor.sensor_id
+        retrieved_sensor = real_rs_manager.cameras[device_id].sensors[sensor.sensor_index].info()
+        assert retrieved_sensor.sensor_index == sensor.sensor_index
         assert retrieved_sensor.name == sensor.name
-        assert retrieved_sensor.type == sensor.type
 
     def test_set_option_rs(self, real_rs_manager):
         """Test setting sensor options using real RealSense API"""
@@ -157,7 +154,7 @@ class TestRealSenseAPIIntegration:
         assert isinstance(sensors, list)
         assert len(sensors) > 0
 
-        for key in ("sensor_id", "name", "type", "supported_stream_profiles", "options"):
+        for key in ("sensor_index", "name", "stream_profiles", "active_streams"):
             assert key in sensors[0]
 
     def test_start_sensor_default_profile_rs(self):
@@ -166,14 +163,19 @@ class TestRealSenseAPIIntegration:
         device_id = first_device_id(client)
 
         sensor = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]
-        default = next(p for p in sensor["supported_stream_profiles"] if p["default"])
-        url = f"/api/v1/devices/{device_id}/sensors/{sensor['sensor_id']}"
+        default = next(p for p in sensor["stream_profiles"] if p["default"])
+        url = f"/api/v1/devices/{device_id}/sensors/{sensor['sensor_index']}"
 
-        response = client.post(f"{url}/start", json={"profiles": [default]})
+        response = client.post(f"{url}/open", json={"profiles": [default]})
+        assert response.status_code == 200, response.text
         try:
-            assert response.status_code == 200, response.text
+            response = client.post(f"{url}/start")
+            try:
+                assert response.status_code == 200, response.text
+            finally:
+                client.post(f"{url}/stop")
         finally:
-            client.post(f"{url}/stop")
+            client.post(f"{url}/close")
 
     def test_start_pipeline_default_profile_rs(self):
         """Start the pipeline with a sensor's SDK default profile, as rs.config.enable_stream takes it"""
@@ -181,7 +183,7 @@ class TestRealSenseAPIIntegration:
         device_id = first_device_id(client)
 
         sensor = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]
-        p = next(p for p in sensor["supported_stream_profiles"] if p["default"])
+        p = next(p for p in sensor["stream_profiles"] if p["default"])
         config = {"stream": p["stream_type"], "index": p["stream_index"], "width": p["width"],
                   "height": p["height"], "format": p["format"], "fps": p["fps"]}
         url = f"/api/v1/devices/{device_id}/stream"

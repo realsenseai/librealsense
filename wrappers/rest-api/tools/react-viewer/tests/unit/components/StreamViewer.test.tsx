@@ -28,7 +28,6 @@ describe('StreamViewer', () => {
     it('shows the same empty state when device is active but no streams enabled', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         // Use `enable` (singular) — the actual StreamConfig field name. The
         // mock factory defaults `enable: true`, so the wrong field name leaves
         // the stream enabled and the empty-state branch never renders.
@@ -53,11 +52,9 @@ describe('StreamViewer', () => {
         enable: true, // Component uses 'enable' property
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [depthConfig],
-        isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
+          0: { sensor_index: 0, name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -83,11 +80,9 @@ describe('StreamViewer', () => {
         format: 'RGB8',
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [depthConfig, colorConfig],
-        isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color') },
+          0: { sensor_index: 0, name: '', is_streaming: true, profiles: startedProfiles('depth', 'color') },
         },
       })
       
@@ -112,19 +107,15 @@ describe('StreamViewer', () => {
       const config2 = createMockStreamConfig({ stream_type: 'depth', enable: true })
       
       const state1 = createMockDeviceState(device1, {
-        isActive: true,
         streamConfigs: [config1],
-        isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
+          0: { sensor_index: 0, name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       const state2 = createMockDeviceState(device2, {
-        isActive: true,
         streamConfigs: [config2],
-        isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
+          0: { sensor_index: 0, name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -139,39 +130,6 @@ describe('StreamViewer', () => {
       
       expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(2)
     })
-
-    it('only shows streams from active devices, not inactive ones', () => {
-      const activeDevice = createMockDevice({ device_id: 'active-1', name: 'Active Device' })
-      const inactiveDevice = createMockDevice({ device_id: 'inactive-1', name: 'Inactive Device' })
-      
-      const activeState = createMockDeviceState(activeDevice, {
-        isActive: true,
-        streamConfigs: [createMockStreamConfig({ enable: true })],
-        isStreaming: true,
-        sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
-        },
-      })
-      const inactiveState = createMockDeviceState(inactiveDevice, {
-        isActive: false,
-        streamConfigs: [createMockStreamConfig({ enable: true })],
-        isStreaming: true,
-        sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
-        },
-      })
-      
-      render(<StreamViewer />, {
-        initialStoreState: {
-          deviceStates: {
-            [activeDevice.device_id]: activeState,
-            [inactiveDevice.device_id]: inactiveState,
-          },
-        },
-      })
-      
-      expect(document.querySelectorAll('canvas.stream-video')).toHaveLength(1)
-    })
   })
 
   describe('Streaming Status', () => {
@@ -180,8 +138,6 @@ describe('StreamViewer', () => {
       const config = createMockStreamConfig({ enable: true })
 
       const notStreamingState = createMockDeviceState(device, {
-        isActive: true,
-        isStreaming: false,
         streamConfigs: [config],
       })
 
@@ -201,15 +157,14 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({
         stream_type: 'infrared-1',
-        sensor_id: 'sensor-0',
+        sensor_index: 0,
         enable: true,
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
         sensorStreamingStatus: {
-          'sensor-0': {
-            sensor_id: 'sensor-0',
+          0: {
+            sensor_index: 0,
             name: 'Stereo Module',
             is_streaming: true,
             profiles: startedProfiles('depth', 'infrared-1'),
@@ -230,15 +185,14 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({
         stream_type: 'color',
-        sensor_id: 'sensor-0',
+        sensor_index: 0,
         enable: true,
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
         sensorStreamingStatus: {
-          'sensor-0': {
-            sensor_id: 'sensor-0',
+          0: {
+            sensor_index: 0,
             name: 'Stereo Module',
             is_streaming: true,
             profiles: startedProfiles('depth'),
@@ -262,11 +216,9 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({ stream_type: 'color', format: 'RGB8', enable: true })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
-        isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
+          0: { sensor_index: 0, name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared') },
         },
       })
       
@@ -284,11 +236,9 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({ stream_type: 'infrared-1', format: 'Y8', enable: true })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
-        isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared-1') },
+          0: { sensor_index: 0, name: '', is_streaming: true, profiles: startedProfiles('depth', 'color', 'infrared-1') },
         },
       })
       

@@ -108,9 +108,9 @@ class ApiClient {
     await this.client.put(`/devices/${deviceId}/${key}/enabled/`, { value: enabled })
   }
 
-  async getSensorFilters(deviceId: string, sensorId: string): Promise<SensorFilters> {
+  async getSensorFilters(deviceId: string, sensorIndex: number): Promise<SensorFilters> {
     const response = await this.client.get<SensorFilters>(
-      `/devices/${deviceId}/sensors/${sensorId}/filters/`
+      `/devices/${deviceId}/sensors/${sensorIndex}/filters/`
     )
     return Object.fromEntries(
       Object.entries(response.data).map(([name, f]) => [name, { ...f, options: visibleOptions(f.options) }])
@@ -151,17 +151,30 @@ class ApiClient {
 
   async getSensors(deviceId: string): Promise<SensorInfo[]> {
     const response = await this.client.get<SensorInfo[]>(`/devices/${deviceId}/sensors/`)
-    return response.data.map((s) => ({ ...s, options: visibleOptions(s.options) }))
+    return response.data
+  }
+
+  async getSensorOptions(deviceId: string, sensorIndex: number): Promise<OptionInfo[]> {
+    const response = await this.client.get<OptionInfo[]>(`/devices/${deviceId}/sensors/${sensorIndex}/options/`)
+    return visibleOptions(response.data)
   }
 
   // ============ Per-Sensor Streaming (Sensor API) ============
 
+  /** Open the sensor with the profiles, then start it; one that won't start is closed again, as in the legacy viewer */
   async startSensor(
     deviceId: string,
-    sensorId: string,
+    sensorIndex: number,
     profiles: SupportedStreamProfile[]
   ): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/sensors/${sensorId}/start`, { profiles })
+    const path = `/devices/${deviceId}/sensors/${sensorIndex}`
+    await this.client.post(`${path}/open`, { profiles })
+    try {
+      await this.client.post(`${path}/start`)
+    } catch (error) {
+      await this.client.post(`${path}/close`)
+      throw error
+    }
   }
 
   /** The device's calibration between its streams, from each to every other */
@@ -170,8 +183,11 @@ class ApiClient {
     return data
   }
 
-  async stopSensor(deviceId: string, sensorId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/sensors/${sensorId}/stop`)
+  /** Stop the sensor, then close it, as the SDK's sensor does */
+  async stopSensor(deviceId: string, sensorIndex: number): Promise<void> {
+    const path = `/devices/${deviceId}/sensors/${sensorIndex}`
+    await this.client.post(`${path}/stop`)
+    await this.client.post(`${path}/close`)
   }
 
   // ============ System ============

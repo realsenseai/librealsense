@@ -26,7 +26,7 @@ const syncMode = createMockOption({
 const all = [exposure, gain, laser, ppSpatial]
 
 const groupOf = (options = all, name = ''): ControlGroup =>
-  ({ section: 'Controls', sensorId: 'sensor-0', name, options })
+  ({ section: 'Controls', sensorIndex: 0, name, options })
 
 describe('searchGroup', () => {
   it('returns all options unchanged for an empty query', () => {

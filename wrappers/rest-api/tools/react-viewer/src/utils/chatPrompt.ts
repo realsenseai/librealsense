@@ -1,6 +1,6 @@
 // System prompt builder and response parser for AI camera configuration chat
 
-import { optionLabel, streamKey } from '../api/types'
+import { isStreaming, optionLabel, streamKey } from '../api/types'
 import type { ControlGroup, DeviceState, SensorInfo, StreamConfig } from '../api/types'
 
 /**
@@ -103,10 +103,10 @@ function buildDeviceContext(deviceStates: Record<string, DeviceState>): string {
   const deviceDescriptions: string[] = []
   
   for (const [serial, state] of Object.entries(deviceStates)) {
-    const { device, sensors, controls, streamConfigs, isStreaming } = state
+    const { device, sensors, controls, streamConfigs } = state
     
     let desc = `### ${device.name} (Serial: ${serial})
-- Status: ${isStreaming ? 'STREAMING' : 'STOPPED'}
+- Status: ${isStreaming(state) ? 'STREAMING' : 'STOPPED'}
 - Firmware: ${device.firmware_version || 'Unknown'}
 - USB Type: ${device.usb_type || 'Unknown'}
 
@@ -129,7 +129,7 @@ function formatSensors(sensors: SensorInfo[]): string {
   if (!sensors.length) return '  (none loaded)'
   
   return sensors.map(s => {
-    const profiles = s.supported_stream_profiles || []
+    const profiles = s.stream_profiles || []
     const streamTypes = [...new Set(profiles.map(streamKey))]
 
     // Build available resolutions and FPS for each stream type
@@ -163,7 +163,7 @@ function formatOptions(controls: Record<string, ControlGroup>): string {
     // Only show key options to keep context manageable
     const keyOptions = group.options.filter(o => isKeyOption(optionLabel(o.option_id)))
     if (keyOptions.length) {
-      formatted.push(`  ${group.sensorId}:`)
+      formatted.push(`  sensor ${group.sensorIndex}:`)
       keyOptions.forEach(o => {
         formatted.push(
           `    - ${optionLabel(o.option_id)}: ${o.current_value} [${o.min_value}-${o.max_value}]`

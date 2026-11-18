@@ -1,4 +1,4 @@
-import type { DeviceInfo, DeviceState, StreamConfig, SensorConfig } from '@/api/types'
+import type { DeviceInfo, DeviceState, StreamConfig } from '@/api/types'
 import { mockSensors } from './sensors'
 
 export const mockDevice: DeviceInfo = {
@@ -25,7 +25,7 @@ export const mockDevice2: DeviceInfo = {
 
 export const mockStreamConfigs: StreamConfig[] = [
   {
-    sensor_id: '123456789-sensor-0',
+    sensor_index: 0,
     stream_type: 'Depth',
     format: 'Z16',
     resolution: { width: 640, height: 480 },
@@ -33,7 +33,7 @@ export const mockStreamConfigs: StreamConfig[] = [
     enable: true,
   },
   {
-    sensor_id: '123456789-sensor-0',
+    sensor_index: 0,
     stream_type: 'Infrared',
     format: 'Y8',
     resolution: { width: 640, height: 480 },
@@ -41,7 +41,7 @@ export const mockStreamConfigs: StreamConfig[] = [
     enable: false,
   },
   {
-    sensor_id: '123456789-sensor-1',
+    sensor_index: 1,
     stream_type: 'Color',
     format: 'RGB8',
     resolution: { width: 640, height: 480 },
@@ -49,7 +49,7 @@ export const mockStreamConfigs: StreamConfig[] = [
     enable: false,
   },
   {
-    sensor_id: '123456789-sensor-2',
+    sensor_index: 2,
     stream_type: 'Accel',
     format: 'MOTION_XYZ32F',
     resolution: { width: 1, height: 1 },
@@ -57,7 +57,7 @@ export const mockStreamConfigs: StreamConfig[] = [
     enable: false,
   },
   {
-    sensor_id: '123456789-sensor-2',
+    sensor_index: 2,
     stream_type: 'Gyro',
     format: 'MOTION_XYZ32F',
     resolution: { width: 1, height: 1 },
@@ -65,21 +65,6 @@ export const mockStreamConfigs: StreamConfig[] = [
     enable: false,
   },
 ]
-
-export const mockSensorConfigs: Record<string, SensorConfig> = {
-  '123456789-sensor-0': {
-    resolution: { width: 640, height: 480 },
-    framerate: 30,
-  },
-  '123456789-sensor-1': {
-    resolution: { width: 640, height: 480 },
-    framerate: 30,
-  },
-  '123456789-sensor-2': {
-    resolution: { width: 1, height: 1 },
-    framerate: 200,
-  },
-}
 
 export const mockDeviceState: DeviceState = {
   device: mockDevice,
@@ -92,21 +77,8 @@ export const mockDeviceState: DeviceState = {
   sensors: mockSensors,
   options: {},
   streamConfigs: mockStreamConfigs,
-  sensorConfigs: mockSensorConfigs,
-  isStreaming: false,
-  isActive: true,
   isLoading: false,
   sensorStreamingStatus: {},
-}
-
-export const mockDeviceStateInactive: DeviceState = {
-  ...mockDeviceState,
-  isActive: false,
-}
-
-export const mockDeviceStateStreaming: DeviceState = {
-  ...mockDeviceState,
-  isStreaming: true,
 }
 
 export const mockDeviceStates: Record<string, DeviceState> = {

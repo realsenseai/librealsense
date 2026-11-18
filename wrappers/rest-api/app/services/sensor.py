@@ -1,7 +1,6 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-import threading
 from typing import Callable, Dict, List
 
 import pyrealsense2 as rs
@@ -28,12 +27,9 @@ class Sensor:
     """One sensor of a camera, as the legacy viewer's subdevice_model: its SDK sensor, its options, its
     streaming through the sensor API, and its post-processing filters"""
 
-    def __init__(self, sensor: rs.sensor, index: int, sensor_id: str):
+    def __init__(self, sensor: rs.sensor, index: int):
         self._sensor = sensor
         self.index = index  # in the device's sensors, as the SDK lists them
-        self.id = sensor_id  # what the API names it by
-        self.started = False  # through the sensor API, which refuses to stop a sensor the pipeline runs
-        self.lock = threading.Lock()  # one start or stop at a time, as endpoints run in parallel
         self.name = sensor.get_info(rs.camera_info.name)
         # Its post-processing filters, in the SDK's recommended order, each to whether it is on: the SDK holds
         # everything else about a filter, its options included. All start off
@@ -42,12 +38,10 @@ class Sensor:
 
     def info(self) -> SensorInfo:
         return SensorInfo(
-            sensor_id=self.id,
+            sensor_index=self.index,
             name=self.name,
-            type=self.name,
-            supported_stream_profiles=[profile_row(p) for p in self._sensor.get_stream_profiles()],
-            active_profiles=self.active_streams(),
-            options=self.options(),
+            stream_profiles=[profile_row(p) for p in self._sensor.get_stream_profiles()],
+            active_streams=self.active_streams(),
         )
 
     def active_profiles(self) -> List[rs.stream_profile]:

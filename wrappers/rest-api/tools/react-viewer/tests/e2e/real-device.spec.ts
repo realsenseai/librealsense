@@ -71,7 +71,8 @@ test.afterEach(async ({ device, baseURL }) => {
   const sensorsUrl = `${baseURL}/api/v1/devices/${device.device_id}/sensors/`
   const sensors: SensorInfo[] = await (await fetch(sensorsUrl)).json()
   for (const sensor of sensors) {
-    await fetch(`${sensorsUrl}${sensor.sensor_id}/stop`, { method: 'POST' })
+    await fetch(`${sensorsUrl}${sensor.sensor_index}/stop`, { method: 'POST' })
+    await fetch(`${sensorsUrl}${sensor.sensor_index}/close`, { method: 'POST' })
   }
 })
 

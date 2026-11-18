@@ -198,9 +198,9 @@ describe('DevicePanel', () => {
       expect(screen.getByText('RealSense D435')).toBeInTheDocument()
     })
 
-    it('shows device as active when deviceState.isActive is true', () => {
+    it('shows device as active when it has a state', () => {
       const mockDevice = createMockDevice()
-      const mockDeviceState = createMockDeviceState(mockDevice, { isActive: true })
+      const mockDeviceState = createMockDeviceState(mockDevice)
       
       render(<DevicePanel />, {
         initialStoreState: {
@@ -342,7 +342,7 @@ describe('DevicePanel', () => {
     it('disables the toggle while streaming, as the C++ viewer does', async () => {
       const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
       useAppStore.setState({ toggleAdvancedMode })
-      const { device, ds } = withAdvancedMode({ isStreaming: true })
+      const { device, ds } = withAdvancedMode({ sensorStreamingStatus: { 0: { sensor_index: 0, is_streaming: true } } })
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
       })
@@ -373,24 +373,22 @@ describe('DevicePanel', () => {
     const row = (width: number, height: number, fps: number) =>
       ({ stream_type: 'depth', stream_index: 0, format: 'z16', width, height, fps, default: false })
 
-    async function renderSensor(framerate: number, updateSensorConfig = vi.fn()) {
+    async function renderSensor(framerate: number, updateStreamConfig = vi.fn()) {
       const device = createMockDevice()
       const sensor = createMockSensor({
-        sensor_id: 'sensor-a',
-        supported_stream_profiles: [row(848, 480, 90), row(848, 480, 30), row(1280, 720, 15), row(1280, 720, 30)],
+        sensor_index: 0,
+        stream_profiles: [row(848, 480, 90), row(848, 480, 30), row(1280, 720, 15), row(1280, 720, 30)],
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         sensors: [sensor],
-        sensorConfigs: { 'sensor-a': { resolution: { width: 848, height: 480 }, framerate } },
-        streamConfigs: [{ sensor_id: 'sensor-a', stream_type: 'depth', format: 'z16',
+streamConfigs: [{ sensor_index: 0, stream_type: 'depth', format: 'z16',
           resolution: { width: 848, height: 480 }, framerate, enable: true }],
       })
       render(<DevicePanel />, {
-        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: deviceState }, updateSensorConfig },
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: deviceState }, updateStreamConfig },
       })
       await userEvent.click(screen.getByText('Stereo Module'))
-      return updateSensorConfig
+      return updateStreamConfig
     }
 
     it('offers every fps the sensor has, like the C++ viewer', async () => {
@@ -400,10 +398,10 @@ describe('DevicePanel', () => {
     })
 
     it('keeps the picked resolution and moves fps onto one it has', async () => {
-      const updateSensorConfig = await renderSensor(90)
+      const updateStreamConfig = await renderSensor(90)
       await userEvent.selectOptions(screen.getByTestId('sensor-resolution'), '1280x720')
-      expect(updateSensorConfig).toHaveBeenLastCalledWith(expect.anything(), 'sensor-a',
-        { resolution: { width: 1280, height: 720 }, framerate: 15 })
+      expect(updateStreamConfig).toHaveBeenLastCalledWith(expect.anything(),
+        expect.objectContaining({ resolution: { width: 1280, height: 720 }, framerate: 15 }))
     })
   })
 
@@ -415,18 +413,17 @@ describe('DevicePanel', () => {
       setControl?: ReturnType<typeof vi.fn>
     } = {}) {
       const device = createMockDevice()
-      const sensor = createMockSensor({ sensor_id: 'sensor-a', name: 'Stereo Module' })
+      const sensor = createMockSensor({ sensor_index: 0, name: 'Stereo Module' })
       const options = overrides.options ?? [
         createMockOption({ option_id: 'Exposure', name: 'Exposure' }),
         createMockOption({ option_id: 'Gain', name: 'Gain' }),
         createMockOption({ option_id: 'Laser_Power', name: 'Laser Power' }),
       ]
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         sensors: [sensor],
         controls: {
-          'sensors/sensor-a/options': {
-            section: 'Controls', sensorId: 'sensor-a', name: '', options,
+          'sensors/0/options': {
+            section: 'Controls', sensorIndex: 0, name: '', options,
           },
         },
       })
@@ -492,8 +489,8 @@ describe('DevicePanel', () => {
       await userEvent.click(screen.getByTitle('Restore Controls to defaults'))
 
       await waitFor(() => expect(setControl).toHaveBeenCalledTimes(2))
-      expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/sensor-a/options', 'Exposure', 50)
-      expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/sensor-a/options', 'Gain', 16)
+      expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/0/options', 'Exposure', 50)
+      expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/0/options', 'Gain', 16)
     })
 
     it('shows a no-match message and collapses the section again on X', async () => {

@@ -6,7 +6,7 @@
 Each message is one JSON text message, {"event": name, ...its fields}:
 
     devices_changed          added, removed: device ids
-    streaming_changed        device_id, sensors: {sensor_id: [stream profile]}, what each sensor streams now
+    streaming_changed        device_id, sensors: [[stream profile] per sensor, by index], what each streams now
     firmware_progress        device_id, progress: 0 to 1, phase: "downloading" or "installing"
     firmware_update_success  device_id, firmware_version
     firmware_update_failed   device_id, error
