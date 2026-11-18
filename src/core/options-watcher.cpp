@@ -24,7 +24,9 @@ options_watcher::~options_watcher()
         std::lock_guard< std::mutex > lock( _mutex );  // so the updater cannot miss it between its check and its wait
         _destructing = true;
     }
-    stop();
+    _stopping.notify_all();
+    if( _updater.joinable() )
+        _updater.join();
 }
 
 void options_watcher::register_option( rs2_option id, std::shared_ptr< option > option )
@@ -99,22 +101,6 @@ void options_watcher::start()
     _stopping.notify_all();
 }
 
-void options_watcher::stop()
-{
-    _stopping.notify_all();
-    if( _updater.joinable() )
-    {
-        try
-        {
-            _updater.join();
-        }
-        catch( ... )
-        {
-            // Nothing to do on error
-        }
-    }
-}
-
 void options_watcher::thread_loop()
 {
     while( ! _destructing )
@@ -127,7 +113,7 @@ void options_watcher::thread_loop()
         if( _destructing )
             break;
 
-        // Every active period starts from a fresh baseline, so a subscriber only gets changes made after it subscribed
+        // A fresh baseline after each idle period, so changes made while nobody was subscribed are not reported
         options_and_values updated_options;
         composite_options_and_values updated_composites;
         update( updated_options, updated_composites );
@@ -166,7 +152,7 @@ options_watcher::options_and_values options_watcher::update_options()
 
     std::lock_guard< std::mutex > lock( _mutex );
 
-    if( should_stop() )
+    if( should_stop() || _paused.load() )  // a pause can land between the caller's check and this lock
         return updated_options;
 
     for( auto & opt : _options )
@@ -210,7 +196,7 @@ options_watcher::composite_options_and_values options_watcher::update_composite_
 
     for( auto & opt : _composite_options )
     {
-        if( should_stop() )
+        if( should_stop() || _paused.load() )
             break;
         try
         {
