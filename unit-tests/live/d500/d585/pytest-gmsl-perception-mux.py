@@ -13,7 +13,7 @@ import pyrealsense2 as rs
 import struct
 import time
 import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
+from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -197,7 +197,6 @@ def test_lpcl_refused_on_a_smaller_capture(device):
 def test_pd_refused_with_lpcl(device):
     """PD + LPCL is not a supported MUX combination: the camera refuses PD joining a running LPCL, which keeps streaming.
     PD started first is refused before the camera (test_lpcl_refused_on_a_smaller_capture)."""
-    skip_d585_on_gmsl( device, "no labeled point cloud frames over GMSL" )
     require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "PD + LPCL refusal" )   # older FW lets PD join
     pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
     frames = Collector()
