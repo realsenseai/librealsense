@@ -227,8 +227,10 @@ def test_enable_while_streaming(filters, mode):
 
 
 @pytest.mark.context("nightly")
+@pytest.mark.device_type("USB")
 @pytest.mark.parametrize("temporal_enabled", (0, 1))
-def test_downscale_x4_with_decimation_streams(filters, temporal_enabled):
+def test_downscale_x4_with_decimation_stream_smoke(filters, temporal_enabled):
+    """Check stream startup and delivery with the controls set, not whether firmware applies every filter."""
     sensor, icr, decimation = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
@@ -240,18 +242,21 @@ def test_downscale_x4_with_decimation_streams(filters, temporal_enabled):
     temporal = _find_filter(sensor, temporal_id)
     assert temporal is not None
     cfg = temporal.get_temporal_filter_dpp_config(temporal_id)
-    cfg.enabled = temporal_enabled
-    temporal.set_temporal_filter_dpp_config(temporal_id, cfg)
-    queue = rs.frame_queue(10)
+    original_temporal = cfg.enabled
     try:
+        cfg.enabled = temporal_enabled
+        temporal.set_temporal_filter_dpp_config(temporal_id, cfg)
+        queue = rs.frame_queue(10)
         with _streaming(sensor, profile, queue.enqueue):
             samples = []
             for _ in range(30):
                 frame = queue.wait_for_frame(5000)
                 video = frame.as_video_frame()
-                assert (video.width(), video.height(), frame.get_data_size()) == (640, 360, 460800)
+                assert frame.get_profile().format() == rs.format.z16
+                assert (video.width(), video.height()) == (640, 360)
+                assert frame.get_data_size() == 640 * 360 * 2
                 samples.append((frame.get_frame_number(), frame.get_timestamp()))
             assert all(b[0] > a[0] and b[1] > a[1] for a, b in zip(samples, samples[1:]))
     finally:
-        cfg.enabled = 0
+        cfg.enabled = original_temporal
         temporal.set_temporal_filter_dpp_config(temporal_id, cfg)

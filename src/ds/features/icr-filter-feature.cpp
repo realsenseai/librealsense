@@ -76,8 +76,7 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
     if( cfg.mode != RS2_ICR_MODE_DOWNSCALE_HDR )
         return;
     uint32_t const ratio = cfg.downscale_ratio == 2 ? 4 : 2;
-    // ICR merges the producer frames before embedded Decimation. Its x4 mode
-    // is compatible with the negotiated 640x360 decimated Depth output.
+    // ICR merges the producer frames before embedded Decimation.
     if( w % ratio != 0 || h % ratio != 0 )
         throw invalid_value_exception( rsutils::string::from()
             << "Improved Close Range Depth Downscale x" << ratio << " requires Depth dimensions divisible by " << ratio
