@@ -1,6 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+import threading
 from typing import Callable, Dict, List
 
 import pyrealsense2 as rs
@@ -32,6 +33,7 @@ class Sensor:
         self.index = index  # in the device's sensors, as the SDK lists them
         self.id = sensor_id  # what the API names it by
         self.started = False  # through the sensor API, which refuses to stop a sensor the pipeline runs
+        self.lock = threading.Lock()  # one start or stop at a time, as endpoints run in parallel
         self.name = sensor.get_info(rs.camera_info.name)
         # Its post-processing filters, in the SDK's recommended order, each to whether it is on: the SDK holds
         # everything else about a filter, its options included. All start off

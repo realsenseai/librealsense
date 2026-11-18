@@ -1,6 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+import logging
 from typing import Dict, List
 
 import pyrealsense2 as rs
@@ -105,6 +106,7 @@ class Camera:
         # Each sensor's filters by its name within the device, the way the SDK compares sensors
         filters = {s.name: s.filters for s in self.sensors}
         sender, device_id, colorizer = self._frame_sender, self.id, self.colorizer
+        failed = set()
 
         def send(frames):
             # Never use self in here, only the locals above: the SDK holds this callback for good, and a camera
@@ -114,7 +116,12 @@ class Camera:
                 if f.get_profile().stream_type() == rs.stream.depth:  # the filters process depth only
                     for flt, on in filters[rs.sensor.from_frame(f).get_info(rs.camera_info.name)].items():
                         if on:
-                            f = flt.process(f)
+                            try:
+                                f = flt.process(f)
+                            except RuntimeError as e:  # a failing filter is skipped, not the whole frame
+                                if flt not in failed:  # logged once, not on every frame
+                                    failed.add(flt)
+                                    logging.warning("Filter %s failed, skipped: %s", flt.get_info(rs.camera_info.name), e)
                 sender.send(device_id, f, colorizer)
         return send
 

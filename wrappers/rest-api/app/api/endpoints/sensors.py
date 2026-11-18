@@ -55,16 +55,17 @@ def start_sensor(
     **Note:** Cannot be used simultaneously with pipeline API (/streams/start).
     Stop all streams before switching between APIs.
     """
-    try:
-        camera.open_sensor(sensor.index, request.profiles)
-    except Exception as e:  # a sensor another client holds refuses open(), and is not ours to close
-        raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
-    try:
-        camera.start_sensor(sensor.index)
-    except Exception as e:
-        camera.close_sensor(sensor.index)
-        raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
-    sensor.started = True
+    with sensor.lock:
+        try:
+            camera.open_sensor(sensor.index, request.profiles)
+        except Exception as e:  # a sensor another client holds refuses open(), and is not ours to close
+            raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
+        try:
+            camera.start_sensor(sensor.index)
+        except Exception as e:
+            camera.close_sensor(sensor.index)
+            raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
+        sensor.started = True
 
 
 @router.post("/{sensor_id}/stop")
@@ -79,11 +80,12 @@ def stop_sensor(
     Other sensors on the same device will continue streaming.
     A sensor the pipeline API runs is refused with 409: stop it with /stream/stop.
     """
-    if not sensor.started:
-        if sensor.active_profiles():
-            raise HTTPException(status_code=409,
-                                detail="The sensor streams through the pipeline; stop it with /stream/stop")
-        return
-    camera.stop_sensor(sensor.index)
-    camera.close_sensor(sensor.index)
-    sensor.started = False
+    with sensor.lock:
+        if not sensor.started:
+            if sensor.active_profiles():
+                raise HTTPException(status_code=409,
+                                    detail="The sensor streams through the pipeline; stop it with /stream/stop")
+            return
+        camera.stop_sensor(sensor.index)
+        camera.close_sensor(sensor.index)
+        sensor.started = False
