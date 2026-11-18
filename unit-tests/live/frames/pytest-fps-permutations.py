@@ -8,9 +8,11 @@ Generates all (N choose 2) pairs of streams and verifies FPS for each.
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 from itertools import combinations
 import fps_helper
 import logging
+from rspy.pytest.device_helpers import require_min_fw_version
 from rspy.snippets import is_dds_dev
 log = logging.getLogger(__name__)
 
@@ -77,6 +79,8 @@ def get_sensors_and_profiles(dev):
 @pytest.mark.timeout(300)
 def test_fps_permutations(test_device):
     dev, ctx = test_device
+    if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
+        require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "fps permutations" )
 
     sensor_profiles_array = get_sensors_and_profiles(dev)
     all_pairs = [[a[1].stream_name(), b[1].stream_name()] for a, b in combinations(sensor_profiles_array, 2)]
