@@ -90,6 +90,8 @@ def test_depth_fps(test_device, exposure):
     dev, ctx = test_device
     product_line = dev.get_info(rs.camera_info.product_line)
     camera_name = dev.get_info(rs.camera_info.name)
+    if exposure == "manual" and "D585" in camera_name and dev.get_info(rs.camera_info.connection_type) == "GMSL":
+        require_min_fw_version(dev, rsutils.version("7.62.0.0"), "depth fps with manual exposure")
 
     log.info(f"Testing depth fps ({exposure} exposure) {product_line} device - {platform.system()} OS")
     log.info(f"Device: {camera_name}, firmware: {dev.get_info(rs.camera_info.firmware_version)}")
