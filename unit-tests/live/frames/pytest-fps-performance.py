@@ -11,6 +11,7 @@ import pytest
 from rspy.stopwatch import Stopwatch
 import pyrealsense2 as rs
 import numpy as np
+import threading
 import time
 from collections import deque
 import logging
@@ -26,6 +27,7 @@ pytestmark = [
 
 # Constants for device initialization and testing
 DEVICE_INIT_SLEEP_SEC = 3  # Sleep time to allow device to get into idle state
+FIRST_FRAME_TIMEOUT = 1.2  # t2ff KPI is 1 second + some extra; the timed window starts then anyway
 MIN_FRAME_COUNT_LOW_FPS = 5  # Minimum frame count for low FPS tests
 
 # ---------------------------------------------------------------------------------------------
@@ -328,9 +330,12 @@ def check_stream_fps_accuracy_generic(device, stream_name, stream_type, formats,
         measurement_interval = 25  # Balance between frequency and performance
         log.info(f"Very high FPS mode for {expected_fps} FPS: warmup={warmup_frames}, interval={measurement_interval}")
 
+    first_frame = threading.Event()
+
     def frame_callback(frame):
         nonlocal frame_count
         current_time = time.time()
+        first_frame.set()
         frame_count += 1
         # Anchor the measurement window at the last warmup frame so warmup arrival times are excluded
         if frame_count == warmup_frames:
@@ -348,6 +353,8 @@ def check_stream_fps_accuracy_generic(device, stream_name, stream_type, formats,
         sensor.open(profile)
         sensor.start(frame_callback)
 
+        # Time the window from the first frame, so a slow stream start (e.g. GMSL) doesn't shorten it
+        first_frame.wait(FIRST_FRAME_TIMEOUT)
         test_stopwatch = Stopwatch()
         while test_stopwatch.get_elapsed() < test_duration:
             time.sleep(0.1)
@@ -1054,9 +1061,12 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
 
     # Frame callbacks
     # Each rate is measured from the stream's last warmup frame, as in the single-stream test
+    depth_started, color_started = threading.Event(), threading.Event()
+
     def depth_callback(frame):
         nonlocal depth_frame_count
         current_time = time.time()
+        depth_started.set()
         depth_frame_count += 1
         if depth_frame_count == warmup_frames:
             depth_monitor.reset()
@@ -1065,6 +1075,7 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
     def color_callback(frame):
         nonlocal color_frame_count
         current_time = time.time()
+        color_started.set()
         color_frame_count += 1
         if color_frame_count == warmup_frames:
             color_monitor.reset()
@@ -1110,7 +1121,9 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
         depth_sensor.start(depth_callback)
         color_sensor.start(color_callback)
 
-        # Wait for test duration
+        # Time the window from both first frames, as in the single-stream test
+        depth_started.wait(FIRST_FRAME_TIMEOUT)
+        color_started.wait(FIRST_FRAME_TIMEOUT)
         test_stopwatch = Stopwatch()
         while test_stopwatch.get_elapsed() < test_duration:
             time.sleep(0.1)
