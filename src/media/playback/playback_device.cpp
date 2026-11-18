@@ -43,7 +43,7 @@ playback_device::playback_device( std::shared_ptr< const device_info > const & d
     , m_is_paused( false )
     , m_sample_rate( 1 )
     , m_real_time( true )
-    , m_prev_timestamp( 0 )
+    , m_prev_timestamp( device_serializer::nanoseconds( 0 ) )
     , m_last_published_timestamp( 0 )
 {
     if (serializer == nullptr)
@@ -716,7 +716,7 @@ const std::string& playback_device::get_file_name() const
 
 uint64_t playback_device::get_position() const
 {
-    return m_prev_timestamp.count();
+    return m_prev_timestamp.load().count();
 }
 void playback_device::catch_up()
 {
