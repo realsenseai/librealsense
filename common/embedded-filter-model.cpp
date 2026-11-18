@@ -334,6 +334,11 @@ namespace rs2
             sanitize_decimation_filter_dpp_config,
             [this]( rs2_decimation_filter_dpp_config & v )
             {
+                if( _decimation_filter_dpp_editor.commit_is_reset )
+                {
+                    _enabled = v.enabled != 0;
+                    return;
+                }
                 v.enabled = 1;
                 _enabled = true;
             } );
@@ -374,6 +379,11 @@ namespace rs2
             sanitize_temporal_filter_dpp_config,
             [this]( rs2_temporal_filter_dpp_config & v )
             {
+                if( _temporal_filter_dpp_editor.commit_is_reset )
+                {
+                    _enabled = v.enabled != 0;
+                    return;
+                }
                 v.enabled = 1;
                 _enabled = true;
             } );
@@ -471,6 +481,11 @@ namespace rs2
             [this]( rs2_icr_control & v ) { sanitize_icr( v ); },
             [this]( rs2_icr_control & v )
             {
+                if( _icr_editor.commit_is_reset )
+                {
+                    _enabled = v.mode != RS2_ICR_MODE_OFF;
+                    return;
+                }
                 if( v.mode == RS2_ICR_MODE_OFF )
                     v.mode = _icr_last_active_mode;
                 _enabled = true;

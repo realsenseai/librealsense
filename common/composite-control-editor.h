@@ -35,9 +35,13 @@ namespace rs2
         void touch()
         {
             _dirty = true;
+            commit_is_reset = false;
             _commit_deadline = std::numeric_limits< double >::max();
             _release_focus_on_commit = false;   // a new interaction supersedes a pending arrow-edit focus drop
         }
+
+        // True while the pending commit is a Reset to Default, so before_commit hooks must not alter the defaults.
+        bool commit_is_reset = false;
 
         // Call once a field's edit is finalized (slider released, value submitted, combo picked).
         // A zero delay commits on this frame, without the countdown.
@@ -167,6 +171,7 @@ namespace rs2
                     value = filter->get_composite_option_range_as< RangeT >( id ).def;
                     sanitize( value );
                     touch();
+                    commit_is_reset = true;
                     finalize( 0.0 );
                 }
                 catch( const std::exception & e )
