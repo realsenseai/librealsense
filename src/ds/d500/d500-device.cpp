@@ -23,6 +23,7 @@
 #include <src/ds/features/temporal-filter-feature.h>
 #include <src/ds/features/icr-filter-feature.h>
 
+#include "proc/embedded-filter-base.h"
 #include "proc/depth-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
@@ -270,6 +271,18 @@ namespace librealsense
         if (_depth_units < 0)
             _depth_units = get_option(RS2_OPTION_DEPTH_UNITS).query();
         return _depth_units;
+    }
+
+    void d500_depth_sensor::add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter )
+    {
+        // The filter's composite options are read by this sensor's watcher: one thread, one bulk-operation scope
+        if( auto base = std::dynamic_pointer_cast< embedded_filter_base >( filter ) )
+        {
+            for( auto id : base->get_supported_composite_options() )
+                register_composite_option_to_update( id, base->get_composite_option_handler( id ) );
+            base->use_sensor_watcher( get_options_watcher() );
+        }
+        _embedded_filters.push_back( std::move( filter ) );
     }
 
     void d500_depth_sensor::set_depth_scale( float val )
@@ -605,17 +618,6 @@ namespace librealsense
                 depth_sensor.register_option(RS2_OPTION_PROJECTOR_TEMPERATURE, proj_temperature);
             }
 
-            // Constructing the option probes the XU; firmware without aligned-depth support throws and we skip it.
-            try
-            {
-                _aligned_depth_option = std::make_shared< d500_enable_aligned_depth_option >( raw_depth_sensor );
-                depth_sensor.register_option( RS2_OPTION_ENABLE_ALIGNED_DEPTH, _aligned_depth_option );
-            }
-            catch( std::exception const & e )
-            {
-                LOG_DEBUG( "Align Depth is not supported by this firmware: " << e.what() );
-            }
-
             if( d5x5_dual_rgb_mode_pids.count( _pid )
                 && _fw_version >= firmware_version( "7.58.40897.13078" ) )
             {
@@ -892,11 +894,12 @@ namespace librealsense
         hwmon_response_type response = d500_hwmon_response::SUCCESS;
         // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
+        std::vector< uint8_t > reply;
         auto send = [&]( uint32_t action, uint32_t enable, std::vector< uint8_t > profile = {} )
         {
             command cmd( MUX_CONTROL, MUX_CONTROL_VERSION, action, stream_id, enable );
             cmd.data = std::move( profile );
-            auto reply = _hw_monitor->send( cmd, &response );
+            reply = _hw_monitor->send( cmd, &response );
             while( response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
             {
                 std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
@@ -932,8 +935,23 @@ namespace librealsense
             std::vector< uint8_t > profile( sizeof( packed ) );
             std::memcpy( profile.data(), &packed, sizeof( packed ) );
             state = send( MUX_ENABLE_WITH_PROFILE, 1, profile );
+            // The camera echoes the profile it took; another one would stream data of another layout
+            if( response == d500_hwmon_response::SUCCESS
+                && ( reply.size() < profile.size() || ! std::equal( profile.begin(), profile.end(), reply.begin() ) ) )
+            {
+                try
+                {
+                    send( MUX_SET_ENABLE, 0 );
+                }
+                catch( const std::exception & e )
+                {
+                    LOG_ERROR( "MUX stream " << stream_id << " disable after a profile mismatch failed: " << e.what() );
+                }
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " enable echoed another profile" );
+            }
             // Camera firmware without the profile action does not know it, and picks the rate itself
-            if( response == d500_hwmon_response::COMMAND_NOT_SUPPORTED )
+            if( response == d500_hwmon_response::COMMAND_NOT_SUPPORTED && stream_id != MUX_POINT_CLOUD_STREAM )
             {
                 LOG_WARNING( "MUX stream " << stream_id << " profile action not supported by the camera; enabling without a rate, "
                                            << "the requested " << fps << " fps may not be served" );

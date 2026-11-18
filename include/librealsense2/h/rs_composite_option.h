@@ -140,6 +140,36 @@ int rs2_is_composite_option_read_only(const rs2_options* options, rs2_composite_
 */
 const char* rs2_get_composite_option_description(const rs2_options* options, rs2_composite_option_id option, rs2_error** error);
 
+/**
+* Retrieve the i-th composite option's raw payload from a list delivered to a composite options-changed callback.
+* An empty payload means the option cannot be read right now (or is disabled).
+* \param[in]  list   the list passed to the callback
+* \param[in]  i      the index of the composite option
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return the option's raw payload, cast it to the struct documented for the id. Free with rs2_delete_raw_data.
+*/
+const rs2_raw_data_buffer* rs2_get_composite_option_value_from_list(const rs2_composite_options_list* list, int i, rs2_error** error);
+
+/**
+* Sets a callback in case a composite option of this options container changes value. Only embedded filters report
+* composite changes. Values are polled periodically, on the thread of the sensor the filter belongs to.
+* \param[in] options    the options container (embedded_filter)
+* \param[in] callback   called with the changed ids and payloads. The receiver owns the list and frees it with
+*                       rs2_delete_composite_options_list
+* \param[out] error     if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_set_composite_options_changed_callback(rs2_options* options,
+                                                rs2_composite_options_changed_callback_ptr callback,
+                                                rs2_error** error);
+
+/**
+* Same as rs2_set_composite_options_changed_callback, for a callback object created from a c++ application.
+* \param[in] callback   ownership over the callback object is moved to librealsense
+*/
+void rs2_set_composite_options_changed_callback_cpp(rs2_options* options,
+                                                    rs2_composite_options_changed_callback* callback,
+                                                    rs2_error** error);
+
 #ifdef __cplusplus
 }
 #endif

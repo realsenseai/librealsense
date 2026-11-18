@@ -75,7 +75,7 @@ namespace librealsense
 
     void disparity_transform::update_transformation_profile(const rs2::frame& f)
     {
-        if(f.get_profile().get() != _source_stream_profile.get())
+        if( _calibration.changed( f ) || f.get_profile().get() != _source_stream_profile.get() )
         {
             _source_stream_profile = f.get_profile();
 

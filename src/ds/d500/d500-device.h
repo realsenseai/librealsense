@@ -18,6 +18,7 @@
 #include "ds/ds-device-common.h"
 #include "backend-device.h"
 #include "d500-auto-calibration.h"
+#include <src/device-calibration.h>
 #include <src/core/video.h>
 #include <src/depth-sensor.h>
 
@@ -52,7 +53,7 @@ namespace librealsense
         float get_preset_max_value() const override;
 
         embedded_filters get_supported_embedded_filters() const override { return _embedded_filters; }
-        void add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter ) { _embedded_filters.push_back( filter ); }
+        void add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter );
 
         // Streams contributed by feature mixins (e.g. dual-color) that this sensor physically carries. They are
         // assigned to matching profiles (by stream type + index) during init_stream_profiles.
@@ -85,6 +86,7 @@ namespace librealsense
         , public d500_auto_calibrated
         , public updatable
         , public extendable_interface
+        , public calibration_change_device
     {
     public:
         std::shared_ptr<synthetic_sensor> create_depth_device(std::shared_ptr<context> ctx,

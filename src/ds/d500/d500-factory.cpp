@@ -580,11 +580,11 @@ namespace librealsense
                     hwm_devices.push_back( hwm );
                 }
 
+                chosen.insert( chosen.end(), devices.begin(), devices.end() );
                 auto info = std::make_shared< d500_info >( ctx,
                                                            std::move( devices ),
                                                            std::move( hwm_devices ),
                                                            std::move( hids ) );
-                chosen.insert( chosen.end(), devices.begin(), devices.end() );
                 results.push_back( info );
             }
         }

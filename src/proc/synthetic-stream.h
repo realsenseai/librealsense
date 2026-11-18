@@ -224,6 +224,7 @@ struct rs2_options
     virtual ~rs2_options() = default;
 
     rsutils::subscription subscription;
+    rsutils::subscription composite_subscription;
 };
 
 struct rs2_processing_block : public rs2_options
