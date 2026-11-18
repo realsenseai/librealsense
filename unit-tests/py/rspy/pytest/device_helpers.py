@@ -405,10 +405,15 @@ def skip_d585_on_gmsl(dev, reason):
         pytest.skip( reason )
 
 
-def require_min_fw_on_d585_gmsl(dev, min_version, feature_name=""):
-    """``require_min_fw_version`` that applies only to a D585 connected over GMSL."""
+def require_min_fw_on_d585_gmsl(dev, feature_name="", min_version="7.62.0.0"):
+    """``require_min_fw_version`` that applies only to a D585 connected over GMSL.
+
+    Older D585 FW fails the tests that call this over GMSL; ``min_version`` is a version string.
+    """
+    import pyrsutils as rsutils
+
     if _is_d585_on_gmsl( dev ):
-        require_min_fw_version( dev, min_version, feature_name )
+        require_min_fw_version( dev, rsutils.version( min_version ), feature_name )
 
 
 def select_target_device(devices_list, module_device_setup):

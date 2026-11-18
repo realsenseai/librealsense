@@ -12,7 +12,6 @@ import time
 
 import pytest
 import pyrealsense2 as rs
-import pyrsutils as rsutils
 from rspy.stopwatch import Stopwatch
 import logging
 from rspy.pytest.device_helpers import require_min_fw_on_d585_gmsl
@@ -31,7 +30,7 @@ pytestmark = [
 @pytest.mark.timeout(220)
 def test_pipeline_start_stop(test_device):
     dev, ctx = test_device
-    require_min_fw_on_d585_gmsl( dev, rsutils.version( "7.62.0.0" ), "pipeline start/stop" )   # older D585 FW fails over GMSL
+    require_min_fw_on_d585_gmsl( dev, "pipeline start/stop" )
 
     pipe = rs.pipeline(ctx)
     pipe.set_device(dev)
