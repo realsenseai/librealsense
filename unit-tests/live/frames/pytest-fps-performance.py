@@ -46,9 +46,9 @@ TIER_FULL = "full"
 
 # Per-tier caps (None = no cap, exercise every supported permutation).
 TIER_CONFIG_CAP = {TIER_GATING: 1, TIER_SEMI: 8, TIER_FULL: None}
-TIER_FPS_CAP = {TIER_GATING: 1, TIER_SEMI: 6}
+TIER_FPS_CAP = {TIER_GATING: 1, TIER_SEMI: 6, TIER_FULL: None}
 # Full multistream is capped (not "all 930 combos") to keep weekly bounded; matches the prior
-# CI cap. Config tests stay uncapped at full.
+# CI cap. Config/FPS tests stay uncapped at full.
 TIER_MULTISTREAM_CAP = {TIER_GATING: 1, TIER_SEMI: 6, TIER_FULL: 50}
 
 # Let USB endpoints tear down between stream reconfigurations. Back-to-back stop/close -> open
@@ -1580,7 +1580,7 @@ def coverage_tier(request):
 
 
 # On weekly the *_configurations tests stream every supported profile, which covers every *_fps_rates case
-covered_on_weekly = pytest.mark.skipif("'weekly' in config.getoption('--context').split()",
+covered_on_weekly = pytest.mark.skipif("resolve_coverage_tier(config) == TIER_FULL",
                                        reason="Covered by the *_configurations tests on weekly")
 
 
