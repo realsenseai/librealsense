@@ -41,11 +41,7 @@ def depth_sensor(test_device):
     sensor = dev.first_depth_sensor()
     original = sensor.get_option( AE_MODE )
     yield sensor
-    sensor.set_option( AE_MODE, original )
-    try:
-        sensor.close()   # the sensor outlives the test - never hand it to the next one still open
-    except RuntimeError:
-        pass             # not open, which is the normal path
+    sensor.set_option( AE_MODE, original )   # collect_policies always closes the sensor it opened
 
 
 def profile(sensor, stream_type, index=0, size=None):
@@ -56,7 +52,7 @@ def profile(sensor, stream_type, index=0, size=None):
                 and p.format() not in (rs.format.raw16, rs.format.yuyv, rs.format.y16) \
                 and (size is None or (v.width(), v.height()) == size):
             return p
-    pytest.skip( f"Device publishes no {stream_type} {index} profile at {FPS} FPS" )
+    pytest.fail( f"Device publishes no {stream_type} {index} profile at {FPS} FPS" )
 
 
 def collect_policies(sensor, profiles):
