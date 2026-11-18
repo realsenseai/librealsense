@@ -10,7 +10,6 @@ def _prefer_local_pyrealsense2() -> None:
     # wheel — newer devices (e.g. D585 Prototype, PID 0x0C08) may not be
     # recognized by the published wheel and only show up when loading the
     # module built from this branch.
-    import logging
     import os
     repo_root = Path(__file__).resolve().parent.parent.parent
     build_dir = repo_root / "build"
@@ -32,19 +31,9 @@ def _prefer_local_pyrealsense2() -> None:
         seen.add(key)
         target_dirs.append(key)
     sys.path[0:0] = target_dirs
-    chosen = candidates[0]
-    if any(part.lower() == "debug" for part in chosen.relative_to(build_dir).parts):
-        # Debug SDK is 10-20x slower per call (measured: colorize 46.7ms vs
-        # 5.5ms at 720p) — streaming will be slow. Warn loudly, never silently.
-        logging.warning(
-            "[pyrealsense2] loading a DEBUG local build: %s — expect low "
-            "streaming FPS; build Release or remove build/Debug to use an "
-            "optimized SDK", target_dirs[0],
-        )
-    else:
-        # print(), not logging.info(): this runs before logging is configured,
-        # and an unconfigured root logger drops INFO records.
-        print(f"[pyrealsense2] preferring local build: {target_dirs[0]}")
+    # print(), not logging.info(): this runs before logging is configured,
+    # and an unconfigured root logger drops INFO records.
+    print(f"[pyrealsense2] preferring local build: {target_dirs[0]}")
     if hasattr(os, "add_dll_directory"):
         for key in target_dirs:
             try:
@@ -55,14 +44,20 @@ def _prefer_local_pyrealsense2() -> None:
 
 _prefer_local_pyrealsense2()
 
+import logging
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.api.endpoints.health import SDK_WARNINGS
 from app.api.router import api_router
 from app.core.errors import setup_exception_handlers
 from config import settings
+
+for warning in SDK_WARNINGS:  # a Debug SDK build: the client shows these too
+    logging.warning(warning)
 
 
 # --- Create FastAPI App ---

@@ -50,14 +50,8 @@ class ApiClient {
 
   // ============ Health ============
 
-  async getHealth(): Promise<{ status: string; service: string; sdk_version: string; warnings?: string[] }> {
-    const response = await this.client.get<{
-      status: string
-      service: string
-      sdk_version: string
-      warnings?: string[]
-    }>('/health')
-    return response.data
+  async getHealth(): Promise<{ sdk_version: string; warnings: string[] }> {
+    return (await this.client.get('/health')).data
   }
 
   // ============ Devices ============

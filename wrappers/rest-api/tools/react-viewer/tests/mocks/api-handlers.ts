@@ -14,7 +14,7 @@ const sensorOptionsMap: Record<string, any[]> = {
 export const handlers = [
   // Health check
   http.get(`${API_BASE}/health`, () => {
-    return HttpResponse.json({ status: 'ok', service: 'realsense-api' })
+    return HttpResponse.json({ sdk_version: '2.58.0', warnings: [] })
   }),
 
   // Get devices list
