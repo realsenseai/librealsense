@@ -58,12 +58,12 @@ def get_filter_option(
     return sensor.filter_option(filter_name, field)
 
 
-@router.put("/{filter_name}/{field}", response_model=OptionInfo)
+@router.put("/{filter_name}/{field}")
 def set_filter_option(
     filter_name: str,
     field: str,
     body: OptionUpdate,
     sensor: Sensor = Depends(get_sensor),
 ):
-    """Set one option on one filter; returns it as the device reports it afterwards."""
-    return sensor.set_filter_option(filter_name, field, body.value)
+    """Set one option on one filter."""
+    sensor.set_filter_option(filter_name, field, body.value)

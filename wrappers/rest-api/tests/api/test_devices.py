@@ -1,6 +1,10 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+from types import SimpleNamespace
+
+import pyrealsense2 as rs
+
 from .conftest import FAKE_DEVICES, OPTIONS_URL, client
 
 
@@ -92,3 +96,12 @@ def test_set_option(setup_mock_managers):
 
     response = client.put(f"{OPTIONS_URL}/{option_id}", json={"value": 0.5})
     assert response.status_code == 200
+
+
+def test_the_sdk_reporting_sensor_options_changed_tells_the_clients_their_values(setup_mock_managers):
+    sensor = FAKE_DEVICES[0].sensors[1]
+    with client.websocket_connect("/api/v1/events") as events:
+        sensor.options_changed([SimpleNamespace(id=rs.option.exposure, value=20.0),
+                                SimpleNamespace(id=rs.option.gain, value=None)])
+        assert events.receive_json() == {"event": "options_changed", "device_id": "device1",
+                                         "group": "sensors/1/options", "options": {"exposure": 20.0, "gain": None}}

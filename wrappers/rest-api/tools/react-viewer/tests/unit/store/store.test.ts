@@ -525,3 +525,51 @@ it('isAnyDeviceStreaming tracks deviceStates after a state update', () => {
     })
   })
 })
+
+describe('refreshControlGroup', () => {
+  it('reads the group another client wrote and shows what the device now holds', async () => {
+    const device = createMockDevice()
+    const option = createMockOption({ option_id: 'exposure', current_value: 100 })
+    const ds = createMockDeviceState(device, {
+      controls: { 'sensors/0/options': { section: 'Controls', sensorIndex: 0, name: '', options: [option] } },
+    })
+    useAppStore.setState({ deviceStates: { [device.device_id]: ds } })
+    const { option_id, ...wire } = option
+    server.use(http.get('/api/v1/devices/:deviceId/sensors/0/options/', () =>
+      HttpResponse.json({ [option_id]: { ...wire, current_value: 200 } })))
+
+    await useAppStore.getState().refreshControlGroup(device.device_id, 'sensors/0/options')
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options[0].current_value)
+      .toBe(200)
+  })
+  it('shows the values the SDK reported without reading the group again', async () => {
+    const device = createMockDevice()
+    const options = [createMockOption({ option_id: 'exposure', current_value: 100 }),
+      createMockOption({ option_id: 'enable_auto_exposure', current_value: 1 })]
+    useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { 'sensors/0/options': { section: 'Controls', sensorIndex: 0, name: '', options } } }) } })
+    let reads = 0
+    server.use(http.get('/api/v1/devices/:deviceId/sensors/0/options/', () => { reads++; return HttpResponse.json({}) }))
+
+    await useAppStore.getState().applyOptionsChanged(device.device_id, 'sensors/0/options',
+      { exposure: 5000, enable_auto_exposure: 0 })
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options
+      .map(o => o.current_value)).toEqual([5000, 0])
+    expect(reads).toBe(0)
+  })
+  it('shows what the device took after its own write, which may be clamped', async () => {
+    const device = createMockDevice()
+    useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { colorizer: { section: 'Controls', sensorIndex: 0, name: '',
+        options: [createMockOption({ option_id: 'max_distance', current_value: 6 })] } } }) } })
+    server.use(
+      http.put('/api/v1/devices/:deviceId/colorizer/max_distance', () => HttpResponse.json(null)),
+      http.get('/api/v1/devices/:deviceId/colorizer/max_distance', () => HttpResponse.json({ current_value: 16 })))
+
+    await useAppStore.getState().setControl(device.device_id, 'colorizer', 'max_distance', 99)
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls.colorizer.options[0].current_value).toBe(16)
+  })
+})

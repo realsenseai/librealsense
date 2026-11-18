@@ -58,11 +58,10 @@ def test_get_colorizer_options_reports_ranges():
     assert opts["min_distance"].step == 0.1
 
 
-def test_set_colorizer_option_writes_and_returns_applied():
+def test_set_colorizer_option_writes_it():
     camera = _camera_with_colorizer()
-    applied = camera.set_colorizer_option("color_scheme", 3)
+    camera.set_colorizer_option("color_scheme", 3)
     assert camera.colorizer.written["color_scheme"] == 3.0
-    assert applied.current_value == 3.0
 
 
 def test_set_colorizer_option_out_of_range_is_left_to_the_device():

@@ -183,6 +183,9 @@ class sensor:
     def get_supported_options(self):
         return list(self._options.keys())
 
+    def on_options_changed(self, callback):
+        self.options_changed = callback  # a test calls it as the SDK would
+
     def get_supported_option_values(self):
         return [SimpleNamespace(id=o, value=v, range=self._option_ranges.get(o)) for o, v in self._options.items()]
 

@@ -99,12 +99,16 @@ describe('API Client', () => {
   })
 
   describe('setControl', () => {
-    it('answers the option as the device now holds it', async () => {
-      const result = await apiClient.setControl(
-        mockDevice.device_id, 'sensors/sensor-0/options', 'exposure', 10000
-      )
+    it('writes the value to the control route', async () => {
+      let written: unknown
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/0/options/exposure', async ({ request }) => {
+        written = await request.json()
+        return new HttpResponse(null)
+      }))
 
-      expect(result).toMatchObject({ option_id: 'exposure', current_value: 10000 })
+      await apiClient.setControl(mockDevice.device_id, 'sensors/0/options', 'exposure', 10000)
+
+      expect(written).toEqual({ value: 10000 })
     })
   })
 

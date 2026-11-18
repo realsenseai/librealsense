@@ -49,12 +49,10 @@ def controls(dev) -> Dict[str, Dict[str, OptionInfo]]:
     return by_group
 
 
-def set_control(dev, group: str, field: str, value: float) -> OptionInfo:
+def set_control(dev, group: str, field: str, value: float) -> None:
     """Set one control: firmware only accepts whole groups, so it is a read-modify-write."""
     controls(dev)[group][field]  # an unknown one 404s as in the GETs, not 500 on the SDK's AttributeError
     am = rs.rs400_advanced_mode(dev)
     values = am[group]
     values[field] = value  # the SDK rounds to the field's own type
     am[group] = values
-    value, minimum, maximum = am[group][field], am[group, 1][field], am[group, 2][field]
-    return control(value, minimum, maximum)

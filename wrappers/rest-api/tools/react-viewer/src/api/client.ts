@@ -91,18 +91,18 @@ class ApiClient {
   }
 
   /**
-   * Write one control and get it back as the device now holds it. `key` is the group's
-   * path under the device (`colorizer`, `advanced_mode/controls/depth_table`,
-   * `sensors/<id>/filters/Spatial Filter`), which is all that separates the four sources.
+   * Write one control. `key` is the group's path under the device (`colorizer`, `advanced_mode/controls/depth_table`,
+   * `sensors/<id>/filters/Spatial Filter`), which is all that separates the four sources. Nothing comes back, as
+   * from the SDK's set_option
    */
-  async setControl(
-    deviceId: string,
-    key: string,
-    field: string,
-    value: number | boolean | string
-  ): Promise<OptionInfo> {
-    const response = await this.client.put(`/devices/${deviceId}/${key}/${field}`, { value })
-    return response.data
+  async setControl(deviceId: string, key: string, field: string, value: number | boolean | string): Promise<void> {
+    await this.client.put(`/devices/${deviceId}/${key}/${field}`, { value })
+  }
+
+  /** The value one control holds now; `key` as for setControl */
+  async getControlValue(deviceId: string, key: string, field: string): Promise<OptionInfo['current_value']> {
+    return (await this.client.get<{ current_value: OptionInfo['current_value'] }>(`/devices/${deviceId}/${key}/${field}`))
+      .data.current_value
   }
 
   /** Bypass or apply one post-processing filter; `key` is the filter's own path. */

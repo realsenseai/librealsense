@@ -30,13 +30,13 @@ def get_option(
     """
     return sensor.option(option_id)
 
-@router.put("/{option_id}", response_model=OptionInfo)
+@router.put("/{option_id}")
 def update_option(
     option_id: str,
     option_update: OptionUpdate,
     sensor: Sensor = Depends(get_sensor),
 ):
     """
-    Update the value of a specific option for a sensor; returns it as the device holds it.
+    Update the value of a specific option for a sensor.
     """
-    return sensor.set_option(option_id, option_update.value)
+    sensor.set_option(option_id, option_update.value)

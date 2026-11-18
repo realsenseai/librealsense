@@ -121,11 +121,8 @@ def test_reports_every_group_the_device_has(device_for):
 
 def test_set_patches_the_field_and_writes_its_group_back(device_for):
     am = _FakeAM()
-    applied = advanced_mode.set_control(
-        device_for(am), "depth_control", "deepSeaSecondPeakThreshold", 500.4
-    )
+    advanced_mode.set_control(device_for(am), "depth_control", "deepSeaSecondPeakThreshold", 500.4)
     assert am.written["depth_control"]["deepSeaSecondPeakThreshold"] == 500  # int-coerced
-    assert (applied.option_id, applied.current_value) == ("deepSeaSecondPeakThreshold", 500)
 
 
 def test_set_unknown_field_raises(device_for):

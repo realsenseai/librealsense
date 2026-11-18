@@ -51,9 +51,6 @@ def all_options(obj) -> Dict[str, OptionInfo]:
             for o in obj.get_supported_option_values() if o.value is not None}
 
 
-def set_option(obj, field: str, value: float) -> OptionInfo:
-    """Set one option and report it as the object holds it."""
-    opt = {o.name: o for o in obj.get_supported_options()}[field]  # an unknown one 404s
-    rng = obj.get_option_range(opt)
-    obj.set_option(opt, float(value))
-    return _info(obj, opt, obj.get_option(opt), rng)
+def set_option(obj, field: str, value: float) -> None:
+    """Set one option, as the SDK's set_option: nothing answered, the clients are told to read it again"""
+    obj.set_option({o.name: o for o in obj.get_supported_options()}[field], float(value))

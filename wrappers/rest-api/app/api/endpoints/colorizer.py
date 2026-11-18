@@ -28,11 +28,11 @@ def get_colorizer_option(
     return camera.colorizer_option(field)
 
 
-@router.put("/{field}", response_model=OptionInfo)
+@router.put("/{field}")
 def set_colorizer_option(
     field: str,
     body: OptionUpdate,
     camera: Camera = Depends(get_camera),
 ):
-    """Set one colorizer option; returns it as the device reports it afterwards."""
-    return camera.set_colorizer_option(field, body.value)
+    """Set one colorizer option."""
+    camera.set_colorizer_option(field, body.value)

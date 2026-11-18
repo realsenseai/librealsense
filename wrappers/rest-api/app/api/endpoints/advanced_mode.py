@@ -67,12 +67,12 @@ def get_advanced_control(
     return camera.advanced_control(group, field)
 
 
-@router.put("/controls/{group}/{field}", response_model=OptionInfo)
+@router.put("/controls/{group}/{field}")
 def set_advanced_control(
     group: str,
     field: str,
     body: OptionUpdate,
     camera: Camera = Depends(get_camera),
 ):
-    """Set one advanced control; returns it as the device reports it afterwards."""
-    return camera.set_advanced_control(group, field, body.value)
+    """Set one advanced control."""
+    camera.set_advanced_control(group, field, body.value)

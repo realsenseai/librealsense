@@ -51,6 +51,10 @@ export function connectEvents(): void {
 // A device returning after a FW flash must not be served from the cached list
 onEvent('devices_changed', () => useAppStore.getState().fetchDevices(true))
 
+// A sensor's options changed, by any client's write or the camera itself: every page shows what the device now holds
+onEvent<{ device_id: string; group: string; options: Record<string, number | boolean | string | null> }>('options_changed',
+  m => useAppStore.getState().applyOptionsChanged(m.device_id, m.group, m.options).catch(() => {})) // a device gone meanwhile
+
 // Any client's start or stop, through either API: every page shows what streams
 onEvent<{ device_id: string; sensors: SupportedStreamProfile[][] }>('streaming_changed', // by sensor_index
   m => useAppStore.getState().applyStreaming(m.device_id, m.sensors))

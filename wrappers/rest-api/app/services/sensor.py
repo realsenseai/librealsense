@@ -59,8 +59,8 @@ class Sensor:
     def option(self, option_id: str) -> OptionInfo:
         return self.options()[option_id]
 
-    def set_option(self, option_id: str, value: float) -> OptionInfo:
-        return options.set_option(self._sensor, option_id, value)
+    def set_option(self, option_id: str, value: float) -> None:
+        options.set_option(self._sensor, option_id, value)
 
     # ---- post-processing ---------------------------------
 
@@ -78,8 +78,8 @@ class Sensor:
         """One option of one filter"""
         return self.filter_options(filter_name)[field]
 
-    def set_filter_option(self, filter_name: str, field: str, value: float) -> OptionInfo:
-        return options.set_option(self._named[filter_name], field, value)
+    def set_filter_option(self, filter_name: str, field: str, value: float) -> None:
+        options.set_option(self._named[filter_name], field, value)
 
     def filter_enabled(self, filter_name: str) -> bool:
         return self.filters[self._named[filter_name]]

@@ -9,7 +9,9 @@ machine (GHA) with no hardware attached.
 
 import importlib
 import logging
+import queue
 import sys
+import threading
 
 import pytest
 
@@ -233,6 +235,34 @@ class TestRealSenseAPIIntegration:
         response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_index}/options/{option_id}")
         assert response.status_code == 200
         assert response.json() == option
+
+    def test_sdk_reports_an_option_write_with_its_new_value_rs(self):
+        """A sensor option written is reported to the clients by the SDK's options watcher, with the new value"""
+        client = real_client()
+        device_id = first_device_id(client)
+        sensors = client.get(f"/api/v1/devices/{device_id}/sensors").json()
+        index = next(s["sensor_index"] for s in sensors
+                     if "exposure" in client.get(f"/api/v1/devices/{device_id}/sensors/{s['sensor_index']}/options").json())
+        url = f"/api/v1/devices/{device_id}/sensors/{index}/options"
+        exposure = client.get(f"{url}/exposure").json()
+        value = exposure["min_value"] if exposure["current_value"] != exposure["min_value"] else exposure["max_value"]
+
+        with client.websocket_connect("/api/v1/events") as events:
+            received = queue.Queue()
+
+            def read():  # the socket gives no timeout of its own
+                try:
+                    while True:
+                        received.put(events.receive_json())
+                except Exception:  # closed at the test's end
+                    pass
+            threading.Thread(target=read, daemon=True).start()
+            try:
+                assert client.put(f"{url}/exposure", json={"value": value}).status_code == 200
+                message = received.get(timeout=5)  # the SDK reads the options about once a second
+                assert message["event"] == "options_changed" and message["group"] == f"sensors/{index}/options" and message["options"]["exposure"] == value
+            finally:
+                client.put(f"{url}/exposure", json={"value": exposure["current_value"]})
 
     def test_filters_endpoint_rs(self):
         """Every filter route of a sensor with filters: each read agrees with the list, and a write reads back"""

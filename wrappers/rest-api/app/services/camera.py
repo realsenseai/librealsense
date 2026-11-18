@@ -39,7 +39,15 @@ class Camera:
         # One colorizer, so depth-visualization options (color scheme, min/max distance, histogram eq)
         # set on it affect the streamed depth image
         self.colorizer = rs.colorizer()
-        self.sensors = [Sensor(s, i) for i, s in enumerate(dev.sensors)]
+        # The SDK keeps an options callback on the sensor object it was given, and dev.sensors makes new ones: so the
+        # callbacks go on the very objects each Sensor keeps
+        sensors = dev.sensors
+        self.sensors = [Sensor(s, i) for i, s in enumerate(sensors)]
+        for i, s in enumerate(sensors):
+            try:
+                s.on_options_changed(self._options_callback(i))
+            except RuntimeError:  # a sensor the SDK watches no options of, such as a software device's
+                pass
 
     def is_metadata_enabled(self) -> bool:
         """False only where Windows keeps its frame metadata off until it is enabled (the SDK says True elsewhere);
@@ -77,8 +85,8 @@ class Camera:
     def colorizer_option(self, field: str) -> OptionInfo:
         return self.colorizer_options()[field]
 
-    def set_colorizer_option(self, field: str, value: float) -> OptionInfo:
-        return options.set_option(self.colorizer, field, value)
+    def set_colorizer_option(self, field: str, value: float) -> None:
+        options.set_option(self.colorizer, field, value)
 
     # ---- advanced mode ---------------------------------
 
@@ -94,8 +102,19 @@ class Camera:
     def advanced_control(self, group: str, field: str) -> OptionInfo:
         return self.advanced_group(group)[field]
 
-    def set_advanced_control(self, group: str, field: str, value: float) -> OptionInfo:
-        return advanced_mode.set_control(self.dev, group, field, value)
+    def set_advanced_control(self, group: str, field: str, value: float) -> None:
+        advanced_mode.set_control(self.dev, group, field, value)
+
+    def _options_callback(self, sensor_index: int):
+        """What the SDK calls when options of the sensor change, by any client's write or by the camera itself (auto
+        exposure), as the legacy viewer is told: every client gets the new values"""
+        events, device_id, group = self._events, self.id, f"sensors/{sensor_index}/options"
+
+        def changed(values):
+            # Never use self in here: a camera the callback held would never be freed once unplugged
+            events.emit("options_changed", {"device_id": device_id, "group": group,
+                                            "options": {v.id.name: v.value for v in values}})  # None: unreadable now
+        return changed
 
     # ---- streaming ---------------------------------
 

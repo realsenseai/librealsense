@@ -10,6 +10,8 @@ Each message is one JSON text message, {"event": name, ...its fields}:
     firmware_progress        device_id, progress: 0 to 1, phase: "downloading" or "installing"
     firmware_update_success  device_id, firmware_version
     firmware_update_failed   device_id, error
+    options_changed          device_id, group: sensors/<index>/options, options: {option ID: new value, null if
+                             unreadable now}, as the SDK's options watcher reports them about a second after a change
 
 Nothing is replayed: a client reads the current state through the REST API once connected.
 """
