@@ -12,9 +12,10 @@ import time
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 from rspy.stopwatch import Stopwatch
 import logging
-from rspy.pytest.device_helpers import require_min_fw_on_d585_gmsl
+from rspy.pytest.device_helpers import require_min_fw_version
 log = logging.getLogger(__name__)
 
 # Relaxed to 3 as 50 was failing often, See [LRS-1213]
@@ -30,7 +31,8 @@ pytestmark = [
 @pytest.mark.timeout(220)
 def test_pipeline_start_stop(test_device):
     dev, ctx = test_device
-    require_min_fw_on_d585_gmsl( dev, "pipeline start/stop" )
+    if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
+        require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "pipeline start/stop" )
 
     pipe = rs.pipeline(ctx)
     pipe.set_device(dev)
