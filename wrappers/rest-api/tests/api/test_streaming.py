@@ -7,7 +7,7 @@ from .conftest import STREAM_CONFIG, client
 def test_start_stream(setup_mock_managers):
     response = client.post("/api/v1/devices/device1/stream/start", json=STREAM_CONFIG)
     assert response.status_code == 200
-    setup_mock_managers["rs_manager"].pipelines["device1"].start.assert_called_once()
+    setup_mock_managers["rs_manager"].cameras["device1"].pipeline.start.assert_called_once()
 
 
 def test_start_stream_defaults_to_any(setup_mock_managers):
@@ -22,9 +22,9 @@ def test_start_stream_rejects_unknown_stream(setup_mock_managers):
 
 
 def test_start_stream_sdk_refusal_is_400(setup_mock_managers):
-    def refuse(device_id, configs):
+    def refuse(configs):
         raise RuntimeError("start() cannot be called before stop()")
-    setup_mock_managers["rs_manager"].start_stream = refuse
+    setup_mock_managers["rs_manager"].cameras["device1"].start_stream = refuse
     response = client.post("/api/v1/devices/device1/stream/start", json=STREAM_CONFIG)
     assert response.status_code == 400
     assert response.json()["detail"] == "start() cannot be called before stop()"
@@ -63,7 +63,7 @@ def test_extrinsics_between_the_device_streams(setup_mock_managers):
 
 
 def test_stopping_a_sensor_the_pipeline_runs_is_refused(setup_mock_managers):
-    sensor = setup_mock_managers["rs_manager"].devices["device1"].sensors[0]
+    sensor = setup_mock_managers["rs_manager"].cameras["device1"].dev.sensors[0]
     sensor._active = sensor.get_stream_profiles()[:1]  # opened by the pipeline, not the sensor API
     response = client.post("/api/v1/devices/device1/sensors/device1-sensor-0/stop")
     assert response.status_code == 409
@@ -83,7 +83,7 @@ def test_every_start_and_stop_tells_the_clients(setup_mock_managers):
 
 
 def test_a_refused_start_leaves_the_other_owner_streaming(setup_mock_managers):
-    sensor = setup_mock_managers["rs_manager"].devices["device1"].sensors[0]
+    sensor = setup_mock_managers["rs_manager"].cameras["device1"].dev.sensors[0]
     running = sensor.get_stream_profiles()[:1]
     sensor._active = running  # another client holds it
 

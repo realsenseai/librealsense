@@ -9,78 +9,42 @@ control than the pipeline-based /streams/* endpoints, allowing individual sensor
 (depth, color, IMU) to be started/stopped independently.
 """
 
-import functools
 from fastapi import APIRouter, Depends, HTTPException
-from starlette.concurrency import run_in_threadpool
 from typing import List
 
 from app.models.sensor import SensorInfo, SensorStartRequest
-from app.services.rs_manager import RealSenseManager
-from app.api.dependencies import get_realsense_manager
+from app.api.dependencies import get_camera, get_sensor
+from app.services.camera import Camera
+from app.services.sensor import Sensor
 
 router = APIRouter()
 
 
-def _handle_rs_exception(e: Exception, default_status: int = 400) -> None:
-    if hasattr(e, 'status_code'):
-        raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-    raise HTTPException(status_code=default_status, detail=str(e))
-
-
-def rs_exception_handler(default_status: int = 400):
-    """Convert any non-HTTPException raised by RealSenseManager into an HTTPException.
-
-    Eliminates the repeated `try / except Exception: _handle_rs_exception(e, ...)` shell
-    around every endpoint body. HTTPExceptions raised inside the wrapped function (e.g.,
-    explicit 400s for bad input) propagate unchanged.
-    """
-    def decorator(fn):
-        @functools.wraps(fn)
-        async def wrapper(*args, **kwargs):
-            try:
-                return await fn(*args, **kwargs)
-            except HTTPException:
-                raise
-            except Exception as e:
-                _handle_rs_exception(e, default_status=default_status)
-
-        return wrapper
-
-    return decorator
-
-
 @router.get("/", response_model=List[SensorInfo])
-@rs_exception_handler(default_status=404)
-async def get_sensors(
-    device_id: str,
-    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+def get_sensors(
+    camera: Camera = Depends(get_camera),
 ):
     """
     Get a list of all sensors for a specific RealSense device.
     """
-    return rs_manager.get_sensors(device_id)
+    return [s.info() for s in camera.sensors]
 
 
 @router.get("/{sensor_id}", response_model=SensorInfo)
-@rs_exception_handler(default_status=404)
-async def get_sensor(
-    device_id: str,
-    sensor_id: str,
-    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+def get_sensor_info(
+    sensor: Sensor = Depends(get_sensor),
 ):
     """
     Get details of a specific sensor for a RealSense device.
     """
-    return rs_manager.get_sensor(device_id, sensor_id)
+    return sensor.info()
 
 
 @router.post("/{sensor_id}/start")
-@rs_exception_handler()
-async def start_sensor(
-    device_id: str,
-    sensor_id: str,
+def start_sensor(
     request: SensorStartRequest,
-    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+    camera: Camera = Depends(get_camera),
+    sensor: Sensor = Depends(get_sensor),
 ):
     """
     Start streaming from a specific sensor using the sensor API.
@@ -91,15 +55,23 @@ async def start_sensor(
     **Note:** Cannot be used simultaneously with pipeline API (/streams/start).
     Stop all streams before switching between APIs.
     """
-    return await run_in_threadpool(rs_manager.start_sensor, device_id, sensor_id, request.profiles)
+    with sensor.lock:
+        try:
+            camera.open_sensor(sensor.index, request.profiles)
+        except Exception as e:  # a sensor another client holds refuses open(), and is not ours to close
+            raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
+        try:
+            camera.start_sensor(sensor.index)
+        except Exception as e:
+            camera.close_sensor(sensor.index)
+            raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
+        sensor.started = True
 
 
 @router.post("/{sensor_id}/stop")
-@rs_exception_handler()
-async def stop_sensor(
-    device_id: str,
-    sensor_id: str,
-    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+def stop_sensor(
+    camera: Camera = Depends(get_camera),
+    sensor: Sensor = Depends(get_sensor),
 ):
     """
     Stop streaming from a specific sensor.
@@ -108,4 +80,12 @@ async def stop_sensor(
     Other sensors on the same device will continue streaming.
     A sensor the pipeline API runs is refused with 409: stop it with /stream/stop.
     """
-    return await run_in_threadpool(rs_manager.stop_sensor, device_id, sensor_id)
+    with sensor.lock:
+        if not sensor.started:
+            if sensor.active_profiles():
+                raise HTTPException(status_code=409,
+                                    detail="The sensor streams through the pipeline; stop it with /stream/stop")
+            return
+        camera.stop_sensor(sensor.index)
+        camera.close_sensor(sensor.index)
+        sensor.started = False

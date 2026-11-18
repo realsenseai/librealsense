@@ -29,7 +29,7 @@ def _enable_metadata_elevated(timeout: float = 120.0) -> int:
 
 
 @router.post("/enable-metadata")
-async def enable_metadata():
+def enable_metadata():
     """Enable Windows UVC frame-metadata for connected D400/D500 devices (UAC prompt)."""
     if platform.system() != "Windows":
         return {"status": "noop", "note": "Metadata management is Windows-only."}

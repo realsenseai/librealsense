@@ -27,5 +27,10 @@ async def stream_frames(
         await websocket.close()  # before accept, uvicorn answers 403 and drops code and reason
         return
     await websocket.accept()
-    await rs_manager.frame_sender.serve(websocket, device_id, stream, stream_index,
-                                        lambda: rs_manager.is_streaming(device_id, stream, stream_index))
+    camera = rs_manager.cameras.get(device_id)
+
+    def streaming() -> bool:
+        """Whether a sensor of the device streams it, through either the sensor API or the pipeline"""
+        return camera is not None and any((p.stream_type(), p.stream_index()) == (stream, stream_index)
+                                          for s in camera.sensors for p in s.active_profiles())
+    await rs_manager.frame_sender.serve(websocket, device_id, stream, stream_index, streaming)

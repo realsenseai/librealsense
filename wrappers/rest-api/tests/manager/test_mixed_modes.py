@@ -8,7 +8,8 @@ import pyrealsense2 as rs
 from unittest.mock import MagicMock
 
 from app.models.stream import StreamConfig
-from app.services.rs_manager import RealSenseManager, _profile_row
+from app.services.rs_manager import RealSenseManager
+from app.services.sensor import profile_row
 
 
 def _add_stream(sensor, stream, fmt, bpp, uid):
@@ -30,39 +31,43 @@ def mgr():
     m = RealSenseManager()
     dev.add_to(m.ctx)
     with m.lock:
-        m._register_new_device(dev)
-    m.start_sensor("SW1", "SW1-sensor-0", [_profile_row(depth)])
+        m._add_cameras([dev])
+    m.cameras["SW1"].open_sensor(0, [profile_row(depth)])
+    m.cameras["SW1"].start_sensor(0)
     yield m
-    m.stop_sensor("SW1", "SW1-sensor-0")
+    if m.cameras["SW1"].dev.sensors[0].get_active_streams():  # the test may have stopped it
+        m.cameras["SW1"].stop_sensor(0)
+        m.cameras["SW1"].close_sensor(0)
 
 
 def _streaming(mgr):
-    return [p.stream_type() for s in mgr.devices["SW1"].sensors for p in s.get_active_streams()]
+    return [p.stream_type() for s in mgr.cameras["SW1"].dev.sensors for p in s.get_active_streams()]
 
 
 def test_pipeline_stop_keeps_sensor_streams(mgr):
-    mgr.start_stream("SW1", [StreamConfig(stream="color")])
+    mgr.cameras["SW1"].start_stream([StreamConfig(stream="color")])
     assert _streaming(mgr) == [rs.stream.depth, rs.stream.color]
 
-    mgr.stop_stream("SW1")
+    mgr.cameras["SW1"].stop_stream()
     assert _streaming(mgr) == [rs.stream.depth]
 
-    mgr.stop_sensor("SW1", "SW1-sensor-0")
+    mgr.cameras["SW1"].stop_sensor(0)
+    mgr.cameras["SW1"].close_sensor(0)
     assert not _streaming(mgr)
 
 
 def test_sdk_refuses_pipeline_on_a_streaming_sensor(mgr):
     with pytest.raises(RuntimeError, match="streaming"):
-        mgr.start_stream("SW1", [StreamConfig(stream="depth")])
+        mgr.cameras["SW1"].start_stream([StreamConfig(stream="depth")])
 
 
 def test_sdk_refuses_stop_before_start(mgr):
     with pytest.raises(RuntimeError, match="can only be called between a start\\(\\) and a following stop\\(\\)"):
-        mgr.stop_stream("SW1")
+        mgr.cameras["SW1"].stop_stream()
 
 
 def test_sdk_refuses_start_twice(mgr):
-    mgr.start_stream("SW1", [StreamConfig(stream="color")])
+    mgr.cameras["SW1"].start_stream([StreamConfig(stream="color")])
     with pytest.raises(RuntimeError, match=r"start\(\) cannot be called before stop\(\)"):
-        mgr.start_stream("SW1", [StreamConfig(stream="color")])
-    mgr.stop_stream("SW1")
+        mgr.cameras["SW1"].start_stream([StreamConfig(stream="color")])
+    mgr.cameras["SW1"].stop_stream()

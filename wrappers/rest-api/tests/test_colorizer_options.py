@@ -3,7 +3,7 @@
 
 from collections import namedtuple
 import pytest
-from app.services.rs_manager import RealSenseManager, RealSenseError
+from app.services.camera import Camera
 
 Range = namedtuple("Range", ["min", "max", "step", "default"])
 
@@ -42,34 +42,33 @@ class _FakeColorizer:
         self.written[opt.name] = v
 
 
-def _mgr_with_colorizer():
-    mgr = RealSenseManager.__new__(RealSenseManager)  # bypass __init__ (no rs.context)
-    mgr.colorizers = {"dev": _FakeColorizer()}
-    mgr.devices = {"dev": object()}  # the colorizer rides a device, so one has to exist
-    return mgr
+def _camera_with_colorizer():
+    camera = Camera.__new__(Camera)  # bypass __init__ (no SDK device)
+    camera.colorizer = _FakeColorizer()
+    return camera
 
 
 def test_get_colorizer_options_reports_ranges():
-    opts = {o.option_id: o for o in _mgr_with_colorizer().get_colorizer_options("dev")}
+    opts = {o.option_id: o for o in _camera_with_colorizer().colorizer_options()}
     assert (opts["color_scheme"].min_value, opts["color_scheme"].max_value) == (0, 9)
     assert opts["min_distance"].step == 0.1
 
 
 def test_set_colorizer_option_writes_and_returns_applied():
-    mgr = _mgr_with_colorizer()
-    applied = mgr.set_colorizer_option("dev", "color_scheme", 3)
-    assert mgr.colorizers["dev"].written["color_scheme"] == 3.0
+    camera = _camera_with_colorizer()
+    applied = camera.set_colorizer_option("color_scheme", 3)
+    assert camera.colorizer.written["color_scheme"] == 3.0
     assert applied.current_value == 3.0
 
 
 def test_set_colorizer_option_out_of_range_is_left_to_the_device():
-    mgr = _mgr_with_colorizer()
+    camera = _camera_with_colorizer()
     with pytest.raises(RuntimeError):  # the SDK's own rejection, not translated here
-        mgr.set_colorizer_option("dev", "min_distance", 999)
-    assert "min_distance" not in mgr.colorizers["dev"].written
+        camera.set_colorizer_option("min_distance", 999)
+    assert "min_distance" not in camera.colorizer.written
 
 
 def test_set_colorizer_option_unknown_raises():
-    mgr = _mgr_with_colorizer()
-    with pytest.raises(StopIteration):
-        mgr.set_colorizer_option("dev", "nope", 1)
+    camera = _camera_with_colorizer()
+    with pytest.raises(KeyError):  # answered 404
+        camera.set_colorizer_option("nope", 1)

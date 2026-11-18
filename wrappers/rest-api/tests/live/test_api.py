@@ -48,28 +48,21 @@ class TestRealSenseAPIIntegration:
         from app.services.rs_manager import RealSenseManager
 
         manager = RealSenseManager()
-        assert manager.get_devices(), "RealSenseManager sees no devices — hub/USB enumeration likely failed"
+        assert manager.cameras, "RealSenseManager sees no devices — hub/USB enumeration likely failed"
         return manager
 
     def test_get_device_rs(self, real_rs_manager):
         """Test getting device information using real RealSense API"""
-        device = real_rs_manager.get_devices()[0]
-        assert device.device_id is not None
-        assert device.name is not None
-        assert device.serial_number is not None
-        assert isinstance(device.sensors, list)
-        assert len(device.sensors) > 0
-
-        retrieved_device = real_rs_manager.get_device(device.device_id)
-        assert retrieved_device.device_id == device.device_id
-        assert retrieved_device.name == device.name
-        assert retrieved_device.serial_number == device.serial_number
+        device_id, camera = next(iter(real_rs_manager.cameras.items()))
+        assert camera.id == device_id
+        assert camera.info["name"] is not None
+        assert len(camera.sensors) > 0
 
     def test_get_sensor_rs(self, real_rs_manager):
         """Test getting sensor information using real RealSense API"""
-        device_id = real_rs_manager.get_devices()[0].device_id
+        device_id = next(iter(real_rs_manager.cameras))
 
-        sensors = real_rs_manager.get_sensors(device_id)
+        sensors = [s.info() for s in real_rs_manager.cameras[device_id].sensors]
         assert len(sensors) > 0
 
         sensor = sensors[0]
@@ -79,24 +72,24 @@ class TestRealSenseAPIIntegration:
         assert isinstance(sensor.supported_stream_profiles, list)
         assert isinstance(sensor.options, list)
 
-        retrieved_sensor = real_rs_manager.get_sensor(device_id, sensor.sensor_id)
+        retrieved_sensor = real_rs_manager.cameras[device_id].sensors[0].info()
         assert retrieved_sensor.sensor_id == sensor.sensor_id
         assert retrieved_sensor.name == sensor.name
         assert retrieved_sensor.type == sensor.type
 
     def test_set_option_rs(self, real_rs_manager):
         """Test setting sensor options using real RealSense API"""
-        device_id = real_rs_manager.get_devices()[0].device_id
+        device_id = next(iter(real_rs_manager.cameras))
 
         writable_option = None
-        sensor_id = None
+        sensor = None
         original_value = None
 
-        for sensor in real_rs_manager.get_sensors(device_id):
-            for option in sensor.options:
+        for candidate in real_rs_manager.cameras[device_id].sensors:
+            for option in candidate.options():
                 if not option.read_only and option.min_value != option.max_value:
                     writable_option = option
-                    sensor_id = sensor.sensor_id
+                    sensor = candidate
                     original_value = option.current_value
                     break
             if writable_option:
@@ -120,10 +113,10 @@ class TestRealSenseAPIIntegration:
         test_value = max(min_val, min(max_val, test_value))
 
         try:
-            applied = real_rs_manager.set_sensor_option(device_id, sensor_id, option_id, test_value)
+            applied = sensor.set_option(option_id, test_value)
             assert applied.option_id == option_id
 
-            updated_option = real_rs_manager.get_sensor_option(device_id, sensor_id, option_id)
+            updated_option = sensor.option(option_id)
 
             # For stepped values, check exact match; for continuous, allow small tolerance
             if step > 0:
@@ -133,7 +126,7 @@ class TestRealSenseAPIIntegration:
 
         finally:
             try:
-                real_rs_manager.set_sensor_option(device_id, sensor_id, option_id, original_value)
+                sensor.set_option(option_id, original_value)
             except Exception:
                 pass
 
