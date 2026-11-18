@@ -4,6 +4,8 @@
 
 #include <librealsense2/h/rs_option.h>
 #include <src/core/option-interface.h>
+#include <src/composite-option-interface.h>
+#include <librealsense2/h/rs_composite_option.h>
 
 #include <rsutils/signal.h>
 #include <rsutils/concurrency/concurrency.h>
@@ -13,6 +15,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <vector>
 #include <thread>
 #include <mutex>
 
@@ -33,8 +36,16 @@ public:
         std::shared_ptr< const rsutils::json > p_last_known_value;
     };
 
+    struct composite_option_and_value
+    {
+        std::shared_ptr< composite_option_interface > sptr;
+        std::shared_ptr< const std::vector< uint8_t > > p_last_known_value;  // empty: unreadable or disabled
+    };
+
     using options_and_values = std::map< rs2_option, option_and_value >;
+    using composite_options_and_values = std::map< rs2_composite_option_id, composite_option_and_value >;
     using callback = std::function< void( options_and_values const & ) >;
+    using composite_callback = std::function< void( composite_options_and_values const & ) >;
 
 public:
     options_watcher( std::chrono::milliseconds update_interval = std::chrono::milliseconds( 1000 ) );
@@ -43,7 +54,11 @@ public:
     void register_option( rs2_option id, std::shared_ptr< option > option );
     void unregister_option( rs2_option id );
 
+    // Composite options are compared by their raw payload
+    void register_composite_option( rs2_composite_option_id id, std::shared_ptr< composite_option_interface > option );
+
     rsutils::subscription subscribe( callback && cb );
+    rsutils::subscription subscribe_composite( composite_callback && cb );
 
     void set_update_interval( std::chrono::milliseconds update_interval ) { _update_interval = update_interval; }
 
@@ -57,17 +72,22 @@ protected:
     void start();
     void stop();
     void thread_loop();
-    virtual options_and_values update_options();
-    void notify( options_and_values const & updated_options );
+    options_and_values update_options();
+    composite_options_and_values update_composite_options();
+    virtual void update( options_and_values & updated_options, composite_options_and_values & updated_composites );
+    void notify( options_and_values const & updated_options, composite_options_and_values const & updated_composites );
 
     options_and_values _options;
+    composite_options_and_values _composite_options;
     rsutils::signal< options_and_values const & > _on_values_changed;
+    rsutils::signal< composite_options_and_values const & > _on_composite_values_changed;
     std::chrono::milliseconds _update_interval;
     std::thread _updater;
     std::mutex _mutex;
     std::condition_variable _stopping;
     std::atomic_bool _destructing;
     std::atomic_bool _paused;
+    std::atomic_bool _running{ false };
 };
 
 
