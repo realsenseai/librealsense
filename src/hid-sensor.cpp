@@ -253,7 +253,13 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
             std::shared_ptr< stream_profile_interface > request;
             {
                 std::lock_guard< std::mutex > lock( _configure_lock );
-                request = _configured_profiles[sensor_name];
+                // stop() and close() can complete while a report waits for this lock.
+                if( ! this->is_streaming() )
+                    return;
+                auto profile = _configured_profiles.find( sensor_name );
+                if( profile == _configured_profiles.end() )
+                    return;
+                request = profile->second;
             }
             bool is_custom_sensor = false;
             static const uint32_t custom_source_id_offset = 16;
