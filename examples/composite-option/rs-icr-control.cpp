@@ -71,10 +71,18 @@ try
     cfg.enable = 1;
     cfg.filter_type = 0;      // Downscale
     cfg.downscale_ratio = 1;  // x2
-    icr.set_composite_option_from( ICR, cfg );
+    try
+    {
+        icr.set_composite_option_from( ICR, cfg );
 
-    // 3. Get again to see what the device applied (it may adjust values), then restore
-    print( "Settings after set:", icr.get_composite_option_as< rs2_icr_filter_dpp_config >( ICR ) );
+        // 3. Get again to see what the device applied (it may adjust values), then restore
+        print( "Settings after set:", icr.get_composite_option_as< rs2_icr_filter_dpp_config >( ICR ) );
+    }
+    catch( ... )
+    {
+        icr.set_composite_option_from( ICR, original );  // leave the device as found on any failure
+        throw;
+    }
 
     icr.set_composite_option_from( ICR, original );
     std::cout << "Original settings restored\n";

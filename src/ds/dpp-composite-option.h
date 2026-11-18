@@ -51,6 +51,8 @@ public:
         : _control( std::move( control ) )
         , _desc( desc )
     {
+        if( ! _control )
+            throw invalid_value_exception( "DPP composite option needs a control" );
         if( _desc.param_count != param_count )
             throw invalid_value_exception( "DPP control description does not match its settings struct" );
     }
