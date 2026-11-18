@@ -15,12 +15,30 @@ router = APIRouter()
 def get_sensor_filters(
     sensor: Sensor = Depends(get_sensor),
 ):
-    """A sensor's post-processing filters, keyed by filter name, each with its options."""
+    """A sensor's post-processing filters, keyed by filter name, each whether it is on and its options."""
     return sensor.all_filters()
 
 
-# Ahead of the per-option route below, which would otherwise take "enabled" for a field.
-@router.put("/{filter_name}/enabled/")
+@router.get("/{filter_name}/", response_model=Dict[str, OptionInfo])
+def get_filter_options(
+    filter_name: str,
+    sensor: Sensor = Depends(get_sensor),
+):
+    """One filter's options"""
+    return sensor.filter_options(filter_name)
+
+
+# Ahead of the per-option routes below, which would otherwise take "enabled" for a field.
+@router.get("/{filter_name}/enabled", response_model=bool)
+def get_filter_enabled(
+    filter_name: str,
+    sensor: Sensor = Depends(get_sensor),
+):
+    """Whether one filter is applied"""
+    return sensor.filter_enabled(filter_name)
+
+
+@router.put("/{filter_name}/enabled")
 def set_filter_enabled(
     filter_name: str,
     body: OptionUpdate,
@@ -30,7 +48,17 @@ def set_filter_enabled(
     sensor.set_filter_enabled(filter_name, body.value)
 
 
-@router.put("/{filter_name}/{field}/", response_model=OptionInfo)
+@router.get("/{filter_name}/{field}", response_model=OptionInfo)
+def get_filter_option(
+    filter_name: str,
+    field: str,
+    sensor: Sensor = Depends(get_sensor),
+):
+    """One option of one filter"""
+    return sensor.filter_option(filter_name, field)
+
+
+@router.put("/{filter_name}/{field}", response_model=OptionInfo)
 def set_filter_option(
     filter_name: str,
     field: str,

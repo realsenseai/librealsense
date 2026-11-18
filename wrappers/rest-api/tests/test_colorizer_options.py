@@ -6,6 +6,7 @@ import pytest
 from app.services.camera import Camera
 
 Range = namedtuple("Range", ["min", "max", "step", "default"])
+OptionValue = namedtuple("OptionValue", ["id", "value", "range"])
 
 
 class _Opt:
@@ -19,6 +20,9 @@ class _FakeColorizer:
 
     def get_supported_options(self):
         return [_Opt("color_scheme"), _Opt("min_distance")]
+
+    def get_supported_option_values(self):
+        return [OptionValue(o, self.get_option(o), self.get_option_range(o)) for o in self.get_supported_options()]
 
     def get_option_range(self, opt):
         return Range(0, 9, 1, 0) if opt.name == "color_scheme" else Range(0.0, 16.0, 0.1, 0.0)
@@ -49,7 +53,7 @@ def _camera_with_colorizer():
 
 
 def test_get_colorizer_options_reports_ranges():
-    opts = {o.option_id: o for o in _camera_with_colorizer().colorizer_options()}
+    opts = _camera_with_colorizer().colorizer_options()
     assert (opts["color_scheme"].min_value, opts["color_scheme"].max_value) == (0, 9)
     assert opts["min_distance"].step == 0.1
 
@@ -72,3 +76,8 @@ def test_set_colorizer_option_unknown_raises():
     camera = _camera_with_colorizer()
     with pytest.raises(KeyError):  # answered 404
         camera.set_colorizer_option("nope", 1)
+
+
+def test_get_one_colorizer_option_as_the_list_has_it():
+    camera = _camera_with_colorizer()
+    assert camera.colorizer_option("min_distance") == camera.colorizer_options()["min_distance"]

@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Dict, List
+from typing import Dict
 
 from app.models.option import OptionInfo, OptionUpdate
 from app.services import advanced_mode
@@ -40,7 +40,7 @@ def set_advanced_mode(
     return advanced_mode.status(rs_manager.cameras[device_id].dev)
 
 
-@router.get("/controls/", response_model=Dict[str, List[OptionInfo]])
+@router.get("/controls/", response_model=Dict[str, Dict[str, OptionInfo]])
 def get_advanced_controls(
     camera: Camera = Depends(get_camera),
 ):
@@ -48,7 +48,26 @@ def get_advanced_controls(
     return camera.advanced_controls()
 
 
-@router.put("/controls/{group}/{field}/", response_model=OptionInfo)
+@router.get("/controls/{group}/", response_model=Dict[str, OptionInfo])
+def get_advanced_group(
+    group: str,
+    camera: Camera = Depends(get_camera),
+):
+    """One group of advanced controls, by field"""
+    return camera.advanced_group(group)
+
+
+@router.get("/controls/{group}/{field}", response_model=OptionInfo)
+def get_advanced_control(
+    group: str,
+    field: str,
+    camera: Camera = Depends(get_camera),
+):
+    """One advanced control"""
+    return camera.advanced_control(group, field)
+
+
+@router.put("/controls/{group}/{field}", response_model=OptionInfo)
 def set_advanced_control(
     group: str,
     field: str,

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
 import { useAppStore } from '@/store'
-import { firmwareStatus, isStreaming, type SupportedStreamProfile } from '@/api/types'
+import { firmwareStatus, isStreaming, type OptionMap, type SupportedStreamProfile } from '@/api/types'
 import { resetStore, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { mockDevice } from '../../mocks/fixtures/devices'
 import { mockDepthSensorProfiles, mockSensors } from '../../mocks/fixtures/sensors'
@@ -142,16 +142,38 @@ describe('AppStore', () => {
       
       expect(useAppStore.getState().chatMessages).toEqual([])
     })
+
+    it('sets an option the chatbot names by its label through its ID', async () => {
+      const key = 'sensors/0/options'
+      const option = createMockOption({ option_id: 'laser_power', current_value: 150 })
+      useAppStore.setState({
+        deviceStates: { [mockDevice.device_id]: createMockDeviceState(mockDevice, {
+          sensors: [createMockSensor()],
+          controls: { [key]: { section: 'Controls', name: '', options: [option] } },
+        }) },
+        pendingSettings: { deviceSerial: mockDevice.serial_number,
+          optionChanges: [{ sensorId: 'Stereo Module', optionId: 'Laser Power', value: 200 }] },
+      })
+      const fields: unknown[] = []
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/0/options/:field', ({ params }) => {
+        fields.push(params.field)
+        return new HttpResponse(null)
+      }))
+
+      await useAppStore.getState().applyProposedSettings()
+
+      expect(fields).toEqual(['laser_power'])
+    })
   })
 
   describe('Post-processing defaults', () => {
     // Activates the mock device; the filters the viewer turns on, in the order it does, go to the returned list
-    async function activate(filters: Record<string, { enabled: boolean; options: [] }>) {
+    async function activate(filters: Record<string, { enabled: boolean; options: OptionMap }>) {
       const enabled: string[] = []
       server.use(
         http.get('/api/v1/devices/:deviceId/sensors/:sensorIndex/filters/', ({ params }) =>
           HttpResponse.json(params.sensorIndex === '0' ? filters : {})),
-        http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/filters/:name/enabled/', async ({ params, request }) => {
+        http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/filters/:name/enabled', async ({ params, request }) => {
           if (((await request.json()) as { value: boolean }).value) enabled.push(params.name as string)
           return HttpResponse.json({})
         }),
@@ -160,7 +182,7 @@ describe('AppStore', () => {
       await vi.waitFor(() => expect(useAppStore.getState().deviceStates[mockDevice.device_id]?.controls).not.toEqual({}))
       return enabled
     }
-    const off = { enabled: false, options: [] as [] }
+    const off = { enabled: false, options: {} }
 
     it('starts a fresh device with the legacy viewer filters', async () => {
       const enabled = await activate({ 'Decimation Filter': off, 'Spatial Filter': off, 'Temporal Filter': off,
@@ -317,7 +339,7 @@ describe('AppStore', () => {
     it("applies a chatbot option change to the sensor at its index, whatever name it gives", async () => {
       await loadSensors()
       let written = ''
-      server.use(http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/options/:optionId/', ({ params }) => {
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/options/:optionId', ({ params }) => {
         written = `${params.sensorIndex}/${params.optionId}`
         return HttpResponse.json(null)
       }))

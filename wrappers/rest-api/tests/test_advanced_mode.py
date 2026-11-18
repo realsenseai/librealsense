@@ -6,7 +6,8 @@ from app.services import advanced_mode
 
 
 class _Struct:
-    """Stands in for a control group: a mapping view over its fields, like the bindings."""
+    """Stands in for a control group: a mapping view over its fields, like the bindings, which
+    raise AttributeError for a field they lack."""
     def __init__(self, **fields):
         self._fields = fields
 
@@ -14,10 +15,10 @@ class _Struct:
         return list(self._fields)
 
     def __getitem__(self, field):
-        return self._fields[field]
+        return getattr(self, field) if field not in self._fields else self._fields[field]
 
     def __setitem__(self, field, value):
-        current = self._fields[field]
+        current = self[field]
         self._fields[field] = int(round(value)) if isinstance(current, int) else float(value)
 
 
@@ -47,7 +48,7 @@ class _FakeAM:
     # am[group] = struct writes it
     def __getitem__(self, key):
         group, mode = key if isinstance(key, tuple) else (key, 0)
-        return self.groups[group][mode]
+        return self.groups[group][mode] if group in self.groups else getattr(self, group)
 
     def __setitem__(self, group, values):
         self.written[group] = values
@@ -63,7 +64,7 @@ class _FakeControls:
         return list(self._am.groups)
 
     def __getitem__(self, group):
-        return self._am.groups[group]
+        return self._am.groups[group] if group in self._am.groups else getattr(self, group)
 
 
 class _Unsupported:
@@ -93,12 +94,12 @@ def device_for(monkeypatch):
 
 
 def _by_field(groups):
-    return {o.option_id: o for opts in groups.values() for o in opts}
+    return {f: o for opts in groups.values() for f, o in opts.items()}
 
 
 def test_reports_a_field_with_its_range(device_for):
     groups = advanced_mode.controls(device_for(_FakeAM()))
-    assert "deepSeaSecondPeakThreshold" in {o.option_id for o in groups["depth_control"]}
+    assert "deepSeaSecondPeakThreshold" in groups["depth_control"]
     o = _by_field(groups)["deepSeaSecondPeakThreshold"]
     assert (o.current_value, o.min_value, o.max_value, o.step) == (325, 0, 1023, 1)
 
@@ -128,12 +129,12 @@ def test_set_patches_the_field_and_writes_its_group_back(device_for):
 
 
 def test_set_unknown_field_raises(device_for):
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError):  # answered 404
         advanced_mode.set_control(device_for(_FakeAM()), "depth_control", "nope", 1)
 
 
 def test_set_unknown_group_raises(device_for):
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError):  # answered 404
         advanced_mode.set_control(device_for(_FakeAM()), "nope", "deepSeaSecondPeakThreshold", 1)
 
 

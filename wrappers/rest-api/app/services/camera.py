@@ -71,8 +71,11 @@ class Camera:
 
     # ---- colorizer ---------------------------------
 
-    def colorizer_options(self) -> List[OptionInfo]:
+    def colorizer_options(self) -> Dict[str, OptionInfo]:
         return options.all_options(self.colorizer)
+
+    def colorizer_option(self, field: str) -> OptionInfo:
+        return self.colorizer_options()[field]
 
     def set_colorizer_option(self, field: str, value: float) -> OptionInfo:
         return options.set_option(self.colorizer, field, value)
@@ -82,8 +85,14 @@ class Camera:
     def set_advanced_mode(self, enable: bool) -> None:
         advanced_mode.toggle(self.dev, enable)
 
-    def advanced_controls(self) -> Dict[str, List[OptionInfo]]:
+    def advanced_controls(self) -> Dict[str, Dict[str, OptionInfo]]:
         return advanced_mode.controls(self.dev)
+
+    def advanced_group(self, group: str) -> Dict[str, OptionInfo]:
+        return self.advanced_controls()[group]
+
+    def advanced_control(self, group: str, field: str) -> OptionInfo:
+        return self.advanced_group(group)[field]
 
     def set_advanced_control(self, group: str, field: str, value: float) -> OptionInfo:
         return advanced_mode.set_control(self.dev, group, field, value)

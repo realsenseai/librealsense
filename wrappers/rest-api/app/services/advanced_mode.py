@@ -4,14 +4,13 @@
 """RS400 advanced-mode controls, flattened into OptionInfo objects."""
 
 import pyrealsense2 as rs
-from typing import Dict, List
+from typing import Dict
 
 from app.models.option import OptionInfo
 
 
-def control(field: str, value, minimum, maximum) -> OptionInfo:
+def control(value, minimum, maximum) -> OptionInfo:
     return OptionInfo(
-        option_id=field,
         current_value=value,
         default_value=value,  # advanced mode exposes no per-field default
         min_value=minimum,
@@ -40,21 +39,22 @@ def toggle(dev, enable: bool) -> None:
     rs.rs400_advanced_mode(dev).toggle_advanced_mode(enable)
 
 
-def controls(dev) -> Dict[str, List[OptionInfo]]:
-    """Every advanced-mode control the device has, keyed by the group the writes go to."""
+def controls(dev) -> Dict[str, Dict[str, OptionInfo]]:
+    """Every advanced-mode control the device has, by field, keyed by the group the writes go to."""
     groups = rs.rs400_advanced_mode(dev).get_all_controls()
-    by_group: Dict[str, List[OptionInfo]] = {}
+    by_group: Dict[str, Dict[str, OptionInfo]] = {}
     for group in groups.keys():
         values, mins, maxes = groups[group]
-        by_group[group] = [control(f, values[f], mins[f], maxes[f]) for f in values.keys()]
+        by_group[group] = {f: control(values[f], mins[f], maxes[f]) for f in values.keys()}
     return by_group
 
 
 def set_control(dev, group: str, field: str, value: float) -> OptionInfo:
     """Set one control: firmware only accepts whole groups, so it is a read-modify-write."""
+    controls(dev)[group][field]  # an unknown one 404s as in the GETs, not 500 on the SDK's AttributeError
     am = rs.rs400_advanced_mode(dev)
     values = am[group]
     values[field] = value  # the SDK rounds to the field's own type
     am[group] = values
     value, minimum, maximum = am[group][field], am[group, 1][field], am[group, 2][field]
-    return control(field, value, minimum, maximum)
+    return control(value, minimum, maximum)

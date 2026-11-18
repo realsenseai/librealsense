@@ -772,7 +772,12 @@ const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p 
           const match = deviceState.sensors?.find(s => s.sensor_index === change.sensorIndex)
             ?? deviceState.sensors?.find(s => s.name === change.sensorId)
           if (!match) throw new Error(`No sensor ${change.sensorIndex ?? `named "${change.sensorId}"`}`)
-          await get().setControl(deviceId, `sensors/${match.sensor_index}/options`, change.optionId, change.value)
+          const key = `sensors/${match.sensor_index}/options`
+          // It names the option as the user sees it ("Laser Power"); the API takes its ID
+          const named = change.optionId.toLowerCase()
+          const option = deviceState.controls[key]?.options.find(o =>
+            [o.option_id, optionLabel(o.option_id)].some(n => n.toLowerCase() === named))
+          await get().setControl(deviceId, key, option?.option_id ?? change.optionId, change.value)
         }
       }
       

@@ -53,18 +53,14 @@ class Sensor:
 
     # ---- options ---------------------------------
 
-    def options(self) -> List[OptionInfo]:
+    def options(self) -> Dict[str, OptionInfo]:
         return options.all_options(self._sensor)
 
     def option(self, option_id: str) -> OptionInfo:
-        return {o.option_id: o for o in self.options()}[option_id]
+        return self.options()[option_id]
 
     def set_option(self, option_id: str, value: float) -> OptionInfo:
-        """The option is matched by its SDK name or by a display label of it, since the chatbot proposes settings
-        by the name the user sees ("Laser Power")."""
-        names = {o.name.lower(): o.name for o in self._sensor.get_supported_options()}
-        name = names.get(option_id.lower()) or names[option_id.lower().replace(" ", "_")]
-        return options.set_option(self._sensor, name, value)
+        return options.set_option(self._sensor, option_id, value)
 
     # ---- post-processing ---------------------------------
 
@@ -74,8 +70,19 @@ class Sensor:
         return {name: FilterInfo(enabled=self.filters[f], options=options.all_options(f))
                 for name, f in self._named.items()}
 
+    def filter_options(self, filter_name: str) -> Dict[str, OptionInfo]:
+        """One filter's options"""
+        return options.all_options(self._named[filter_name])
+
+    def filter_option(self, filter_name: str, field: str) -> OptionInfo:
+        """One option of one filter"""
+        return self.filter_options(filter_name)[field]
+
     def set_filter_option(self, filter_name: str, field: str, value: float) -> OptionInfo:
         return options.set_option(self._named[filter_name], field, value)
+
+    def filter_enabled(self, filter_name: str) -> bool:
+        return self.filters[self._named[filter_name]]
 
     def set_filter_enabled(self, filter_name: str, enabled: float) -> None:
         """Bypass or apply one filter"""

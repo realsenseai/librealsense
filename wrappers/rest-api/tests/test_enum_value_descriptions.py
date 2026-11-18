@@ -42,11 +42,11 @@ def test_unlabelled_option_stops_at_the_first_value():
 
 def test_non_integer_step_is_not_probed():
     obj = _FakeObj({0: "a"})
-    assert _harvest(obj, object(), Range(0.0, 1.0, 0.1, 0.0)) is None
+    assert _harvest(obj, object(), Range(0.0, 1.0, 0.1, 0.0)) == {}
     assert obj.probes == 0
 
 
 def test_non_integer_bounds_is_not_probed():
     obj = _FakeObj({0: "a"})
-    assert _harvest(obj, object(), Range(0.5, 3.5, 1.0, 0.5)) is None
+    assert _harvest(obj, object(), Range(0.5, 3.5, 1.0, 0.5)) == {}
     assert obj.probes == 0

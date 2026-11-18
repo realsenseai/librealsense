@@ -5,6 +5,7 @@ import { visibleOptions } from './types'
 import type {
   AdvancedControls,
   AdvancedModeStatus,
+  OptionMap,
   DeviceInfo,
   SensorFilters,
   SensorInfo,
@@ -84,8 +85,9 @@ class ApiClient {
   }
 
   async getAdvancedControls(deviceId: string): Promise<AdvancedControls> {
-    const response = await this.client.get(`/devices/${deviceId}/advanced_mode/controls/`)
-    return response.data
+    const response = await this.client.get<Record<string, OptionMap>>(`/devices/${deviceId}/advanced_mode/controls/`)
+    return Object.fromEntries(Object.entries(response.data).map(([group, fields]) => [group,
+      Object.entries(fields).map(([field, c]) => ({ option_id: field, ...c }))]))
   }
 
   /**
@@ -99,17 +101,17 @@ class ApiClient {
     field: string,
     value: number | boolean | string
   ): Promise<OptionInfo> {
-    const response = await this.client.put(`/devices/${deviceId}/${key}/${field}/`, { value })
+    const response = await this.client.put(`/devices/${deviceId}/${key}/${field}`, { value })
     return response.data
   }
 
   /** Bypass or apply one post-processing filter; `key` is the filter's own path. */
   async setFilterEnabled(deviceId: string, key: string, enabled: boolean): Promise<void> {
-    await this.client.put(`/devices/${deviceId}/${key}/enabled/`, { value: enabled })
+    await this.client.put(`/devices/${deviceId}/${key}/enabled`, { value: enabled })
   }
 
   async getSensorFilters(deviceId: string, sensorIndex: number): Promise<SensorFilters> {
-    const response = await this.client.get<SensorFilters>(
+    const response = await this.client.get<Record<string, { enabled: boolean; options: OptionMap }>>(
       `/devices/${deviceId}/sensors/${sensorIndex}/filters/`
     )
     return Object.fromEntries(
@@ -118,7 +120,7 @@ class ApiClient {
   }
 
   async getColorizerOptions(deviceId: string): Promise<OptionInfo[]> {
-    const response = await this.client.get(`/devices/${deviceId}/colorizer/`)
+    const response = await this.client.get<OptionMap>(`/devices/${deviceId}/colorizer/`)
     return visibleOptions(response.data)
   }
 
@@ -155,7 +157,7 @@ class ApiClient {
   }
 
   async getSensorOptions(deviceId: string, sensorIndex: number): Promise<OptionInfo[]> {
-    const response = await this.client.get<OptionInfo[]>(`/devices/${deviceId}/sensors/${sensorIndex}/options/`)
+    const response = await this.client.get<OptionMap>(`/devices/${deviceId}/sensors/${sensorIndex}/options/`)
     return visibleOptions(response.data)
   }
 

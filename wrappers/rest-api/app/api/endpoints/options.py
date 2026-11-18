@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from fastapi import APIRouter, Depends
-from typing import List
+from typing import Dict
 
 
 from app.models.option import OptionInfo, OptionUpdate
@@ -11,7 +11,7 @@ from app.services.sensor import Sensor
 
 router = APIRouter()
 
-@router.get("/", response_model=List[OptionInfo])
+@router.get("/", response_model=Dict[str, OptionInfo])
 def get_options(
     sensor: Sensor = Depends(get_sensor),
 ):
@@ -20,7 +20,7 @@ def get_options(
     """
     return sensor.options()
 
-@router.get("/{option_id}/", response_model=OptionInfo)
+@router.get("/{option_id}", response_model=OptionInfo)
 def get_option(
     option_id: str,
     sensor: Sensor = Depends(get_sensor),
@@ -30,7 +30,7 @@ def get_option(
     """
     return sensor.option(option_id)
 
-@router.put("/{option_id}/", response_model=OptionInfo)
+@router.put("/{option_id}", response_model=OptionInfo)
 def update_option(
     option_id: str,
     option_update: OptionUpdate,

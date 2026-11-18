@@ -30,8 +30,10 @@ const HIDDEN_OPTIONS = [
   'noise_estimation', 'region_of_interest', 'readout_shaping', 'sensors_config_mode',
 ]
 
-export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
-  return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
+export function visibleOptions(options: OptionMap): OptionInfo[] {
+  return Object.entries(options)
+    .filter(([optionId]) => !HIDDEN_OPTIONS.includes(optionId.toLowerCase()))
+    .map(([optionId, o]) => ({ option_id: optionId, ...o }))
 }
 
 export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
@@ -91,6 +93,10 @@ export function profilesAt(
   return sensor.stream_profiles.filter(p => streamKey(p) === stream && p.fps === fps &&
     p.width === resolution.width && p.height === resolution.height)
 }
+
+// Wire shapes: the API keys each option by its ID
+export type WireOption = Required<Omit<OptionInfo, 'option_id'>>
+export type OptionMap = Record<string, WireOption>
 
 export interface OptionInfo {
   option_id: string

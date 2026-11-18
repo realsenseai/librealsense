@@ -79,15 +79,16 @@ def test_get_sensor_options(setup_mock_managers):
 
 
 def test_get_option_by_id(setup_mock_managers):
-    option_id = client.get(OPTIONS_URL).json()[0]["option_id"]
+    options = client.get(OPTIONS_URL).json()
+    option_id = next(iter(options))
 
     response = client.get(f"{OPTIONS_URL}/{option_id}")
     assert response.status_code == 200
-    assert response.json()["option_id"] == option_id
+    assert response.json() == options[option_id]
 
 
 def test_set_option(setup_mock_managers):
-    option_id = client.get(OPTIONS_URL).json()[0]["option_id"]
+    option_id = next(iter(client.get(OPTIONS_URL).json()))
 
     response = client.put(f"{OPTIONS_URL}/{option_id}", json={"value": 0.5})
     assert response.status_code == 200
