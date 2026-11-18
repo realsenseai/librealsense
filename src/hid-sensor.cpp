@@ -12,7 +12,6 @@
 #include "platform/stream-profile-impl.h"
 #include <src/metadata-parser.h>
 #include <src/core/time-service.h>
-#include <src/core/notification.h>
 
 #include <rsutils/type/fourcc.h>
 using rsutils::type::fourcc;
@@ -51,33 +50,6 @@ hid_sensor::hid_sensor(
     , _is_configured_stream( RS2_STREAM_COUNT )
     , _hid_iio_timestamp_reader( std::move( hid_iio_timestamp_reader ) )
     , _custom_hid_timestamp_reader( std::move( custom_hid_timestamp_reader ) )
-    , _frame_timeout_monitor(
-          [this]( dispatcher::cancellable_timer timer )
-          {
-              if( ! timer.try_sleep( std::chrono::seconds(1) ) )
-                  return;
-              std::vector< std::string > missing;
-              {
-                  std::lock_guard< std::mutex > lock( _frame_timeout_mutex );
-                  auto const now = std::chrono::steady_clock::now();
-                  for( auto & sensor : _last_frame_times )
-                  {
-                      if( now - sensor.second >= std::chrono::seconds(5) )
-                      {
-                          missing.push_back( sensor.first );
-                          sensor.second = now;
-                      }
-                  }
-              }
-              for( auto const & name : missing )
-              {
-                  notification n{ RS2_NOTIFICATION_CATEGORY_FRAMES_TIMEOUT, 0, RS2_LOG_SEVERITY_WARN,
-                                  "HID frames didn't arrive within 5 seconds from " + name };
-                  LOG_WARNING( n.description );
-                  _notifications_processor->raise_notification( n );
-              }
-          },
-          "HID frame timeout" )
 {
     register_metadata( RS2_FRAME_METADATA_BACKEND_TIMESTAMP,
                        make_additional_data_parser( &frame_additional_data::backend_timestamp ) );
@@ -222,14 +194,6 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
     rs2_time_t last_timestamp = 0;
     raise_on_before_streaming_changes( true );  // Required to be just before actual start allow recording to work
 
-    {
-        std::lock_guard< std::mutex > lock( _frame_timeout_mutex );
-        _last_frame_times.clear();
-        auto const now = std::chrono::steady_clock::now();
-        for( auto const & profile : _configured_profiles )
-            _last_frame_times.emplace( profile.first, now );
-    }
-
     auto on_sample = [this, last_frame_number, last_timestamp]( const platform::sensor_data & sensor_data ) mutable
         {
             const auto system_time = time_service::get_time();  // time frame was received from the backend
@@ -243,12 +207,6 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
                 LOG_INFO( "HID Frame received when Streaming is not active," << sensor_name << ",Arrived,"
                                                                            << std::fixed << system_time );
                 return;
-            }
-            {
-                std::lock_guard< std::mutex > lock( _frame_timeout_mutex );
-                auto sensor = _last_frame_times.find( sensor_name );
-                if( sensor != _last_frame_times.end() )
-                    sensor->second = std::chrono::steady_clock::now();
             }
             std::shared_ptr< stream_profile_interface > request;
             {
@@ -345,7 +303,6 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
         throw;
     }
     _is_streaming = true;
-    _frame_timeout_monitor.start();
 }
 
 void hid_sensor::stop()
@@ -353,7 +310,6 @@ void hid_sensor::stop()
     if( ! _is_streaming )
         throw wrong_api_call_sequence_exception( "stop_streaming() failed. Hid device is not streaming!" );
 
-    _frame_timeout_monitor.stop();
     _hid_device->stop_capture();
     _is_streaming = false;
     {

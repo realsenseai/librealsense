@@ -301,9 +301,26 @@ namespace librealsense
                         CHECK_HR(interval.CoCreateInstance( CLSID_PortableDeviceValues ));
                         CHECK_HR(interval->SetUnsignedIntegerValue( SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL,
                                                                   profile.frequency ));
-                        const HRESULT hr = set_sensor_property( sensor->get_sensor(), interval,
-                                                                SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL );
-                        CHECK_HR(hr);
+                        const HRESULT set_hr = set_sensor_property( sensor->get_sensor(), interval,
+                                                                     SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL );
+                        CHECK_HR_STR( "Setting the HID report interval", set_hr );
+
+                        // Windows can accept the request and select a different interval.
+                        PROPVARIANT current_interval{};
+                        const HRESULT get_hr = sensor->get_sensor()->GetProperty(
+                            SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL, &current_interval );
+                        const bool valid_interval = current_interval.vt == VT_UI4;
+                        const ULONG interval_ms = valid_interval ? current_interval.ulVal : 0;
+                        PropVariantClear( &current_interval );
+                        CHECK_HR_STR( "Reading the HID report interval", get_hr );
+                        if( ! valid_interval )
+                            throw std::runtime_error( "Windows returned an invalid HID report interval for "
+                                                      + profile.sensor_name );
+                        if( interval_ms != profile.frequency )
+                            throw std::runtime_error(
+                                rsutils::string::from() << profile.sensor_name << " reports a " << interval_ms
+                                                       << " ms interval after requesting " << profile.frequency
+                                                       << " ms" );
 
                         const bool is_gyro = profile.sensor_name == "HID Sensor Class Device: Gyroscope";
                         const bool is_accel = profile.sensor_name == "HID Sensor Class Device: Accelerometer";
