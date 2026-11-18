@@ -96,6 +96,8 @@ def test_setting_color_options(test_device_wrapped):
     dev, ctx = test_device_wrapped
     product_line = dev.get_info(rs.camera_info.product_line)
     product_name = dev.get_info(rs.camera_info.name)
+    if 'D555' in product_name and is_dds_dev(dev):
+        pytest.skip("D555 DDS FW resets color options on a preset change")
     depth_sensor = dev.first_depth_sensor()
 
     # Skipped at runtime: a per-test device_exclude lets pytest run this test before the prerequisite tests
@@ -106,8 +108,10 @@ def test_setting_color_options(test_device_wrapped):
             color_sensor = depth_sensor
         elif 'D405' in product_name:
             pytest.skip("D405 default preset does not reset hue (see default_405 in presets.cpp)")
+        elif any(m in product_name for m in ('D421', 'D430', 'Dual RGB')):
+            pytest.skip("No color sensor")
         else:
-            pytest.skip("No color sensor")  # e.g. D421, D430, D585 2C
+            raise
 
     if not color_sensor.supports(rs.option.hue):
         pytest.skip("Color sensor does not support hue option")
