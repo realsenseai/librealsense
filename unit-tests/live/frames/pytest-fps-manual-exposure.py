@@ -12,7 +12,7 @@ import pyrsutils as rsutils
 import fps_helper
 import platform
 import logging
-from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.pytest.device_helpers import require_min_fw_version, require_min_fw_on_d585_gmsl
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -69,6 +69,7 @@ def set_exposure_half_frame_time(sensor, requested_fps):
 
 def test_depth_fps_manual_exposure(test_device):
     dev, ctx = test_device
+    require_min_fw_on_d585_gmsl( dev, rsutils.version( "7.62.0.0" ), "depth fps with manual exposure" )   # older D585 FW fails over GMSL
     product_line = dev.get_info(rs.camera_info.product_line)
     camera_name = dev.get_info(rs.camera_info.name)
     os_name = platform.system()

@@ -3,7 +3,9 @@
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 import logging
+from rspy.pytest.device_helpers import require_min_fw_on_d585_gmsl
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -67,6 +69,7 @@ def test_temporal_filter_dpp_basic_parameter_changes(test_device):
     """Check whether Temporal Filter DPP is supported; if so, bounce its writable fields to new
     in-range values (verifying each readback) and restore the original value at the end."""
     dev, ctx = test_device
+    require_min_fw_on_d585_gmsl( dev, rsutils.version( "7.62.0.0" ), "temporal filter DPP" )   # older D585 FW fails over GMSL
     depth_sensor = dev.first_depth_sensor()
     embedded_filter = _find_temporal_filter_dpp_filter(depth_sensor)
     if embedded_filter is None:
