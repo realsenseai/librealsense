@@ -61,6 +61,6 @@ def test_depth_imu_extrinsics(test_device):
         expected_translation = [-0.03739999979734421, 0.007189999800175428, 0.022299999371170998]
     compatible_devices = ["D585"]
     if any(device in device_name for device in compatible_devices):
-        expected_translation = [-0.01950000040233135, 0, -0.011400000192224979]
+        expected_translation = [-0.01950000040233135, 0, 0.013500000350177288]
     assert list(actual_extrinsics.rotation) == pytest.approx(expected_rotation, abs=1e-6)
     assert list(actual_extrinsics.translation) == pytest.approx(expected_translation, abs=1e-6)

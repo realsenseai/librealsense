@@ -218,6 +218,15 @@ namespace librealsense
             { 0x80000043, uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), sizeof( md_point_cloud ), true },
             { 640, 360, rs_fourcc( 'P', 'A', 'L', '8' ), 640 * 360 * ( 3 * sizeof( float ) + 1 ), false } };
 
+    // Point cloud XYZ: one stream with a record per resolution, so one registration per PCL tuple. GREY as on USB
+    platform::muxed_stream pcl_xyz_muxed_stream( uint32_t width, uint32_t height )
+    {
+        return { "Point Cloud",
+                 ds::MUX_POINT_CLOUD_STREAM,
+                 { uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), sizeof( md_point_cloud ), true },
+                 { width, height, rs_fourcc( 'G', 'R', 'E', 'Y' ), size_t( width ) * height * 3 * sizeof( float ), false } };
+    }
+
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
         _occupancy_stream(new stream(RS2_STREAM_OCCUPANCY)),
@@ -241,7 +250,11 @@ namespace librealsense
                 enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
         };
         std::vector< std::shared_ptr< platform::uvc_device > > perception_devs;
-        for( auto const & desc : { occupancy_muxed_stream, labeled_point_cloud_muxed_stream } )
+        std::vector< platform::muxed_stream > descs = { occupancy_muxed_stream, labeled_point_cloud_muxed_stream };
+        if( ! _is_safety_layout )
+            for( auto const & t : pcl_xyz_tuples )
+                descs.push_back( pcl_xyz_muxed_stream( t.width, t.height ) );
+        for( auto const & desc : descs )
             if( auto dev = depth_uvc->create_muxed_stream_device( desc, enable ) )
                 perception_devs.push_back( dev );
         std::shared_ptr< platform::uvc_device > mapping_dev;
@@ -278,14 +291,9 @@ namespace librealsense
                                               { depth_sensor_allowed_or_throw( requests ); } );
     }
 
-    // The camera builds occupancy from depth at these sizes only, at the occupancy rate
-    static bool is_occupancy_depth_source( const stream_profile_interface & p, uint32_t fps, bool fixed_source_only )
+    static bool is_depth_at_rate( const stream_profile_interface & p, uint32_t fps )
     {
-        auto vp = dynamic_cast< const video_stream_profile_interface * >( &p );
-        if( p.get_stream_type() != RS2_STREAM_DEPTH || ! vp || p.get_framerate() != fps )
-            return false;
-        bool const native = vp->get_width() == 640 && vp->get_height() == 360;
-        return native || ( ! fixed_source_only && vp->get_width() == 1280 && vp->get_height() == 720 );
+        return p.get_stream_type() == RS2_STREAM_DEPTH && p.get_framerate() == fps;
     }
 
     static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
@@ -295,39 +303,53 @@ namespace librealsense
         return it == profiles.end() ? nullptr : *it;
     }
 
-    void d500_depth_mapping::occupancy_allowed_or_throw( const stream_profiles & requests ) const
+    void d500_depth_mapping::mapping_allowed_or_throw( const stream_profiles & requests ) const
     {
-        auto const occupancy = find_stream( requests, RS2_STREAM_OCCUPANCY );
-        if( _is_safety_layout || ! occupancy )
+        auto mapping = find_stream( requests, RS2_STREAM_OCCUPANCY );
+        if( ! mapping )
+            mapping = find_stream( requests, RS2_STREAM_LABELED_POINT_CLOUD );
+        if( _is_safety_layout || ! mapping )
             return;
         auto const running = get_sensor( _depth_device_idx ).get_active_streams();
-        uint32_t const fps = occupancy->get_framerate();
+        uint32_t const fps = mapping->get_framerate();
+        auto const name = rs2_stream_to_string( mapping->get_stream_type() );
         if( running.empty() )
             return;
+        // A rebuilt Mapping branch normalizes any negotiated native Depth view at the Mapping rate.
         if( std::none_of( running.begin(), running.end(),
-                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_occupancy_depth_source( *p, fps, false ); } ) )
+                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_depth_at_rate( *p, fps ); } ) )
             throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << "Occupancy needs Depth at 640x360 or 1280x720, " << fps << " fps, while the depth sensor streams" );
-        // Over USB the camera keeps the colors open but stops delivering them
+                << name << " needs Depth at " << fps << " fps, while the depth sensor streams" );
+        // Keep the USB 2C Color restriction for both Mapping outputs: colors can be left open without frames.
         if( ! _is_mipi_device && find_stream( running, RS2_STREAM_COLOR ) )
-            throw wrong_api_call_sequence_exception( "Occupancy cannot start while the depth sensor streams color" );
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                << name << " cannot start while the depth sensor streams color" );
     }
 
     void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
     {
-        auto const occupancy = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_OCCUPANCY );
-        if( ! occupancy )
+        auto const active = get_sensor( _depth_mapping_idx ).get_active_streams();
+        auto mapping = find_stream( active, RS2_STREAM_OCCUPANCY );
+        if( ! mapping )
+            mapping = find_stream( active, RS2_STREAM_LABELED_POINT_CLOUD );
+        if( ! mapping )
             return;
-        // Keep the existing Depth/Color join rules; the GMSL MUX backend enforces IR exclusion.
-        uint32_t const fps = occupancy->get_framerate();
-        if( find_stream( requests, RS2_STREAM_DEPTH ) )
+        uint32_t const fps = mapping->get_framerate();
+        auto const name = rs2_stream_to_string( mapping->get_stream_type() );
+        if( auto const depth = find_stream( requests, RS2_STREAM_DEPTH ) )
         {
-            if( requests.size() != 1 || ! is_occupancy_depth_source( *requests.front(), fps, true ) )
+            // The rebuilt Mapping branch accepts native Depth sizes, but the shared sensor must join alone.
+            if( ! is_depth_at_rate( *depth, fps ) )
                 throw wrong_api_call_sequence_exception( rsutils::string::from()
-                    << "While Occupancy streams, Depth can start only alone at 640x360, " << fps << " fps" );
+                    << "Depth must run at " << fps << " fps while " << name
+                    << " is active. Select that frame rate or stop the " << name << " stream." );
+            if( requests.size() != 1 )
+                throw wrong_api_call_sequence_exception( rsutils::string::from()
+                    << "While " << name << " streams, Depth can start only alone at " << fps << " fps" );
         }
         else if( find_stream( requests, RS2_STREAM_COLOR ) )
-            throw wrong_api_call_sequence_exception( "Color cannot start while Occupancy streams" );
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                << "Color cannot start while " << name << " streams" );
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
@@ -992,13 +1014,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << "The Depth Mapping Camera streams one of Point Cloud, Labeled Point Cloud, or Occupancy at a time; "
                 << requests.size() << " profiles were requested");
 
-        // FW Phase 1 rejects PCL STREAM_OPEN while Depth streams (no prebuilt XYZ branch); fail here with a clear error.
-        // Depth starting while PCL streams is supported.
-        if( ! requests.empty() && requests.front()->get_stream_type() == RS2_STREAM_POINT_CLOUD
-            && _owner->get_depth_sensor().is_streaming() )
-            throw wrong_api_call_sequence_exception( "Point Cloud cannot start while Depth is streaming; stop Depth first" );
-
-        _owner->occupancy_allowed_or_throw(requests);
+        _owner->mapping_allowed_or_throw(requests);
         synthetic_sensor::open(requests);
     }
 

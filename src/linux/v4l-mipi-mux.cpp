@@ -214,24 +214,24 @@ namespace librealsense
                             throw wrong_api_call_sequence_exception( s->desc.name + " started before it was configured" );
                         if( s->enabled )
                             return;
-                        if( ! _streaming )
+                        try
                         {
-                            clear_stale_requests( *s );
-                            set_enable( *s, true );
-                            // Firmware owns the backing graph, including inputs it starts on its own
-                            try
+                            if( ! _streaming )
                             {
+                                clear_stale_requests( *s );
+                                set_enable( *s, true );
+                                // Firmware owns the backing graph, including inputs it starts on its own
                                 _carrier->stream_on( error_handler );
+                                _streaming = true;
                             }
-                            catch( const std::exception & e )
-                            {
-                                throw backend_exception( rsutils::string::from()
-                                                         << "The camera refused to start " << s->desc.name << " (" << e.what() << ")" );
-                            }
-                            _streaming = true;
+                            else
+                                set_enable( *s, true );
                         }
-                        else
-                            set_enable( *s, true );
+                        catch( const std::exception & e )
+                        {
+                            LOG_ERROR( s->desc.name << " start failed: " << e.what() );
+                            throw backend_exception( "The camera refused to start " + s->desc.name );
+                        }
                     }
 
                     void set_started( slot * s, bool on )

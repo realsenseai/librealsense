@@ -55,8 +55,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Win_SH_EX_CfU  # Check for Updates, no usage monitoring
-            cmake-options: -DCHECK_FOR_UPDATES=true -DENABLE_STATS=OFF
+          - name: Win_SH_EX_CfU  # Check for Updates, no usage monitoring; warnings fail the build
+            cmake-options: -DCHECK_FOR_UPDATES=true -DENABLE_STATS=OFF -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
           - name: Win_SH_EX_No_Logs  # no EasyLogging and no Check for Updates
             cmake-options: -DCHECK_FOR_UPDATES=false -DBUILD_EASYLOGGINGPP=false
     name: ${{ matrix.name }}
@@ -97,6 +97,7 @@ jobs:
           -DCHECK_FOR_UPDATES=false
           -DBUILD_WITH_DDS=false
           -DBUILD_PYTHON_BINDINGS=true
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
 
     - name: LibCI
       # Note: requires BUILD_UNIT_TESTS or the executable C++ unit-tests won't run (and it won't complain)
@@ -143,6 +144,7 @@ jobs:
           -DCHECK_FOR_UPDATES=false
           -DBUILD_WITH_DDS=true
           -DBUILD_PYTHON_BINDINGS=true
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
           -DENABLE_SECURITY_FLAGS=true
 
     - name: LibCI

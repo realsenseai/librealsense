@@ -6,6 +6,7 @@
 #include <librealsense2/hpp/rs_frame.hpp>
 #include <librealsense2/hpp/rs_processing.hpp>
 #include "proc/synthetic-stream.h"
+#include "proc/calibration-change-tracker.h"
 
 namespace librealsense
 {
@@ -41,6 +42,7 @@ namespace librealsense
         std::map< std::pair< rs2_stream, int >, float > _last_rotation_values;
         std::map< std::pair< rs2_stream, int >, rs2::stream_profile > _target_stream_profiles;
         std::map< std::pair< rs2_stream, int >, rs2::stream_profile > _source_stream_profiles;
+        calibration_change_tracker _calibration;
     };
     MAP_EXTENSION( RS2_EXTENSION_ROTATION_FILTER, librealsense::rotation_filter );
     }

@@ -325,6 +325,7 @@ typedef struct rs2_options rs2_options;
 typedef struct rs2_options_list rs2_options_list;
 typedef struct rs2_composite_options_list rs2_composite_options_list;
 typedef struct rs2_options_changed_callback rs2_options_changed_callback;
+typedef struct rs2_composite_options_changed_callback rs2_composite_options_changed_callback;
 typedef struct rs2_devices_changed_callback rs2_devices_changed_callback;
 typedef struct rs2_notification rs2_notification;
 typedef struct rs2_notifications_callback rs2_notifications_callback;
@@ -340,6 +341,7 @@ typedef void (*rs2_frame_callback_ptr)(rs2_frame*, void*);
 typedef void (*rs2_frame_processor_callback_ptr)(rs2_frame*, rs2_source*, void*);
 typedef void (*rs2_update_progress_callback_ptr)(const float, void*);
 typedef void (*rs2_options_changed_callback_ptr)(const rs2_options_list *);
+typedef void (*rs2_composite_options_changed_callback_ptr)(rs2_composite_options_list *);
 
 typedef double      rs2_time_t;     /**< Timestamp format. units are milliseconds */
 typedef long long   rs2_metadata_type; /**< Metadata attribute type is defined as 64 bit signed integer*/

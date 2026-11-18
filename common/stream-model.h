@@ -175,7 +175,7 @@ namespace rs2
         void create_graph(rs2_stream stream_type);
         void show_metadata_by_default(const rs2::stream_profile& p);
         void add_depth_mapping_metadata_descriptions(std::map<rs2_frame_metadata_value, std::string>& descriptions) const;
-        std::string adapt_depth_mapping_metadata_name(const std::string& name) const;
+        std::string adapt_depth_mapping_metadata_name(const std::string& name, bool safety_camera) const;
         void add_dds_metadata_descriptions(std::map<rs2_frame_metadata_value, std::string>& descriptions) const;
         void deal_d585S_metadata_md_values_special_cases(const frame& f);
         std::string get_meaning(const rs2_frame_metadata_value& md_val, const std::vector<std::string>& reasons, const std::string& reason_for_zero = "") const;

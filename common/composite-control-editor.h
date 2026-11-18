@@ -6,6 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <imgui.h>
 
+#include <mutex>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -75,6 +76,7 @@ namespace rs2
         void collapse_deadline_on_focus_loss( bool any_field_active_this_frame );
 
         bool commit_due() const { return _dirty && ImGui::GetTime() >= _commit_deadline; }
+        bool is_dirty() const { return _dirty; }
         void clear_dirty();
 
     private:
@@ -96,13 +98,40 @@ namespace rs2
         T value{};
         bool initialized = false;
 
-        // Seeds `value` from a GET the first time this is called; a no-op afterward. Returns whether
-        // `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
+        // The device value changed behind our back (options-changed callback thread): taken on the next ensure_initialized()
+        void push_external( const T & v )
+        {
+            std::lock_guard< std::mutex > lock( _pending_mutex );
+            _pending = v;
+            _has_pending = true;
+        }
+
+        // `value`, or the pushed external one that ensure_initialized() has not taken yet
+        T latest() const
+        {
+            std::lock_guard< std::mutex > lock( _pending_mutex );
+            return _has_pending ? _pending : value;
+        }
+
+        // Seeds `value` from a GET the first time this is called, and takes a pushed external value unless an edit is
+        // pending. Returns whether `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
         bool ensure_initialized( const std::shared_ptr< rs2::embedded_filter > & filter,
                                  rs2_composite_option_id id,
                                  std::string & error_message,
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
+            if( ! is_dirty() )
+            {
+                std::lock_guard< std::mutex > lock( _pending_mutex );
+                if( _has_pending )
+                {
+                    value = _pending;
+                    _has_pending = false;
+                    initialized = true;
+                    if( on_read )
+                        on_read( value );
+                }
+            }
             if( initialized )
                 return true;
             try
@@ -178,5 +207,10 @@ namespace rs2
             }
             clear_dirty();
         }
+
+    private:
+        mutable std::mutex _pending_mutex;
+        T _pending{};
+        bool _has_pending = false;
     };
 }

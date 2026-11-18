@@ -84,16 +84,24 @@ namespace librealsense
                 return from_pose( get_d500_color_stream_extrinsic( *_color_calib_table_raw ) );
             } );
         environment::get_instance().get_extrinsics_graph().register_extrinsics(*_color_stream, *_depth_stream, _color_extrinsic);
-        if( _aligned_depth_option )
+
+        // Aligned-depth is a depth XU control. Firmware without aligned-depth support throws and we skip it.
+        try
         {
-            // The option holds the observer for as long as it lives, so keep the sensor out of it
-            std::weak_ptr< rsutils::lazy< rs2_extrinsics > > extrinsic = _color_extrinsic;
+            _aligned_depth_option = std::make_shared< d500_enable_aligned_depth_option >( get_raw_depth_sensor() );
+            get_depth_sensor().register_option( RS2_OPTION_ENABLE_ALIGNED_DEPTH, _aligned_depth_option );
+            // The mode swaps depth's intrinsics and extrinsics to color's. Notify only after the extrinsics reset, as
+            // listeners may re-read them right away. The option is owned by this device, so it cannot outlive `this`.
             _aligned_depth_option->add_observer(
-                [extrinsic]( bool )
+                [this]( bool )
                 {
-                    if( auto lazy = extrinsic.lock() )
-                        lazy->reset();
+                    _color_extrinsic->reset();
+                    notify_calibration_change();
                 } );
+        }
+        catch( std::exception const & e )
+        {
+            LOG_DEBUG( "Align Depth is not supported by this firmware: " << e.what() );
         }
         register_stream_to_extrinsic_group(*_color_stream, 0);
 

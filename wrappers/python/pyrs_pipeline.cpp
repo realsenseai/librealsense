@@ -101,7 +101,7 @@ void init_pipeline(py::module &m) {
              "blocks, according to each module requirements and threading model.\n"
              "During the loop execution, the application can access the camera streams by calling wait_for_frames() or poll_for_frames().\n"
              "The streaming loop runs until the pipeline is stopped.\n"
-             "Starting the pipeline is possible only when it is not started. If the pipeline was started, an exception is raised.\n")
+             "Starting the pipeline is possible only when it is not started. If the pipeline was started, an exception is raised.\n", py::call_guard<py::gil_scoped_release>())
         .def("start", (rs2::pipeline_profile(rs2::pipeline::*)(const rs2::config&)) &rs2::pipeline::start, "Start the pipeline streaming according to the configuraion.\n"
              "The pipeline streaming loop captures samples from the device, and delivers them to the attached computer vision modules and processing blocks, according to "
              "each module requirements and threading model.\n"
@@ -112,11 +112,11 @@ void init_pipeline(py::module &m) {
              "When the rs2::config is provided to the method, the pipeline tries to activate the config resolve() result.\n"
              "If the application requests are conflicting with pipeline computer vision modules or no matching device is available on the platform, the method fails.\n"
              "Available configurations and devices may change between config resolve() call and pipeline start, in case devices are connected or disconnected, or another "
-             "application acquires ownership of a device.", "config"_a)
+             "application acquires ownership of a device.", "config"_a, py::call_guard<py::gil_scoped_release>())
         .def("start", [](rs2::pipeline& self, std::function<void(rs2::frame)> f) { return self.start(f); }, "Start the pipeline streaming with its default configuration.\n"
              "The pipeline captures samples from the device, and delivers them to the provided frame callback.\n"
              "Starting the pipeline is possible only when it is not started. If the pipeline was started, an exception is raised.\n"
-             "When starting the pipeline with a callback both wait_for_frames() and poll_for_frames() will throw exception.", "callback"_a)
+             "When starting the pipeline with a callback both wait_for_frames() and poll_for_frames() will throw exception.", "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("start", [](rs2::pipeline& self, const rs2::config& config, std::function<void(rs2::frame)> f) { return self.start(config, f); }, "Start the pipeline streaming according to the configuraion.\n"
              "The pipeline captures samples from the device, and delivers them to the provided frame callback.\n"
              "Starting the pipeline is possible only when it is not started. If the pipeline was started, an exception is raised.\n"
@@ -125,11 +125,11 @@ void init_pipeline(py::module &m) {
              "When the rs2::config is provided to the method, the pipeline tries to activate the config resolve() result.\n"
              "If the application requests are conflicting with pipeline computer vision modules or no matching device is available on the platform, the method fails.\n"
              "Available configurations and devices may change between config resolve() call and pipeline start, in case devices are connected or disconnected, "
-             "or another application acquires ownership of a device.", "config"_a, "callback"_a)
+             "or another application acquires ownership of a device.", "config"_a, "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("start", [](rs2::pipeline& self, rs2::frame_queue& queue) { return self.start(queue); },"Start the pipeline streaming with its default configuration.\n"
              "The pipeline captures samples from the device, and delivers them to the provided frame queue.\n"
              "Starting the pipeline is possible only when it is not started. If the pipeline was started, an exception is raised.\n"
-             "When starting the pipeline with a callback both wait_for_frames() and poll_for_frames() will throw exception.", "queue"_a)
+             "When starting the pipeline with a callback both wait_for_frames() and poll_for_frames() will throw exception.", "queue"_a, py::call_guard<py::gil_scoped_release>())
         .def("start", [](rs2::pipeline& self, const rs2::config& config, rs2::frame_queue queue) { return self.start(config, queue); }, "Start the pipeline streaming according to the configuraion.\n"
             "The pipeline captures samples from the device, and delivers them to the provided frame queue.\n"
             "Starting the pipeline is possible only when it is not started. If the pipeline was started, an exception is raised.\n"
@@ -138,7 +138,7 @@ void init_pipeline(py::module &m) {
             "When the rs2::config is provided to the method, the pipeline tries to activate the config resolve() result.\n"
             "If the application requests are conflicting with pipeline computer vision modules or no matching device is available on the platform, the method fails.\n"
             "Available configurations and devices may change between config resolve() call and pipeline start, in case devices are connected or disconnected, "
-            "or another application acquires ownership of a device.", "config"_a, "queue"_a)
+            "or another application acquires ownership of a device.", "config"_a, "queue"_a, py::call_guard<py::gil_scoped_release>())
         .def("stop", &rs2::pipeline::stop, "Stop the pipeline streaming.\n"
              "The pipeline stops delivering samples to the attached computer vision modules and processing blocks, stops the device streaming and releases "
              "the device resources used by the pipeline. It is the application's responsibility to release any frame reference it owns.\n"
@@ -163,13 +163,13 @@ void init_pipeline(py::module &m) {
              "To avoid frame drops, this method should be called as fast as the device frame rate.\n"
              "The application can maintain the frames handles to defer processing. However, if the application maintains too long "
              "history, the device may lack memory resources to produce new frames, and the following calls to this method shall "
-             "return no new frames, until resources become available.")
+             "return no new frames, until resources become available.", py::call_guard<py::gil_scoped_release>())
         .def("try_wait_for_frames", [](const rs2::pipeline &self, unsigned int timeout_ms) {
             rs2::frameset fs;
             auto success = self.try_wait_for_frames(&fs, timeout_ms);
             return std::make_tuple(success, fs);
         }, "timeout_ms"_a = 5000, py::call_guard<py::gil_scoped_release>())
-        .def("get_active_profile", &rs2::pipeline::get_active_profile) // No docstring in C++
+        .def("get_active_profile", &rs2::pipeline::get_active_profile, py::call_guard<py::gil_scoped_release>()) // No docstring in C++
         .def( "set_device", &rs2::pipeline::set_device,
               "The function is used to assign the device, useful when the user wish to set controls that cannot be set while streaming. ",
               "device"_a );

@@ -386,6 +386,26 @@ def require_min_fw_version(dev, min_version, feature_name="", inclusive=True):
     _fw_version_cache[key] = True
 
 
+def is_d585_on_gmsl(dev):
+    """True when the device is a D585 connected over GMSL"""
+    import pyrealsense2 as rs
+
+    return "D585" in dev.get_info(rs.camera_info.name) and dev.supports(rs.camera_info.connection_type) \
+        and dev.get_info(rs.camera_info.connection_type) == "GMSL"
+
+
+def skip_d585_on_gmsl(dev, reason):
+    """Skip the test when the device is a D585 connected over GMSL.
+
+    For a test that other SKUs or transports also run, where the ``device_type_exclude`` marker
+    cannot express the SKU + transport combination.
+    """
+    import pytest
+
+    if is_d585_on_gmsl(dev):
+        pytest.skip(reason)
+
+
 def select_target_device(devices_list, module_device_setup):
     """
     Pick the right pyrealsense2 device from `devices_list` for the current test.

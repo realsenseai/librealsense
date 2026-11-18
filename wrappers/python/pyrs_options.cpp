@@ -174,6 +174,29 @@ void init_options(py::module &m) {
               },
               py::keep_alive< 0, 1 >() );
 
+    py::class_< rs2::composite_options_list >( m, "composite_options_list",
+                                               "Composite options that changed value, with their payloads" )
+        .def( "__len__", &rs2::composite_options_list::size )
+        .def( "id", &rs2::composite_options_list::id, "Id of the i-th changed composite option", "i"_a )
+        .def(
+            "get_value",
+            []( rs2::composite_options_list const & self, size_t i ) -> py::bytes
+            {
+                auto raw = self.get_value( i );
+                return py::bytes( reinterpret_cast< const char * >( raw.data() ), raw.size() );
+            },
+            "Raw payload of the i-th option; empty when it cannot be read right now.",
+            "i"_a )
+        .def( "get_decimation_filter_dpp_config",
+              &rs2::composite_options_list::get_as< rs2_decimation_filter_dpp_config >,
+              "Payload of the i-th option as a Decimation Filter DPP config.", "i"_a )
+        .def( "get_temporal_filter_dpp_config",
+              &rs2::composite_options_list::get_as< rs2_temporal_filter_dpp_config >,
+              "Payload of the i-th option as a Temporal Filter DPP config.", "i"_a )
+        .def( "get_icr_control",
+              &rs2::composite_options_list::get_as< rs2_icr_control >,
+              "Payload of the i-th option as an Improved Close Range control.", "i"_a );
+
     py::class_<rs2::options> options(m, "options", "Base class for options interface. Should be used via sensor or processing_block."); // No docstring in C++
     options.def("is_option_read_only", &rs2::options::is_option_read_only, "Check if particular option "
                 "is read only.", "option"_a)
@@ -226,6 +249,9 @@ void init_options(py::module &m) {
               "Retrieve the supported options, each with its value and range", py::call_guard< py::gil_scoped_release >() )
         .def( "on_options_changed", &rs2::options::on_options_changed,
               "Sets a callback to notify in case options in this container change value", "callback"_a )
+        .def( "on_composite_options_changed", &rs2::options::on_composite_options_changed,
+              "Sets a callback to notify in case composite options of this container (an embedded filter) change value",
+              "callback"_a )
         // Composite options are a completely separate identity space from ordinary rs2_option
         // scalar options above. Mirrors the C++ wrapper's "raw bytes only, no is<T>()/as<T>()"
         // surface - Python has no templates either, so get/set hand back/take raw bytes.
