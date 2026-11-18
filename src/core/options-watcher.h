@@ -87,7 +87,6 @@ protected:
     std::condition_variable _stopping;
     std::atomic_bool _destructing;
     std::atomic_bool _paused;
-    std::atomic_bool _running{ false };
 };
 
 
