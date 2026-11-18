@@ -65,7 +65,7 @@ namespace rs2
         // so an unpopulated/never-drawn filter reads as disabled rather than enabled.
         bool is_decimation_filter_dpp_enabled() const
         {
-            return _decimation_filter_dpp_editor.initialized && _decimation_filter_dpp_editor.value.enabled != 0;
+            return _decimation_filter_dpp_editor.initialized && _decimation_filter_dpp_editor.latest().enabled != 0;
         }
 
         // Seeds the cache above straight from the device, so is_decimation_filter_dpp_enabled() is
@@ -108,6 +108,7 @@ namespace rs2
                                        std::string & error_message );
         void populate_composite_options( std::string & error_message );
         void register_options_changed_callback();
+        void register_composite_options_changed_callback();
 
     protected:
         // The viewer stops sensors in the background; a SET sent meanwhile blocks the UI and sees the stream as still open

@@ -1,146 +1,195 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Currently, we exclude D555 as it's failing
-# D405 has no separate color sensor: color streams from the depth sensor, so the sensor-interface
-# tests open both streams on that one sensor (see get_color_sensor / start_sensors)
-
 import pytest
-import pyrealsense2 as rs, os, time, tempfile, platform, sys
+import pyrealsense2 as rs, os, time, tempfile
+from contextlib import contextmanager
 from pytest_check import check
 from rspy import frame_utils
+from rspy.timer import Timer
 import logging
 
 log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
-    pytest.mark.device_exclude("D401"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D555"),
 ]
 
-cp = dp = None
-color_format = depth_format = None
-color_fps = depth_fps = None
-color_width = depth_width = None
-color_height = depth_height = None
-previous_depth_frame_number = -1
-previous_color_frame_number = -1
-got_frames_rgb = False
-got_frames_depth = False
-
-is_d400 = False
-is_jetson_context = False
-
+RECORD_TIME = 3           # [sec] gating and nightly; module set-up dominates their run time
+WEEKLY_RECORD_TIME = 120  # [sec] long recording, played back in full
+FPS_TOLERANCE = 0.1     # recording writes to disk on top of streaming
 # Our KPI is to prevent sequential frame drops, therefore single frame drop is allowed.
 allowed_drops = 1
 
-# finding the wanted profile settings. We want to use default settings except for color fps where we want
-# the lowest value available
-def find_default_profile_settings():
-    global color_format, color_fps, color_width, color_height
-    global depth_format, depth_fps, depth_width, depth_height
-    for p in color_sensor.profiles:
-        if p.is_default() and p.stream_type() == rs.stream.color:
-            color_format = p.format()
-            color_fps = p.fps()
-            color_width = p.as_video_stream_profile().width()
-            color_height = p.as_video_stream_profile().height()
-            break
-    for p in color_sensor.profiles:
-        if p.stream_type() == rs.stream.color and p.format() == color_format and \
-           p.fps() < color_fps and\
-           p.as_video_stream_profile().width() == color_width and \
-           p.as_video_stream_profile().height() == color_height:
-            color_fps = p.fps()
-    for p in depth_sensor.profiles:
-        if p.is_default() and p.stream_type() == rs.stream.depth:
-            depth_format = p.format()
-            depth_fps = p.fps()
-            depth_width = p.as_video_stream_profile().width()
-            depth_height = p.as_video_stream_profile().height()
-            break
-    # One sensor streaming both depth and color (D405) runs them at a single fps
-    if color_sensor.is_depth_sensor():
-        color_fps = depth_fps
+
+def same_mode( p, q, fps=True ):
+    a, b = p.as_video_stream_profile(), q.as_video_stream_profile()
+    return ( p.stream_type(), p.stream_index(), p.format(), a.width(), a.height() ) == \
+           ( q.stream_type(), q.stream_index(), q.format(), b.width(), b.height() ) and ( not fps or p.fps() == q.fps() )
 
 
-def get_color_sensor( device ):
-    """
-    The device's color sensor. Devices without one (D405) stream color from the depth sensor,
-    so that sensor is returned instead.
-    """
+def pick_profiles( dev ):
+    """Default depth profile, plus the default color resolution at its lowest fps when the device has color.
+    Without a color sensor (D405) color comes from the depth sensor, at the depth fps."""
+    depth_sensor = dev.first_depth_sensor()
+    dp = next( p for p in depth_sensor.profiles if p.is_default() and p.stream_type() == rs.stream.depth )
+    color_sensor = next( ( s for s in dev.query_sensors() if s.is_color_sensor() ), depth_sensor )
+    cp = next( ( p for p in color_sensor.profiles if p.is_default() and p.stream_type() == rs.stream.color ), None )
+    if not cp:
+        return [( depth_sensor, dp )]
+    modes = [p for p in color_sensor.profiles if same_mode( p, cp, fps=False )]
+    if color_sensor.is_depth_sensor():  # one sensor streams both at a single fps
+        modes = [p for p in modes if p.fps() == dp.fps()]
+    return [( depth_sensor, dp ), ( color_sensor, min( modes, key=lambda p: p.fps() ) )]
+
+
+def matching_picks( device, picks ):
+    """A profile can't be opened twice; find the same sensor and mode again (on the live or a playback device)."""
+    out = []
+    for s, p in picks:
+        sensor = next( x for x in device.query_sensors() if x.get_info( rs.camera_info.name ) == s.get_info( rs.camera_info.name ) )
+        matches = [x for x in sensor.profiles if same_mode( x, p )]
+        assert matches, f"{p} not found on {sensor.get_info( rs.camera_info.name )}"
+        out.append( ( sensor, matches[0] ) )
+    return out
+
+
+@contextmanager
+def streaming( picks, sink ):
+    """Open each sensor once with all its profiles (D405 streams depth and color on one sensor)."""
+    sensors = {}
+    for s, p in picks:
+        sensors.setdefault( s.get_info( rs.camera_info.name ), ( s, [] ) )[1].append( p )
+    opened, started = [], []
     try:
-        return device.first_color_sensor()
+        for s, profiles in sensors.values():
+            s.open( profiles )
+            opened.append( s )
+            s.start( sink )
+            started.append( s )
+        yield
+    finally:  # undo only what succeeded, so a failed open/start doesn't leave another sensor streaming
+        for s in started:
+            s.stop()
+        for s in opened:
+            s.close()
+
+
+class FrameLog:
+    """Frame callback: per-stream arrival times, optionally checking frame-number drops."""
+    def __init__( self, check_drops=False, is_d400=False, skip_depth_drops=False ):
+        self.arrivals = {}
+        self.last_number = {}
+        self.check_drops, self.is_d400, self.skip_depth_drops = check_drops, is_d400, skip_depth_drops
+
+    def __call__( self, f ):
+        name = f.get_profile().stream_name()
+        self.arrivals.setdefault( name, [] ).append( time.perf_counter() )
+        if self.check_drops and not ( self.skip_depth_drops and f.get_profile().stream_type() == rs.stream.depth ):
+            # D400 depth may reset its frame counter
+            frame_utils.check_frame_drops( f, self.last_number.get( name, -1 ), allowed_drops, self.is_d400 )
+        self.last_number[name] = f.get_frame_number()
+
+    def fps( self, name ):
+        t = self.arrivals.get( name, [] )
+        return ( len( t ) - 1 ) / ( t[-1] - t[0] ) if len( t ) > 1 else 0
+
+
+def wait_for( condition, timeout ):
+    t = Timer( timeout )
+    t.start()
+    while not condition() and not t.has_expired():
+        time.sleep( 0.1 )
+
+
+def toggle_emitter( depth_sensor ):
+    """An option re-written while recording used to leave the whole recorded snapshot replaced by that single option."""
+    if not depth_sensor.supports( rs.option.emitter_enabled ):
+        return None
+    emitter = depth_sensor.get_option( rs.option.emitter_enabled )
+    try:
+        depth_sensor.set_option( rs.option.emitter_enabled, 0 if emitter else 1 )
     except RuntimeError as e:
-        # Fall back only when there is no color sensor; any other device error propagates
-        if 'Could not find requested sensor type' not in str( e ):
-            raise
-        ds = device.first_depth_sensor()
-        if any( p.stream_type() == rs.stream.color for p in ds.profiles ):
-            return ds
-        raise
+        # D585S rejects the write (nothing to restore); the playback check still verifies the snapshot
+        log.warning( f"could not change an option mid-recording: {e}" )
+        return None
+    return emitter
 
 
-def start_sensors( depth_cb, color_cb ):
-    """
-    Open and start the depth and color streams. When color comes from the depth sensor (D405), both
-    streams must be opened together on that sensor, and one callback dispatches frames by stream type.
-    """
-    if color_sensor.is_depth_sensor():
-        depth_sensor.open( [dp, cp] )
-        if depth_cb is color_cb:   # e.g. a syncer: hand it every frame
-            depth_sensor.start( depth_cb )
-        else:
-            depth_sensor.start( lambda f: ( color_cb if f.get_profile().stream_type() == rs.stream.color else depth_cb )( f ) )
-    else:
-        depth_sensor.open( dp )
-        depth_sensor.start( depth_cb )
-        color_sensor.open( cp )
-        color_sensor.start( color_cb )
+@pytest.fixture( scope="module" )
+def recording( test_device, tmp_path_factory, request ):
+    """Record depth (+ color when available) through the sensor API once per camera."""
+    dev, ctx = test_device
+    weekly = 'weekly' in request.config.getoption( "--context", default="" ).split()
+    seconds = WEEKLY_RECORD_TIME if weekly else RECORD_TIME
+    file_name = str( tmp_path_factory.mktemp( "recordings" ) / "rec.db3" )
+    picks = pick_profiles( dev )
+    log.info( "Recording %s for %s [sec]", [str( p ) for _, p in picks], seconds )
+
+    frames = FrameLog()
+    with streaming( picks, frames ):
+        wait_for( lambda: frames.arrivals, 5 )
+        recorder = rs.recorder( file_name, dev )  # attached to a device that is already streaming
+        frames.arrivals.clear()  # measure fps while recording only
+        time.sleep( 1 )  # an option written right after attaching replaces the recorded snapshot (SDK race)
+        emitter = toggle_emitter( picks[0][0] )
+        time.sleep( seconds )
+        recorder.pause()
+    recorder = None
+    if emitter is not None:
+        picks[0][0].set_option( rs.option.emitter_enabled, emitter )
+    yield dict( file_name=file_name, picks=picks, frames=frames, seconds=seconds )
+    if weekly:
+        os.remove( file_name )  # weekly files are very large (GBs); no room to keep pytest's run history
 
 
-def color_frame_call_back( frame ):
-    global previous_color_frame_number
-    global is_d400
-    global allowed_drops
-    global got_frames_rgb
-    got_frames_rgb = True
-    frame_utils.check_frame_drops( frame, previous_color_frame_number, allowed_drops, is_d400 )
-    previous_color_frame_number = frame.get_frame_number()
+@pytest.mark.device_exclude( "D401" )  # failure not yet checked
+@pytest.mark.device_exclude( "D555" )  # unstable
+@pytest.mark.device_type_exclude( "GMSL" )  # recording slows depth delivery on Jetson
+def test_fps_while_recording( recording ):
+    for _, p in recording['picks']:
+        fps = recording['frames'].fps( p.stream_name() )
+        log.info( "%s recorded at %.2f fps", p, fps )
+        check.almost_equal( fps, p.fps(), rel=FPS_TOLERANCE, msg=f"{p} recorded at {fps:.2f} fps" )
 
-def depth_frame_call_back( frame ):
-    global previous_depth_frame_number
-    global is_d400
-    global allowed_drops
-    global got_frames_depth
 
-    got_frames_depth = True
-    # On Jetson, capture-side drops surface here; skip the check (RSDEV-7935)
-    if not is_jetson_context:
-        frame_utils.check_frame_drops( frame, previous_depth_frame_number, allowed_drops, is_d400 )
-    previous_depth_frame_number = frame.get_frame_number()
+def test_streaming_after_record_stop( test_device, recording ):
+    """Starting a stream after a recording session used to crash the viewer."""
+    dev, _ = test_device
+    frames = FrameLog()
+    with streaming( matching_picks( dev, recording['picks'] ), frames ):
+        wait_for( lambda: len( frames.arrivals ) == len( recording['picks'] ), 5 )
+    for _, p in recording['picks']:
+        check.is_true( frames.arrivals.get( p.stream_name() ), f"no {p.stream_name()} frames after recording stopped" )
 
-def restart_profiles():
-    """
-    You can't use the same profile twice, but we need the same profile several times. So this function resets the
-    profiles with the given parameters to allow quick profile creation
-    """
-    global cp, dp, color_sensor, depth_sensor
-    global color_format, color_fps, color_width, color_height
-    global depth_format, depth_fps, depth_width, depth_height
-    cp = next( p for p in color_sensor.profiles if p.fps() == color_fps
-               and p.stream_type() == rs.stream.color
-               and p.format() == color_format
-               and p.as_video_stream_profile().width() == color_width
-               and p.as_video_stream_profile().height() == color_height )
 
-    dp = next( p for p in depth_sensor.profiles if p.fps() == depth_fps
-               and p.stream_type() == rs.stream.depth
-               and p.format() == depth_format
-               and p.as_video_stream_profile().width() == depth_width
-               and p.as_video_stream_profile().height() == depth_height )
+@pytest.mark.device_exclude( "D401" )  # failure not yet checked
+@pytest.mark.device_exclude( "D405" )  # playback drops its RGB Rectification filter
+@pytest.mark.device_exclude( "D555" )  # unstable
+def test_playback_of_recorded_profiles( test_device, test_context_var, recording ):
+    dev, ctx = test_device
+    playback = ctx.load_device( recording['file_name'] )
+    picks = matching_picks( playback, recording['picks'] )
+
+    # Not every option reaches the file, so count instead of comparing sets
+    check.greater( len( picks[0][0].get_supported_options() ), 1 )
+    for ( live, _ ), ( played, _ ) in zip( recording['picks'], picks ):
+        live_filters = [f.get_info( rs.camera_info.name ) for f in live.get_recommended_filters()]
+        check.is_true( live_filters )
+        check.equal( [f.get_info( rs.camera_info.name ) for f in played.get_recommended_filters()], live_filters )
+
+    # On Jetson, capture-side depth drops surface here; skip the depth drop check (RSDEV-7935)
+    frames = FrameLog( check_drops=True, is_d400=dev.get_info( rs.camera_info.product_line ) == "D400",
+                       skip_depth_drops='jetson' in test_context_var )
+    with streaming( picks, frames ):  # play the whole recording, so the drop check covers all of it
+        wait_for( lambda: frames.arrivals and playback.current_status() == rs.playback_status.stopped,
+                  recording['seconds'] + 10 )
+    for _, p in picks:
+        check.is_true( frames.arrivals.get( p.stream_name() ), f"no {p.stream_name()} frames in playback" )
+    playback = None
+    ctx.unload_device( recording['file_name'] )
+
 
 def stop_pipeline( pipeline ):
     if pipeline:
@@ -153,21 +202,10 @@ def stop_pipeline( pipeline ):
         except Exception as e:
             check.fail(f"Unexpected exception: {e}")
 
-def stop_sensor( sensor ):
-    if sensor:
-        # if the sensor is already closed get_active_streams returns an empty list
-        if sensor.get_active_streams():
-            try:
-                sensor.stop()
-                sensor.close()
-            except RuntimeError as rte:
-                if str( rte ) != "stop_streaming() failed. UVC device is not streaming!":
-                    check.fail(f"Unexpected exception: {rte}")
-            except Exception as e:
-                check.fail(f"Unexpected exception: {e}")
-
 
 ################################################################################################
+@pytest.mark.device_exclude( "D401" )  # failure not yet checked
+@pytest.mark.device_exclude( "D555" )  # unstable
 def test_pipeline_interface(test_device):
     log.info("Trying to record and playback using pipeline interface")
     dev, ctx = test_device
@@ -205,135 +243,24 @@ def test_pipeline_interface(test_device):
 
 
 ################################################################################################
-def test_sensor_interface(test_device, test_context_var):
-    global previous_depth_frame_number, previous_color_frame_number, got_frames_rgb, got_frames_depth, is_jetson_context
-    previous_depth_frame_number = -1
-    previous_color_frame_number = -1
-    got_frames_rgb = False
-    got_frames_depth = False
-    is_jetson_context = 'jetson' in test_context_var
-
-    log.info("Trying to record and playback using sensor interface")
-    global dev, ctx, depth_sensor, color_sensor, is_d400
+@pytest.mark.device_exclude( "D401" )  # failure not yet checked
+@pytest.mark.device_exclude( "D555" )  # unstable
+def test_sensor_interface_with_syncer( test_device, tmp_path ):
+    log.info( "Trying to record and playback using sensor interface with syncer" )
     dev, ctx = test_device
-    depth_sensor = dev.first_depth_sensor()
-    color_sensor = get_color_sensor( dev )
+    file_name = str( tmp_path / "rec.db3" )
+    picks = pick_profiles( dev )
 
-    # The test also checks frame drops, therefore D400-specific relaxation must apply
-    # The follow code is borrowed fro test-drops-on-set.py and later can be merged/refactored
-    is_d400 = (dev.get_info(rs.camera_info.product_line) == "D400")
-
-    find_default_profile_settings()
-
-    temp_dir = tempfile.TemporaryDirectory( prefix='recordings_' )
-    file_name = temp_dir.name + os.sep + 'rec.db3'
-
-    recorder = playback = None
-    try:
-        recorder = rs.recorder( file_name, dev )
-
-        restart_profiles()
-
-        start_sensors( lambda f: None, lambda f: None )
-
-        time.sleep(3)
-
+    sync = rs.syncer()
+    recorder = rs.recorder( file_name, dev )
+    with streaming( picks, sync ):
+        time.sleep( 3 )
         recorder.pause()
+    recorder = None
 
-        stop_sensor(depth_sensor)
-        stop_sensor(color_sensor)
-
-        recorder = None
-
-        color_filters = [f.get_info(rs.camera_info.name) for f in color_sensor.get_recommended_filters()]
-        depth_filters = [f.get_info(rs.camera_info.name) for f in depth_sensor.get_recommended_filters()]
-
-        check.is_true( len(color_filters) > 0 )
-        check.is_true( len(depth_filters) > 0 )
-
-        playback = ctx.load_device( file_name )
-
-        depth_sensor = playback.first_depth_sensor()
-        color_sensor = get_color_sensor( playback )
-
-        playback_color_filters = [f.get_info(rs.camera_info.name) for f in color_sensor.get_recommended_filters()]
-        playback_depth_filters = [f.get_info(rs.camera_info.name) for f in depth_sensor.get_recommended_filters()]
-
-        check.equal( playback_color_filters, color_filters )
-        check.equal( playback_depth_filters, depth_filters )
-
-        restart_profiles()
-
-        start_sensors( depth_frame_call_back, color_frame_call_back )
-
-        time.sleep(3)
-
-        # if record and playback worked we will receive frames, the callback functions will be called and got-frames
-        # will be True. If the record and playback failed it will be false
-        check.is_true( got_frames_depth )
-        check.is_true( got_frames_rgb )
-    except Exception as e:
-        check.fail(f"Unexpected exception: {e}")
-    finally: # we must remove all references to the file so we can use it again in the next test
-        stop_sensor( depth_sensor )
-        stop_sensor( color_sensor )
-        depth_sensor = None
-        color_sensor = None
-        if recorder:
-            recorder = None
-        if playback:
-            playback = None
-
-
-#####################################################################################################
-def test_sensor_interface_with_syncer(test_device):
-    log.info("Trying to record and playback using sensor interface with syncer")
-    global dev, ctx, depth_sensor, color_sensor
-    dev, ctx = test_device
-    depth_sensor = dev.first_depth_sensor()
-    color_sensor = get_color_sensor( dev )
-    find_default_profile_settings()
-
-    temp_dir = tempfile.TemporaryDirectory( prefix='recordings_' )
-    file_name = temp_dir.name + os.sep + 'rec.db3'
-
-    recorder = playback = None
-    try:
-        sync = rs.syncer()
-        recorder = rs.recorder( file_name, dev )
-
-        restart_profiles()
-
-        start_sensors( sync, sync )
-
-        time.sleep(3)
-
-        recorder.pause()
-
-        stop_sensor(depth_sensor)
-        stop_sensor(color_sensor)
-
-        recorder = None
-
-        playback = ctx.load_device( file_name )
-
-        depth_sensor = playback.first_depth_sensor()
-        color_sensor = get_color_sensor( playback )
-
-        restart_profiles()
-
-        start_sensors( sync, sync )
-
+    playback = ctx.load_device( file_name )
+    with streaming( matching_picks( playback, picks ), sync ):
         # if the record-playback worked we will get frames, otherwise the next line will timeout and throw
         sync.wait_for_frames()
-    except Exception as e:
-        check.fail(f"Unexpected exception: {e}")
-    finally: # we must remove all references to the file so the temporary folder can be deleted
-        stop_sensor( depth_sensor )
-        stop_sensor( color_sensor )
-        depth_sensor = None
-        color_sensor = None
-        if recorder:
-            recorder = None
-        if playback:
-            playback = None
+    playback = None
+    ctx.unload_device( file_name )

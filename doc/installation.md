@@ -52,7 +52,7 @@ Some OEM/Vendors choose to lock the kernel for modifications. Unlocking this cap
 5. Prepare Linux Backend and the Dev. Environment \
    Unplug any connected RealSense camera and run:
    ```sh
-   sudo apt-get install libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev at
+   sudo apt-get install libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev
    ```
 5. Install IDE (Optional): \
    We use [QtCreator](https://wiki.qt.io/Main) as an IDE for Linux development on Ubuntu.

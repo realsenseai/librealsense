@@ -306,9 +306,8 @@ namespace librealsense
                         CHECK_HR(hr);
 
                         const bool is_gyro = profile.sensor_name == "HID Sensor Class Device: Gyroscope";
-                        const bool is_accel = profile.apply_sensitivity_to_accel
-                            && profile.sensor_name == "HID Sensor Class Device: Accelerometer";
-                        if( is_gyro || is_accel )
+                        const bool is_accel = profile.sensor_name == "HID Sensor Class Device: Accelerometer";
+                        if( profile.apply_sensitivity && ( is_gyro || is_accel ) )
                         {
                             CComPtr<IPortableDeviceValues> axes, properties;
                             CHECK_HR(axes.CoCreateInstance( CLSID_PortableDeviceValues ));
