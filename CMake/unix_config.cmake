@@ -4,8 +4,8 @@ macro(os_set_flags)
 
     # Put all the collaterals together, so we can find when trying to run examples/tests
     # Note: this puts the outputs under <binary>/<build-type>
-    if( "${CMAKE_BUILD_TYPE}" STREQUAL "" )
-        # This can happen according to the docs -- and in GHA...
+    if( "${CMAKE_BUILD_TYPE}" STREQUAL "" OR "${CMAKE_BUILD_TYPE}" STREQUAL "None" )
+        # Empty (GHA) or "None" (debhelper packaging) would otherwise build without our Release flags
         message( STATUS "No output directory set; using ${CMAKE_BINARY_DIR}/Release/" )
         set( CMAKE_BUILD_TYPE "Release" )
     endif()
