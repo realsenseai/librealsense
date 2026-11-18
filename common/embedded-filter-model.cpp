@@ -321,7 +321,12 @@ namespace rs2
     void embedded_filter_model::draw_decimation_filter_dpp_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP;
-        if( ! _decimation_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message, print_decimation_filter_dpp_config ) )
+        if( ! _decimation_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message,
+                [this]( const rs2_decimation_filter_dpp_config & v )
+                {
+                    print_decimation_filter_dpp_config( v );
+                    _enabled = v.enabled != 0;
+                } ) )
             return;
         sanitize_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
 
@@ -369,7 +374,12 @@ namespace rs2
     void embedded_filter_model::draw_temporal_filter_dpp_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP;
-        if( ! _temporal_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message, print_temporal_filter_dpp_config ) )
+        if( ! _temporal_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message,
+                [this]( const rs2_temporal_filter_dpp_config & v )
+                {
+                    print_temporal_filter_dpp_config( v );
+                    _enabled = v.enabled != 0;
+                } ) )
             return;
         sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
 
