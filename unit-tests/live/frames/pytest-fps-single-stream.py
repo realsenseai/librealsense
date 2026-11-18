@@ -23,7 +23,7 @@ pytestmark = [
 ]
 
 TESTED_FPS =          [5,  6,  15, 30, 60, 90]
-TIME_TO_TEST_FPS =    [13, 12, 10, 7,  5,  4]
+TIME_TO_TEST_FPS =    [8,  8,  5,  4,  3,  2]
 
 fps_helper.TIME_FOR_STEADY_STATE = 1.2  # t2ff KPI is 1 second + some extra
 
