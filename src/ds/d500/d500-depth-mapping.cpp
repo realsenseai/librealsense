@@ -371,19 +371,25 @@ namespace librealsense
         if( ! _is_d585s )
             _raw_depth_mapping_ep = raw_mapping_ep;
 
-        // The mapping function reports every EP12 output as GREY; the PCL XYZ tuples are the
-        // device point cloud, not occupancy (D5xx layout only).
-        if( ! _is_safety_layout )
+        // The Mapping interface shares GREY between occupancy and point cloud.
+        // Classify the stream without changing its format for UVC negotiation.
+        raw_mapping_ep->set_stream_id_resolver( [safety_layout = _is_safety_layout](
+            const std::vector< platform::stream_profile > &,
+            const platform::stream_profile & p,
+            rs2_stream & type,
+            std::vector< int > & )
         {
-            raw_mapping_ep->set_stream_id_resolver( []( const std::vector< platform::stream_profile > &,
-                                                        const platform::stream_profile & p,
-                                                        rs2_stream & type,
-                                                        std::vector< int > & )
-                {
-                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
-                        type = RS2_STREAM_POINT_CLOUD;
-                } );
-        }
+            if( p.format != rs_fourcc( 'G', 'R', 'E', 'Y' ) )
+                return;
+
+            if( safety_layout )
+            {
+                if( p.width == 2880 && ( p.height == 1040 || p.height == 260 || p.height == 32 ) )
+                    type = RS2_STREAM_LABELED_POINT_CLOUD;
+            }
+            else if( is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+                type = RS2_STREAM_POINT_CLOUD;
+        } );
 
         auto mapping_ep = std::make_shared<d500_depth_mapping_sensor>(this,
             raw_mapping_ep,
