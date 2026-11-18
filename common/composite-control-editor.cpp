@@ -62,6 +62,7 @@ namespace rs2
     void composite_control_editor_base::clear_dirty()
     {
         _dirty = false;
+        _commit_is_reset = false;
         _commit_deadline = std::numeric_limits< double >::max();
         if( _release_focus_on_commit )
             RsImGui::ClearItemFocus();
