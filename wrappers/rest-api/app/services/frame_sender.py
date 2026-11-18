@@ -21,6 +21,7 @@ import struct
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import pyrealsense2 as rs
+from fastapi import WebSocket
 
 STOPPED = 4000  # the stream was stopped, by any client
 DISCONNECTED = 4001  # the device is gone
@@ -30,7 +31,7 @@ REASONS = {STOPPED: "stream stopped", DISCONNECTED: "device disconnected", NOT_S
 _METADATA = list(rs.frame_metadata_value.__members__.items())
 
 
-def encode_frame(frame: Any, color_table: bytes = b"") -> bytes:
+def encode_frame(frame: rs.frame, color_table: bytes = b"") -> bytes:
     """One message for one SDK frame. Copies the frame's data once, so the frame can be released."""
     profile = frame.get_profile()
     header: Dict[str, Any] = {
@@ -67,7 +68,7 @@ def encode_frame(frame: Any, color_table: bytes = b"") -> bytes:
 class _Subscriber:
     """One WebSocket. Holds at most one unsent frame: a newer frame replaces it, and a close ends it."""
 
-    def __init__(self, websocket: Any):
+    def __init__(self, websocket: WebSocket):
         self.websocket = websocket
         self._pending: Optional[bytes] = None
         self._close_code: Optional[int] = None
@@ -95,10 +96,10 @@ class FrameSender:
     """Routes frames from the SDK threads to the subscribers of each stream."""
 
     def __init__(self) -> None:
-        self._subscribers: Dict[Tuple[str, Any, int], Set[_Subscriber]] = {}  # (device, rs.stream, index)
+        self._subscribers: Dict[Tuple[str, rs.stream, int], Set[_Subscriber]] = {}  # (device, stream, index)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
-    async def serve(self, websocket: Any, device_id: str, stream_type: Any, stream_index: int,
+    async def serve(self, websocket: WebSocket, device_id: str, stream_type: rs.stream, stream_index: int,
                     streaming: Callable[[], bool]) -> None:
         """Stream one device stream's frames to an accepted WebSocket until the client disconnects or the stream ends."""
         self._loop = asyncio.get_running_loop()
@@ -118,7 +119,7 @@ class FrameSender:
             if not self._subscribers[key]:
                 del self._subscribers[key]
 
-    def send(self, device_id: str, frame: Any, colorizer: Any = None) -> None:
+    def send(self, device_id: str, frame: rs.frame, colorizer: Any = None) -> None:
         """Called from an SDK thread with a frame of the device; returns once its data is copied."""
         profile = frame.get_profile()
         key = (device_id, profile.stream_type(), profile.stream_index())
@@ -127,16 +128,16 @@ class FrameSender:
             table = colorizer.get_color_table(frame.as_depth_frame()) if z16 else b""
             self._loop.call_soon_threadsafe(self._offer, key, encode_frame(frame, table))
 
-    def _offer(self, key: Tuple[str, Any, int], message: bytes) -> None:
+    def _offer(self, key: Tuple[str, rs.stream, int], message: bytes) -> None:
         for subscriber in self._subscribers.get(key, ()):
             subscriber.offer(message)
 
-    def close(self, device_id: str, code: int, streams: Optional[List[Tuple[Any, int]]] = None) -> None:
+    def close(self, device_id: str, code: int, streams: Optional[List[Tuple[rs.stream, int]]] = None) -> None:
         """Close the sockets of the device's streams, given as (rs.stream, index), or all of them; from any thread."""
         if self._loop:  # no socket was ever served otherwise
             self._loop.call_soon_threadsafe(self._close, device_id, code, streams)
 
-    def _close(self, device_id: str, code: int, streams: Optional[List[Tuple[Any, int]]]) -> None:
+    def _close(self, device_id: str, code: int, streams: Optional[List[Tuple[rs.stream, int]]]) -> None:
         for (device, stream_type, stream_index), subscribers in self._subscribers.items():
             if device == device_id and (streams is None or (stream_type, stream_index) in streams):
                 for subscriber in subscribers:
