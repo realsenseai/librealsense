@@ -4,7 +4,7 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "a35563755365e577176da5a89854314ec6c154406714111429b10d114f5809cf";
+static const char dictionary_sha256[] = "736ac59279154cd605dfb52c9abe49ce25f82176da5ace795c4accd0681206c6";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
@@ -66,6 +66,8 @@ static const unsigned status_patch_offset = 18U;
 static const unsigned status_rule_revision_offset = 20U;
 static const unsigned status_total_reasons_offset = 52U;
 static const unsigned status_reject_mask_offset = 54U;
+static const unsigned status_control_states_offset = 55U;
+static const unsigned status_control_states_capacity = 9U;
 static const unsigned reason_kind_offset = 0U;
 static const unsigned reason_sensor_offset = 1U;
 static const unsigned reason_record_offset = 2U;
@@ -139,6 +141,7 @@ enum StatusFlags : uint8_t {
     STATUS_NEWER_SENDER = 2,
     STATUS_HOST_TOKEN_VALID = 4,
     STATUS_REASONS_TRUNCATED = 8,
+    STATUS_CONTROL_STATES_VALID = 16,
 };
 enum ControlKind : uint8_t {
     CONTROL_SCALAR = 0,

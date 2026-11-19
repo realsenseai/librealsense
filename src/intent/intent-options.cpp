@@ -209,6 +209,7 @@ void declare_pipeline_intent(device_interface &device,
     const auto discovery = intent.discovery(status);
     const auto report = rsutils::json::parse(decode_intent_capabilities(discovery));
     auto document = rsutils::json::parse(decode_intent_json(firmware, status));
+    const auto actual = document.at("status").value("actual_controls", rsutils::json::array());
     document.erase("layout");
     document.erase("status");
     const auto require_ids = [&](const char *key, std::initializer_list<uint8_t> required) {
@@ -220,19 +221,32 @@ void declare_pipeline_intent(device_interface &device,
     require_ids("supported_record_ids", {rsintent::SENSOR, rsintent::SENSOR_ID, rsintent::STREAM});
     require_ids("supported_stream_attribute_ids", {rsintent::BRANCH_ID, rsintent::STATE,
         rsintent::FORMAT, rsintent::WIDTH, rsintent::HEIGHT, rsintent::FPS});
+    const auto sku = rsintent::read16(status.data() + rsintent::status_sku_offset);
     for (auto &sensor : document["sensors"]) {
         sensor.erase("layout");
         if (sensor.contains("controls"))
             require_ids("supported_record_ids", {rsintent::CONTROL});
-        for (auto &control : sensor["controls"])
+        unsigned sensor_id = rsintent::max_sensor_id + 1U;
+        for (const auto &entry : rsintent::sensors)
+            if (sensor["sensor"] == entry.sdk_name)
+                sensor_id = entry.id;
+        for (auto &control : sensor["controls"]) {
             control["required_state"] = "OFF";
+            if (actual.empty())
+                continue;
+            const auto state = std::find_if(actual.begin(), actual.end(), [&](const auto &entry) {
+                return entry["sensor"] == sensor_id && entry["id"] == control["id"];
+            });
+            if (state == actual.end())
+                throw invalid_value_exception("Global Intent Status lacks a mandatory control state");
+            control["required_state"] = state->at("state");
+        }
         if (sensor["controls"].is_null()) sensor.erase("controls");
         for (auto &stream : sensor["streams"]) {
             const auto name = stream["stream"], index = stream["index"];
             stream = {{"stream", name}, {"index", index}, {"state", "DISABLED"}};
         }
     }
-    const auto sku = rsintent::read16(status.data() + rsintent::status_sku_offset);
     for (const auto &profile : profiles) {
         const std::string name = rs2_stream_to_string(profile->get_stream_type());
         const std::string format = rs2_format_to_string(profile->get_format());

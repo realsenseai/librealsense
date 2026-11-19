@@ -572,6 +572,23 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
         throw std::invalid_argument("Intent: malformed STATUS sections");
     if (status[rsintent::status_format_version_offset] == rsintent::status_layout_i2)
         j["status"]["reject_mask"] = status[rsintent::status_reject_mask_offset];
+    if (status[rsintent::status_format_version_offset] == rsintent::status_layout_i2 &&
+        (status[rsintent::status_flags_offset] & rsintent::STATUS_CONTROL_STATES_VALID)) {
+        const auto defaults = rsintent::defaultModel(
+            rsintent::read16(status.data() + rsintent::status_sku_offset));
+        if (defaults.controlCount && defaults.controlCount <= rsintent::status_control_states_capacity) {
+            auto actual = json::array();
+            for (size_t i = 0; i < defaults.controlCount; ++i) {
+                const auto &c = defaults.controls[i];
+                const auto *def = rsintent::controlDefinition(c.sensor, c.kind, c.id);
+                const auto value = status[rsintent::status_control_states_offset + i];
+                if (!def || value > def->max_state)
+                    throw std::invalid_argument("Intent: invalid actual control state");
+                actual.push_back({{"sensor", c.sensor}, {"id", def->name}, {"state", value}});
+            }
+            j["status"]["actual_controls"] = std::move(actual);
+        }
+    }
     j["status"]["conformance"] = status[rsintent::status_conformance_offset];
     j["status"]["host_token_supported"] = false;
     j["status"]["total_reasons"] = rsintent::read16(status.data() + rsintent::status_total_reasons_offset);
