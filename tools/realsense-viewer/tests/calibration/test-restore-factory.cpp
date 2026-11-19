@@ -18,8 +18,11 @@ using calib_table = rs2::calibration_table;
 struct factory_calibration_restore
 {
     rs2::auto_calibrated_device dev;
+    bool done = false;  // the button already restored it
     ~factory_calibration_restore()
     {
+        if( done )
+            return;
         try { dev.reset_to_factory_calibration(); }
         catch( std::exception const & e ) { fprintf( stderr, "factory calibration reset failed: %s\n", e.what() ); }
     }
@@ -61,10 +64,10 @@ VIEWER_TEST( "calibration", "restore_factory" )
     table->header.crc32 = rsutils::number::calc_crc32(
         modified.data() + sizeof( librealsense::ds::table_header ),
         modified.size() - sizeof( librealsense::ds::table_header ) );
+    IM_CHECK( modified != factory );
     dev.set_calibration_table( modified );
     dev.write_calibration();
     IM_CHECK( dev.get_calibration_table() == modified );
-    IM_CHECK( modified != factory );
 
     // the window reads the camera's table when it opens
     test.click_device_menu_item( model, "Calibration Data" );
@@ -76,7 +79,8 @@ VIEWER_TEST( "calibration", "restore_factory" )
         << rs2::textual_icons::industry << " Restore Factory";
     test.imgui->ItemClick( restore_label.c_str() );
 
-    IM_CHECK( test.wait_until( 20, 0.25f, [&] { return dev.get_calibration_table() == factory; } ) );
-
-    test.imgui->ItemClick( "Cancel" );
+    bool const restored = test.wait_until( 20, 0.25f, [&] { return dev.get_calibration_table() == factory; } );
+    test.imgui->ItemClick( "Cancel" );  // close the window before checking, a failed check must not leave it open
+    IM_CHECK( restored );
+    restore.done = true;
 }

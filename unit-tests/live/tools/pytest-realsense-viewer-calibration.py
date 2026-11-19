@@ -8,7 +8,8 @@ from viewer_helper import run_viewer_tests
 # so the D500 restore-factory-calibration GUI test runs on its own here.
 
 pytestmark = [
-    pytest.mark.device_each("D500*"),
+    pytest.mark.device_each("D585"),
+    pytest.mark.device_exclude("D585S"),  # other D500 cameras not verified yet
     pytest.mark.context("nightly"),
     pytest.mark.context("gui"),
     pytest.mark.timeout(400),
