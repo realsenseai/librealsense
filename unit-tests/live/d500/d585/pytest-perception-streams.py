@@ -11,9 +11,10 @@ import pyrealsense2 as rs
 import struct
 import time
 import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
+REASON = "D585 over GMSL on rs-ci-orin-04 returns empty point-cloud payloads (nightly builds LRS_jetson_compile_pipeline #20852, #20861); passes on rs-sdk-nano-2/3; re-enable once the orin-04 hardware issue is resolved"
 
 
 pytestmark = [
@@ -160,6 +161,8 @@ def test_standalone_lifecycle(device, stream):
     """Runs with no other capture, resumes after stop, and a second session starts after the first one closed."""
     if "D555" in device.get_info( rs.camera_info.name ):
         pytest.skip( "Perception lifecycle metadata checks are D585-only" )
+    if stream in ( 'labeled_point_cloud', 'point_cloud' ):
+        skip_d585_on_gmsl( device, REASON )
     if stream == 'labeled_point_cloud':
         require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "labeled point cloud" )   # older FW has no LPCL stream
     if stream == 'point_cloud':  # older FW publishes the profiles but delivers no frames
