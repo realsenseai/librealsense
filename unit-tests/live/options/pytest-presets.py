@@ -5,7 +5,7 @@ import pytest
 import pyrealsense2 as rs
 import time
 import logging
-from rspy.snippets import is_dds_dev
+from rspy.snippets import is_dds_dev, is_d585_dual_rgb
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -76,7 +76,7 @@ def test_setting_color_options(test_device_wrapped):
     try:
         color_sensor = dev.first_color_sensor()
     except RuntimeError:
-        if 'D401' in product_name or 'Dual RGB' in product_name:
+        if 'D401' in product_name or is_d585_dual_rgb(product_name):
             color_sensor = dev.first_depth_sensor()
         elif 'D405' in product_name:
             pytest.skip("D405 default preset does not reset hue (see default_405 in presets.cpp)")

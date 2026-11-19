@@ -16,7 +16,7 @@ import logging
 log = logging.getLogger(__name__)
 import time
 import platform
-from rspy.snippets import is_dds_dev
+from rspy.snippets import is_dds_dev, is_d585_dual_rgb
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -126,7 +126,7 @@ def test_first_color_frame_delay(sensor_device):
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
 
-    cs = dev.first_depth_sensor() if 'Dual RGB' in product_name else dev.first_color_sensor()  # Dual RGB colors stream from the depth sensor
+    cs = dev.first_depth_sensor() if is_d585_dual_rgb(product_name) else dev.first_color_sensor()  # Dual RGB colors stream from the depth sensor
     cp = next(p for p in cs.profiles
               if p.fps() == 30
               and p.stream_type() == rs.stream.color
