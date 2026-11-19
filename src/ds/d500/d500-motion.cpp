@@ -109,8 +109,7 @@ namespace librealsense
     std::shared_ptr<synthetic_sensor> d500_motion::create_hid_device( std::shared_ptr<context> ctx,
                                                                       const std::vector<platform::hid_device_info>& all_hid_infos )
     {
-        // D5x5 FW serves accel and gyro at 100/200/400 Hz
-        return _ds_motion_common->create_hid_device( ctx, all_hid_infos, _tf_keeper, ds::d5x5_family_pids.count( get_pid() ) > 0 );
+        return _ds_motion_common->create_hid_device( ctx, all_hid_infos, _tf_keeper );
     }
 
     d500_motion::d500_motion( std::shared_ptr< const d500_info > const & dev_info )
