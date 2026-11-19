@@ -207,6 +207,7 @@ def test_gmsl_zero_copy_frames_are_cached(test_device):
             t = time.perf_counter()
             pool[offset:offset + data.size].copy()
             ordinary_ms.append((time.perf_counter() - t) * 1000)
+        depth = data = None  # release the last frame before stop()
         assert len(frame_ms) >= 10, "too few depth frames received"
         frame_med, ordinary_med = float(np.median(frame_ms)), float(np.median(ordinary_ms))
         log.info("copy of a zero-copy depth frame: %.3f ms, of ordinary memory: %.3f ms", frame_med, ordinary_med)

@@ -52,29 +52,24 @@ namespace librealsense
 
         void v4l_mipi_device::prepare_capture_buffers()
         {
-            if( _use_memory_map )
-                return v4l_uvc_meta_device::prepare_capture_buffers();
-
-            // Same order as v4l_uvc_meta_device: metadata node first, then video
-            if( _md_fd != -1 )
-                for( auto && buf : _md_buffers )
-                    buf->prepare_for_streaming( _md_fd );
             try
             {
-                v4l_uvc_device::prepare_capture_buffers();
+                v4l_uvc_meta_device::prepare_capture_buffers();
             }
             catch( const std::exception & e )
             {
-                // The driver rejected our USERPTR buffers: use its MMAP buffers (slower CPU reads, but it streams)
+                if( _use_memory_map )
+                    throw;
+                // The driver rejected our USERPTR buffers: redo all buffers with its MMAP ones (slower CPU reads)
                 LOG_WARNING( "MIPI " << _name << ": USERPTR capture buffers rejected (" << e.what()
                                      << "), falling back to MMAP" );
                 const size_t num = _buffers.size();
-                v4l_uvc_device::negotiate_kernel_buffers( 0 );  // also drops any USERPTR buffer already queued
-                v4l_uvc_device::allocate_io_buffers( 0 );
+                negotiate_kernel_buffers( 0 );  // also drops any buffer already queued
+                allocate_io_buffers( 0 );
                 _use_memory_map = true;
-                v4l_uvc_device::negotiate_kernel_buffers( num );
-                v4l_uvc_device::allocate_io_buffers( num );
-                v4l_uvc_device::prepare_capture_buffers();
+                negotiate_kernel_buffers( num );
+                allocate_io_buffers( num );
+                v4l_uvc_meta_device::prepare_capture_buffers();
             }
         }
 
