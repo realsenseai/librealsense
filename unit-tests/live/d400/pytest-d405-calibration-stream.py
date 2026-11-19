@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D405"),
-    pytest.mark.skip(reason="RSDEV-16745: D405 FW drops Y16 IR when started with color; re-enable once FW fixes it"),
+    pytest.mark.skip(reason="D405 FW drops Y16 IR when started with color; re-enable once FW fixes it"),
 ]
 
 
