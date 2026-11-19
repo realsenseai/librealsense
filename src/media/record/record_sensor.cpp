@@ -78,13 +78,6 @@ stream_profiles record_sensor::get_stream_profiles(int tag) const
 
 void librealsense::record_sensor::open(const stream_profiles& requests)
 {
-    // A stream added while recording starts delivering at once: write its header before its first frame
-    auto synthetic = dynamic_cast< synthetic_sensor * >( &m_sensor );
-    if( m_is_recording && synthetic && synthetic->get_raw_sensor()->supports_incremental_streams() )
-    {
-        std::lock_guard< std::mutex > lock( m_mutex );
-        wrap_streams( requests );
-    }
     m_sensor.open(requests);
 }
 
@@ -292,6 +285,7 @@ void record_sensor::record_frame(frame_holder frame)
 {
     if(m_is_recording)
     {
+        wrap_stream( frame->get_stream() );  // a stream is recorded from its first frame, so a failed open leaves nothing
         //Send to recording thread
         _on_frame( std::move( frame ) );
     }
@@ -303,7 +297,6 @@ void record_sensor::enable_sensor_hooks()
     if (m_is_sensor_hooked)
         return;
     hook_sensor_callbacks();
-    wrap_streams( m_sensor.get_active_streams() );
     m_is_sensor_hooked = true;
 }
 void record_sensor::disable_sensor_hooks()
@@ -415,31 +408,29 @@ void record_sensor::disable_sensor_options_recording()
         option.enable_recording([](const librealsense::option& snapshot) {});
     }
 }
-void record_sensor::wrap_streams( const stream_profiles & streams )
+void record_sensor::wrap_stream( std::shared_ptr< stream_profile_interface > const & stream )
 {
-    for (auto stream : streams)
+    std::lock_guard< std::mutex > lock( m_streams_mutex );
+    auto id = stream->get_unique_id();
+    if (m_recorded_streams_ids.count(id) == 0)
     {
-        auto id = stream->get_unique_id();
-        if (m_recorded_streams_ids.count(id) == 0)
-        {
-            std::shared_ptr<stream_profile_interface> snapshot;
-            stream->create_snapshot(snapshot);
-            rs2_extension extension_type;
-            if (Is<librealsense::video_stream_profile_interface>(stream))
-                extension_type = RS2_EXTENSION_VIDEO_PROFILE;
-            else if (Is<librealsense::motion_stream_profile_interface>(stream))
-                extension_type = RS2_EXTENSION_MOTION_PROFILE;
-            else if (Is<librealsense::pose_stream_profile_interface>(stream))
-                extension_type = RS2_EXTENSION_POSE_PROFILE;
-            else if (Is<librealsense::perception_stream_profile_interface>(stream))
-                extension_type = RS2_EXTENSION_PERCEPTION_PROFILE;
-            else
-                throw std::runtime_error("Unsupported stream");
+        std::shared_ptr<stream_profile_interface> snapshot;
+        stream->create_snapshot(snapshot);
+        rs2_extension extension_type;
+        if (Is<librealsense::video_stream_profile_interface>(stream))
+            extension_type = RS2_EXTENSION_VIDEO_PROFILE;
+        else if (Is<librealsense::motion_stream_profile_interface>(stream))
+            extension_type = RS2_EXTENSION_MOTION_PROFILE;
+        else if (Is<librealsense::pose_stream_profile_interface>(stream))
+            extension_type = RS2_EXTENSION_POSE_PROFILE;
+        else if (Is<librealsense::perception_stream_profile_interface>(stream))
+            extension_type = RS2_EXTENSION_PERCEPTION_PROFILE;
+        else
+            throw std::runtime_error("Unsupported stream");
 
-            if( m_is_recording )
-                _on_extension_change( extension_type, std::dynamic_pointer_cast< extension_snapshot >( snapshot ) );
+        if( m_is_recording )
+            _on_extension_change( extension_type, std::dynamic_pointer_cast< extension_snapshot >( snapshot ) );
 
-            m_recorded_streams_ids.insert(id);
-        }
+        m_recorded_streams_ids.insert(id);
     }
 }

@@ -57,7 +57,6 @@ namespace librealsense
         rs2_frame_callback_sptr get_frames_callback() const override;
         void set_frames_callback( rs2_frame_callback_sptr callback ) override;
         stream_profiles get_active_streams() const override;
-        stream_profiles get_sensor_active_streams() const override { return get_active_streams(); }
         stream_profiles const & get_raw_stream_profiles() const override { return m_available_profiles; }
         int register_before_streaming_changes_callback(std::function<void(bool)> callback) override;
         void unregister_before_start_callback(int token) override;

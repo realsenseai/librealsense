@@ -244,8 +244,6 @@ namespace librealsense
 
         // Our raw profiles are the ones that the raw sensor gave us, before we manipulated them
         stream_profiles const & get_raw_stream_profiles() const override { return _raw_sensor->get_raw_stream_profiles(); }
-        // User-opened streams only, until the camera reports the streams it activates on their behalf
-        stream_profiles get_sensor_active_streams() const override { return get_active_streams(); }
 
         void open(const stream_profiles& requests) override;
         void close() override;
