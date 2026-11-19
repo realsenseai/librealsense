@@ -13,7 +13,7 @@ from pytest_check import check
 from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
-REASON = "D585 over GMSL on rs-ci-orin-04 returns empty point-cloud payloads (nightly builds LRS_jetson_compile_pipeline #20852, #20861); passes on rs-sdk-nano-2/3; re-enable once the orin-04 hardware issue is resolved"
+REASON = "D585 over GMSL on rs-ci-orin-04 returns empty point-cloud payloads; passes on rs-sdk-nano-2/3; re-enable once the orin-04 hardware issue is resolved"
 
 
 pytestmark = [
