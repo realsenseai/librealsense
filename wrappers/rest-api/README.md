@@ -23,7 +23,8 @@ Frames are sent raw (720p depth + color is about 1 Gbit/s), so a slower link dro
     *   List and retrieve current values for sensor options (e.g., exposure, gain).
     *   Update writable sensor options.
 *   **REST-based Stream Control:**
-    *   Start/Stop streams with specific configurations (resolution, format, FPS).
+    *   Start/Stop streams with specific configurations (resolution, format, FPS), through the pipeline.
+    *   Open, start, stop and close each sensor on its own, as the SDK's sensor.
 *   **Frame Streaming:**
     *   Open a WebSocket to `/api/v1/devices/{device_id}/frames/{stream_type}/{stream_index}` for a running stream.
     *   Each binary message is one frame: a JSON header (number, timestamp, metadata, profile, size, intrinsics) and the frame's bytes, unchanged; see `app/services/frame_sender.py`.

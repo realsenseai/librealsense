@@ -15,7 +15,6 @@ describe('Header', () => {
       initialStoreState: {
         deviceStates: {
           '123': {
-            isActive: true,
             device: { device_id: '123', name: 'Test Device' },
           } as any,
         },
@@ -31,7 +30,6 @@ describe('Header', () => {
       initialStoreState: {
         deviceStates: {
           '123': {
-            isActive: true,
             device: { device_id: '123', name: 'Test Device' },
           } as any,
         },

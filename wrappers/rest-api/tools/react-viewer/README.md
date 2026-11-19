@@ -278,8 +278,9 @@ The viewer connects to the REST API at `/api/v1/`:
 
 - `GET /devices` - List connected devices
 - `GET /devices/{id}/sensors` - Get device sensors
-- `PUT /devices/{id}/sensors/{sid}/options/{oid}` - Update camera option
-- `POST /devices/{id}/streams/start` - Start streaming
+- `PUT /devices/{id}/sensors/{sensor_index}/options/{oid}` - Update camera option
+- `POST /devices/{id}/sensors/{sensor_index}/open|start|stop|close` - Drive one sensor, as the SDK's sensor
+- `POST /devices/{id}/stream/start` - Start streaming through the pipeline
 - `WS /devices/{id}/frames/{stream}/{index}` - A stream's frames
 
 Server events (devices, streaming, firmware updates) arrive as JSON on the `/api/v1/events` WebSocket.

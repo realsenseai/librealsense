@@ -4,8 +4,6 @@
 from pydantic import BaseModel
 from typing import List
 
-from app.models.option import OptionInfo
-
 class StreamProfile(BaseModel):
     stream_type: str
     stream_index: int
@@ -13,15 +11,13 @@ class StreamProfile(BaseModel):
     width: int  # 0 for motion, as the SDK reports it
     height: int
     fps: int
-    default: bool
+    default: bool = False  # the SDK's is_default
 
-class SensorStartRequest(BaseModel):
-    profiles: List[StreamProfile]  # from the sensor's supported_stream_profiles, e.g. depth + IR
+class SensorOpenRequest(BaseModel):
+    profiles: List[StreamProfile]  # from the sensor's stream_profiles, e.g. depth + IR
 
 class SensorInfo(BaseModel):
-    sensor_id: str
+    sensor_index: int  # in the device's sensors, as the SDK lists them
     name: str
-    type: str
-    supported_stream_profiles: List[StreamProfile] = []
-    active_profiles: List[StreamProfile] = []  # what it streams now, by any API; empty when stopped
-    options: List[OptionInfo] = []
+    stream_profiles: List[StreamProfile]
+    active_streams: List[StreamProfile]  # what it is opened with, by any API, from open to close

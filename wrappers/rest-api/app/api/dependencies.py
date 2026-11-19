@@ -1,13 +1,13 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-from fastapi import Depends
+from fastapi import Depends, Path
 from fastapi.security import OAuth2PasswordBearer
-
+from typing import Annotated
 
 from app.services.camera import Camera
-from app.services.sensor import Sensor
 from app.services.rs_manager import RealSenseManager
+from app.services.sensor import Sensor
 
 # OAuth2 setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -25,6 +25,6 @@ def get_camera(device_id: str, rs_manager: RealSenseManager = Depends(get_realse
     return rs_manager.cameras[device_id]
 
 
-def get_sensor(sensor_id: str, camera: Camera = Depends(get_camera)) -> Sensor:
+def get_sensor(sensor_index: Annotated[int, Path(ge=0)], camera: Camera = Depends(get_camera)) -> Sensor:
     """The sensor of that camera a request's path names; 404 if none"""
-    return {s.id: s for s in camera.sensors}[sensor_id]
+    return camera.sensors[sensor_index]

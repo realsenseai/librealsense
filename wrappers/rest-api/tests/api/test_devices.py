@@ -31,20 +31,26 @@ def test_get_sensors(setup_mock_managers):
 
     sensors = response.json()
     assert len(sensors) == 2
-    assert sensors[0]["type"] in ["Depth Sensor", "RGB Camera"]
-    assert sensors[1]["type"] in ["Depth Sensor", "RGB Camera"]
+    assert {s["name"] for s in sensors} == {"Depth Sensor", "RGB Camera"}
 
 
-def test_get_sensor_by_id(setup_mock_managers):
-    response = client.get("/api/v1/devices/device1/sensors/device1-sensor-0")
+def test_get_sensor_by_index(setup_mock_managers):
+    response = client.get("/api/v1/devices/device1/sensors/0")
     assert response.status_code == 200
-    assert response.json()["sensor_id"] == "device1-sensor-0"
+    assert response.json()["sensor_index"] == 0
 
-    assert client.get("/api/v1/devices/device1/sensors/nonexistent").status_code == 404
+    assert client.get("/api/v1/devices/device1/sensors/99").status_code == 404
+    assert client.get("/api/v1/devices/device1/sensors/nonexistent").status_code == 422
+
+
+def test_sensor_routes_refuse_a_negative_index(setup_mock_managers):
+    """Python would take -1 as the last sensor"""
+    for action in ("open", "start", "stop", "close"):
+        assert client.post(f"/api/v1/devices/device1/sensors/-1/{action}", json={"profiles": []}).status_code == 422
 
 
 def test_sensor_lists_each_profile(setup_mock_managers):
-    profiles = client.get("/api/v1/devices/device1/sensors/device1-sensor-0").json()["supported_stream_profiles"]
+    profiles = client.get("/api/v1/devices/device1/sensors/0").json()["stream_profiles"]
     assert [(p["width"], p["height"], p["fps"], p["default"]) for p in profiles] == [
         (640, 480, 30, False),
         (640, 480, 60, False),
@@ -54,13 +60,15 @@ def test_sensor_lists_each_profile(setup_mock_managers):
     assert {(p["stream_type"], p["stream_index"], p["format"]) for p in profiles} == {("depth", 0, "z16")}
 
 
-def test_start_sensor_opens_listed_profile(setup_mock_managers):
-    url = "/api/v1/devices/device1/sensors/device1-sensor-0"
-    profile = client.get(url).json()["supported_stream_profiles"][3]
-    assert client.post(f"{url}/start", json={"profiles": [profile]}).status_code == 200
+def test_open_sensor_opens_listed_profile(setup_mock_managers):
+    url = "/api/v1/devices/device1/sensors/0"
+    profile = client.get(url).json()["stream_profiles"][3]
+    assert client.post(f"{url}/open", json={"profiles": [profile]}).status_code == 200
     sensor = FAKE_DEVICES[0].sensors[0]
     assert sensor.opened_profiles == [sensor.get_stream_profiles()[3]]
+    assert client.post(f"{url}/start").status_code == 200
     assert client.post(f"{url}/stop").status_code == 200
+    assert client.post(f"{url}/close").status_code == 200
     assert not sensor.get_active_streams()
 
 

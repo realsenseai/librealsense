@@ -2,26 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel
-from typing import Any, List, Optional, Union
-
-class OptionBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-class OptionCreate(OptionBase):
-    pass
-
-class Option(OptionBase):
-    option_id: str
-    current_value: Any
-    default_value: Any
-    min_value: Optional[Union[float, int]] = None
-    max_value: Optional[Union[float, int]] = None
-    step: Optional[Union[float, int]] = None
-    units: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+from typing import List, Optional, Union
 
 class OptionUpdate(BaseModel):
     value: float
@@ -29,8 +10,8 @@ class OptionUpdate(BaseModel):
 class OptionInfo(BaseModel):
     option_id: str
     description: Optional[str] = None
-    current_value: Any
-    default_value: Any
+    current_value: Union[float, int, bool, str]  # by the option's type in the SDK
+    default_value: float
     min_value: float
     max_value: float
     step: Optional[Union[float, int]] = None

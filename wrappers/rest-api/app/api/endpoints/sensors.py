@@ -4,15 +4,14 @@
 """
 REST API endpoints for sensor enumeration and per-sensor streaming control.
 
-The streaming endpoints use the RealSense sensor API, which provides finer-grained
-control than the pipeline-based /streams/* endpoints, allowing individual sensors
-(depth, color, IMU) to be started/stopped independently.
+Each sensor is driven as the SDK's rs2::sensor: open -> start -> stop -> close, one route each.
+Unlike the pipeline's /stream/* endpoints, each sensor (depth, color, IMU) runs on its own.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from fastapi import APIRouter, Depends, Path
+from typing import Annotated, List
 
-from app.models.sensor import SensorInfo, SensorStartRequest
+from app.models.sensor import SensorInfo, SensorOpenRequest
 from app.api.dependencies import get_camera, get_sensor
 from app.services.camera import Camera
 from app.services.sensor import Sensor
@@ -30,7 +29,7 @@ def get_sensors(
     return [s.info() for s in camera.sensors]
 
 
-@router.get("/{sensor_id}", response_model=SensorInfo)
+@router.get("/{sensor_index}", response_model=SensorInfo)
 def get_sensor_info(
     sensor: Sensor = Depends(get_sensor),
 ):
@@ -40,52 +39,41 @@ def get_sensor_info(
     return sensor.info()
 
 
-@router.post("/{sensor_id}/start")
+@router.post("/{sensor_index}/open")
+def open_sensor(
+    sensor_index: Annotated[int, Path(ge=0)],
+    request: SensorOpenRequest,
+    camera: Camera = Depends(get_camera),
+):
+    """
+    Open a sensor with profiles from its `stream_profiles` (several for e.g. depth + IR),
+    as the SDK's sensor.open() does; start it next.
+    """
+    return camera.open_sensor(sensor_index, request.profiles)
+
+
+@router.post("/{sensor_index}/start")
 def start_sensor(
-    request: SensorStartRequest,
+    sensor_index: Annotated[int, Path(ge=0)],
     camera: Camera = Depends(get_camera),
-    sensor: Sensor = Depends(get_sensor),
 ):
-    """
-    Start streaming from a specific sensor using the sensor API.
-
-    Opens the sensor with the given profiles from its `supported_stream_profiles`
-    (several for e.g. depth + IR).
-
-    **Note:** Cannot be used simultaneously with pipeline API (/streams/start).
-    Stop all streams before switching between APIs.
-    """
-    with sensor.lock:
-        try:
-            camera.open_sensor(sensor.index, request.profiles)
-        except Exception as e:  # a sensor another client holds refuses open(), and is not ours to close
-            raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
-        try:
-            camera.start_sensor(sensor.index)
-        except Exception as e:
-            camera.close_sensor(sensor.index)
-            raise HTTPException(status_code=500, detail=f"Failed to start sensor: {e}")
-        sensor.started = True
+    """Start streaming from an opened sensor, as the SDK's sensor.start() does."""
+    return camera.start_sensor(sensor_index)
 
 
-@router.post("/{sensor_id}/stop")
+@router.post("/{sensor_index}/stop")
 def stop_sensor(
+    sensor_index: Annotated[int, Path(ge=0)],
     camera: Camera = Depends(get_camera),
-    sensor: Sensor = Depends(get_sensor),
 ):
-    """
-    Stop streaming from a specific sensor.
+    """Stop streaming from a sensor, as the SDK's sensor.stop() does; it stays open. Others keep streaming."""
+    return camera.stop_sensor(sensor_index)
 
-    The sensor will be stopped and closed, freeing its resources.
-    Other sensors on the same device will continue streaming.
-    A sensor the pipeline API runs is refused with 409: stop it with /stream/stop.
-    """
-    with sensor.lock:
-        if not sensor.started:
-            if sensor.active_profiles():
-                raise HTTPException(status_code=409,
-                                    detail="The sensor streams through the pipeline; stop it with /stream/stop")
-            return
-        camera.stop_sensor(sensor.index)
-        camera.close_sensor(sensor.index)
-        sensor.started = False
+
+@router.post("/{sensor_index}/close")
+def close_sensor(
+    sensor_index: Annotated[int, Path(ge=0)],
+    camera: Camera = Depends(get_camera),
+):
+    """Close a stopped sensor, freeing it, as the SDK's sensor.close() does."""
+    return camera.close_sensor(sensor_index)

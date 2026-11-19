@@ -63,15 +63,13 @@ export interface AdvancedModeStatus {
 }
 
 export interface SensorInfo {
-  sensor_id: string
+  sensor_index: number
   name: string
-  type: string
-  supported_stream_profiles: SupportedStreamProfile[]
-  active_profiles: SupportedStreamProfile[] // what it streams now, started by any client; empty when stopped
-  options: OptionInfo[]
+  stream_profiles: SupportedStreamProfile[]
+  active_streams: SupportedStreamProfile[] // what it is opened with, by any client, from open to close
 }
 
-// One SDK stream profile, as listed; /sensors/{id}/start takes these back unchanged
+// One SDK stream profile, as listed; /sensors/{id}/open takes these back unchanged
 export interface SupportedStreamProfile {
   stream_type: string
   stream_index: number
@@ -82,7 +80,7 @@ export interface SupportedStreamProfile {
   default: boolean
 }
 
-/** The backend's name for a profile's stream ("depth", "infrared-1"), as stream configs and frame lookups use it. */
+/** The viewer's key for a profile's stream ("depth", "infrared-1"), as stream configs and frame lookups use it. */
 export const streamKey = (p: SupportedStreamProfile) =>
   p.stream_type === 'infrared' ? `infrared-${p.stream_index}` : p.stream_type
 
@@ -90,7 +88,7 @@ export const streamKey = (p: SupportedStreamProfile) =>
 export function profilesAt(
   sensor: SensorInfo, stream: string, resolution: { width: number; height: number }, fps: number
 ): SupportedStreamProfile[] {
-  return sensor.supported_stream_profiles.filter(p => streamKey(p) === stream && p.fps === fps &&
+  return sensor.stream_profiles.filter(p => streamKey(p) === stream && p.fps === fps &&
     p.width === resolution.width && p.height === resolution.height)
 }
 
@@ -126,7 +124,7 @@ export const SECTIONS = ['Controls', 'Advanced Controls', 'Depth Visualization',
  */
 export interface ControlGroup {
   section: typeof SECTIONS[number]
-  sensorId: string    // the sensor it is drawn under, which for a device-level group
+  sensorIndex?: number   // the sensor it is drawn under, which for a device-level group
                       // (the colorizer, advanced mode) is the depth sensor
   name: string        // '' when the section draws its controls without a subheader
   enabled?: boolean   // filters only: whether the frame passes through it
@@ -135,7 +133,7 @@ export interface ControlGroup {
 }
 
 export interface StreamConfig {
-  sensor_id: string
+  sensor_index: number
   stream_type: string
   format: string
   resolution: { width: number; height: number }
@@ -146,19 +144,6 @@ export interface StreamConfig {
 // UI State types
 export type ViewMode = '2d' | '3d'
 
-export interface StreamLayout {
-  id: string
-  streamType: string
-  position: { x: number; y: number }
-  size: { width: number; height: number }
-}
-
-// Per-sensor configuration (resolution/FPS shared across all streams from same sensor)
-export interface SensorConfig {
-  resolution: { width: number; height: number }
-  framerate: number
-}
-
 // Per-device state for multi-camera support
 export interface DeviceState {
   device: DeviceInfo
@@ -167,21 +152,22 @@ export interface DeviceState {
   // Every control the device shows, keyed by the endpoint that writes it.
   controls: Record<string, ControlGroup>
   /**
-   * Whether each sensor runs its post-processing at all, keyed by sensor_id, on unless
+   * Whether each sensor runs its post-processing at all, keyed by sensor_index, on unless
    * set. Neither the SDK nor the API has such a switch - it is the viewer's, as in the
    * legacy one (subdevice-model.h), and it leaves the per-filter choices alone.
    */
-  postProcessing?: Record<string, boolean>
+  postProcessing?: Record<number, boolean>
   sensors: SensorInfo[]
   streamConfigs: StreamConfig[]
-  sensorConfigs: Record<string, SensorConfig> // Per-sensor resolution/FPS, keyed by sensor_id
-  isStreaming: boolean
-  isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
   // Per-sensor streaming state (sensor API)
-  sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
+  sensorStreamingStatus: Record<number, SensorStreamStatus> // keyed by sensor_index
   extrinsics?: StreamExtrinsics[] // the device's calibration between its streams
 }
+
+/** Whether any of its sensors streams */
+export const isStreaming = (ds: DeviceState) =>
+  Object.values(ds.sensorStreamingStatus).some(s => s.is_streaming)
 
 /** As rs2_intrinsics; model is an rs2_distortion name such as "brown_conrady" */
 export interface Intrinsics {
@@ -210,7 +196,7 @@ export interface StreamExtrinsics {
 
 // Per-sensor streaming state, kept by the viewer
 export interface SensorStreamStatus {
-  sensor_id: string
+  sensor_index: number
   is_streaming: boolean
   profiles?: SupportedStreamProfile[]  // what it streams now, started by any client
   error?: string | null

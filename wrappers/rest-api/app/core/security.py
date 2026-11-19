@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Optional
 
 
 from app.core.config import get_settings

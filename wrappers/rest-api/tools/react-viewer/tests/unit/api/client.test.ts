@@ -81,10 +81,10 @@ describe('API Client', () => {
       expect(depthSensor).toBeDefined()
       if (depthSensor) {
         expect(depthSensor.name).toBe('Stereo Module')
-        expect(depthSensor.supported_stream_profiles).toBeDefined()
-        expect(depthSensor.supported_stream_profiles.length).toBeGreaterThan(0)
+        expect(depthSensor.stream_profiles).toBeDefined()
+        expect(depthSensor.stream_profiles.length).toBeGreaterThan(0)
         // Check the first profile's stream_type
-        const firstProfile = depthSensor.supported_stream_profiles[0]
+        const firstProfile = depthSensor.stream_profiles[0]
         expect(firstProfile.stream_type).toBeDefined()
       }
     })
@@ -92,7 +92,7 @@ describe('API Client', () => {
 
   describe('getSensorFilters', () => {
     it('answers the filter chain, keyed by filter name', async () => {
-      const filters = await apiClient.getSensorFilters(mockDevice.device_id, mockDevice.device_id + '-sensor-0')
+      const filters = await apiClient.getSensorFilters(mockDevice.device_id, 0)
       expect(Object.keys(filters).length).toBeGreaterThan(0)
       expect(filters['Decimation Filter'].options[0].option_id).toBe('filter_magnitude')
     })
@@ -110,21 +110,45 @@ describe('API Client', () => {
 
 
   describe('Sensor Streaming', () => {
-    it('starts sensor streaming with the listed profiles', async () => {
+    it('opens the sensor with the listed profiles to start it', async () => {
       let body: unknown
-      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorId/start', async ({ request }) => {
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/open', async ({ request }) => {
         body = await request.json()
         return HttpResponse.json(null)
       }))
-      const profile = mockSensors[0].supported_stream_profiles[0]
+      const profile = mockSensors[0].stream_profiles[0]
 
-      await apiClient.startSensor(mockDevice.device_id, 'sensor-0', [profile])
+      await apiClient.startSensor(mockDevice.device_id, 0, [profile])
 
       expect(body).toEqual({ profiles: [profile] })
     })
 
+    it('closes a sensor that opened but would not start', async () => {
+      const steps: string[] = []
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/:step', ({ params }) => {
+        steps.push(params.step as string)
+        return params.step === 'start' ? HttpResponse.json({ detail: 'failed' }, { status: 400 }) : HttpResponse.json(null)
+      }))
+
+      await expect(apiClient.startSensor(mockDevice.device_id, 0, [])).rejects.toThrow()
+
+      expect(steps).toEqual(['open', 'start', 'close'])
+    })
+
     it('stops sensor streaming', async () => {
-      await expect(apiClient.stopSensor(mockDevice.device_id, 'sensor-0')).resolves.toBeUndefined()
+      await expect(apiClient.stopSensor(mockDevice.device_id, 0)).resolves.toBeUndefined()
+    })
+
+    it('closes a sensor that was opened but not started', async () => {
+      const steps: string[] = []
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/:step', ({ params }) => {
+        steps.push(params.step as string)
+        return params.step === 'stop' ? HttpResponse.json({ detail: 'not streaming' }, { status: 400 }) : HttpResponse.json(null)
+      }))
+
+      await apiClient.stopSensor(mockDevice.device_id, 0)
+
+      expect(steps).toEqual(['stop', 'close'])
     })
   })
 
