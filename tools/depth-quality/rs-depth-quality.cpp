@@ -120,6 +120,7 @@ static void calculate_temporal_noise(const std::vector<rs2::float3>& points, con
 
 int main(int argc, const char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-depth-quality" );
     rs2::cli cmd( "rs-depth-quality" );
     auto settings = cmd.process( argc, argv );
 

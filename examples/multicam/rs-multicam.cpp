@@ -9,6 +9,7 @@
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-multicam" );
     // Create a simple OpenGL window for rendering:
     window app(1280, 960, "CPP Multi-Camera Example");
 

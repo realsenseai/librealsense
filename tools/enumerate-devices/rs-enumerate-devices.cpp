@@ -299,6 +299,7 @@ void output_modes( std::vector< stream_profile > const & profiles, bool verbose,
 
 int main(int argc, char** argv) try
 {
+    rs2::rum::set_app_name( "rs-enumerate-devices" );
     cli cmd( "librealsense rs-enumerate-devices tool" );
 
     cli::flag short_view_arg('s', "short", "Provide a one-line summary of the devices");

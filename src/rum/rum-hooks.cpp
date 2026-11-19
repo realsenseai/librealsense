@@ -139,6 +139,12 @@ void on_notification( rs2_notification_category category )
 }
 
 
+void on_app_name( std::string const & name )
+{
+    rum_collector::instance().record_app( name );
+}
+
+
 void on_context_closed() noexcept
 {
     try

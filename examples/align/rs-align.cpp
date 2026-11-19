@@ -38,6 +38,7 @@ void render_slider(rect location, float* alpha, direction* dir);
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-align" );
     auto settings = rs2::cli( "rs-align example" )
         .process( argc, argv );
 

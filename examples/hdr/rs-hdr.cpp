@@ -12,6 +12,7 @@
 // HDR Example demonstrates how to use the HDR feature - only for D400 product line devices
 int main() try
 {
+    rs2::rum::set_app_name( "rs-hdr" );
 
     rs2::context ctx;
     rs2::device_list devices_list = ctx.query_devices();

@@ -415,6 +415,7 @@ namespace
 int main()
 try
 {
+    rs2::rum::set_app_name( "rs-composite-option" );
     rs2::context ctx;
     auto devices = ctx.query_devices();
     std::cout << "=== Composite-option API sample ===\n";

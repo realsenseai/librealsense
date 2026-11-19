@@ -14,6 +14,7 @@
 // The callback example demonstrates asynchronous usage of the pipeline
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-callback" );
     auto settings = rs2::cli( "rs-callback example" )
         .process( argc, argv );
 
