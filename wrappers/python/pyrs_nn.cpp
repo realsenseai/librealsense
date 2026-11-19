@@ -33,12 +33,13 @@ void init_nn( py::module & m )
                   py::gil_scoped_release release;
                   nn_upload( self, file, target, slot, activate, std::move( callback ) );
               },
-              "Upload an NN model package (bytes), sent to the device as is. Stop the Perception sensor first. When the "
-              "install is done the SDK resets the camera: the device disconnects and must be opened again, as after a "
+              "Upload an NN model package (bytes), sent to the device as is. Stop any NN stream (Object Detection) "
+              "first; other streams, e.g. Occupancy, may run. When the install is done the SDK resets the camera: the device disconnects and must be opened again, as after a "
               "firmware update. Firmware update is refused while the device installs a model, uploaded by any "
               "process. If the upload does not complete, wait a minute before resetting or reconnecting the camera: it "
-              "may still be writing the model. Currently only "
-              "target=flash, slot=0 and activate=True are supported. The callback receives the progress in [0, 1].",
+              "may still be writing the model. Currently only target=flash and activate=True are supported, to "
+              "slot=0 (Object Detection weights) or slot=2 (a custom network: a code + weights package). The callback "
+              "receives the progress in [0, 1].",
               "data"_a, "target"_a = RS2_NN_TARGET_FLASH, "slot"_a = 0, "activate"_a = true, "callback"_a = nullptr )
         .def( "nn_upload",
               []( const rs2::nn_loader & self, py::object path, rs2_nn_target target, int slot, bool activate,

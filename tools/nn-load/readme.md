@@ -8,7 +8,7 @@ D585 and D585F over USB, unlocked, with firmware that supports NN model upload. 
 
 ## Prerequisites
 - An unlocked camera: in this release, models can only be uploaded to unlocked cameras.
-- The Perception sensor must not be streaming during the upload.
+- No NN stream (Object Detection) may be streaming during the upload; other streams, e.g. Occupancy, may.
 
 ## Usage
 Run `rs-nn-load -l` to list the connected cameras that accept NN models and whether upload is available on each:
@@ -37,5 +37,5 @@ When the install is done the camera resets and comes back with the new model. If
 |`-f <path>`|Path of the NN model package||
 |`-s <serial_number>`|The device to upload to, mandatory if more than one is connected||
 |`--target <flash\|ddr>`|Where to store the model; only `flash` is supported|`flash`|
-|`--slot <number>`|Model slot; only 0 is supported|0|
+|`--slot <number>`|Model slot: 0 for Object Detection weights, 2 for a custom network (code + weights)|0|
 |`--no-activate`|Store the model without activating it; not supported yet||

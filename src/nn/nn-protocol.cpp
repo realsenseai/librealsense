@@ -83,8 +83,10 @@ std::string error_message( int32_t code )
 }
 
 
-void throw_error( int32_t code )
+void throw_error( int32_t code, int slot )
 {
+    if( code == -1 && slot == CUSTOM_SLOT )
+        throw not_implemented_exception( "Custom NN upload is not supported by this camera's firmware (-1)" );
     std::string msg = rsutils::string::from() << "NN upload failed: " << error_message( code ) << " (" << code << ")";
     if( code == -1 || code == -4 || code == -12 || code == -19 || code == -34 )
         throw not_implemented_exception( msg );

@@ -6,6 +6,7 @@
 #include <src/core/extension.h>
 
 #include <librealsense2/hpp/rs_types.hpp>
+#include <librealsense2/h/rs_sensor.h>
 
 #include <string>
 
@@ -31,5 +32,8 @@ MAP_EXTENSION( RS2_EXTENSION_NN_LOADER, nn_loader_interface );
 
 // Rejects the arguments the current protocol cannot carry, before any device traffic
 void validate_nn_upload_args( size_t size, rs2_nn_target target, int slot, bool activate );
+
+// Whether the stream runs a network on the device: an upload is refused while one streams
+bool is_nn_stream( rs2_stream stream );
 
 }  // namespace librealsense

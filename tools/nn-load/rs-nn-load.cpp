@@ -70,7 +70,7 @@ try
     cli::value< std::string > file_arg( 'f', "file", "path", "", "Path of the NN model package from the Perception Service" );
     cli::value< std::string > serial_number_arg( 's', "serial_number", "string", "", "The serial number of the device, mandatory if more than one NN loader device is connected" );
     cli::value< std::string > target_arg( "target", "flash|ddr", "flash", "Where to store the model (only flash is supported)" );
-    cli::value< int > slot_arg( "slot", "number", 0, "Model slot (only 0 is supported)" );
+    cli::value< int > slot_arg( "slot", "number", 0, "Model slot: 0 for Object Detection weights, 2 for a custom network" );
     cli::flag no_activate_arg( "no-activate", "Store the model without activating it (not supported)" );
 
     cmd.default_log_level( RS2_LOG_SEVERITY_WARN );

@@ -29,11 +29,13 @@ namespace rs2
         }
 
         /**
-         * Upload an NN model package, sent to the device as is. Stop the Perception sensor first. When the install
-         * is done the SDK resets the camera: the device disconnects and must be opened again, as after a firmware
-         * update. Firmware update on the device is refused while it installs a model, uploaded by any process. If
-         * the upload does not complete, wait a minute before resetting or reconnecting the camera: it may still be
-         * writing the model. Currently only RS2_NN_TARGET_FLASH, slot 0 and activate = true are supported.
+         * Upload an NN model package, sent to the device as is. Stop any NN stream (Object Detection) first; other
+         * streams, e.g. Occupancy, may run. When the install is done the SDK resets the camera: the device
+         * disconnects and must be opened again, as after a firmware update. Firmware update on the device is refused
+         * while it installs a model, uploaded by any process. If the upload does not complete, wait a minute before
+         * resetting or reconnecting the camera: it may still be writing the model. Currently only
+         * RS2_NN_TARGET_FLASH and activate = true are supported, to slot 0 (Object Detection weights) or slot 2 (a
+         * custom network: a code + weights package).
          */
         void nn_upload( const std::vector< uint8_t > & file,
                         rs2_nn_target target = RS2_NN_TARGET_FLASH,

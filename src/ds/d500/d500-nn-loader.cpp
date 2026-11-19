@@ -5,7 +5,7 @@
 #include "d500-info.h"
 #include "d500-private.h"
 
-#include <src/perception-sensor.h>
+#include <src/core/stream-profile-interface.h>
 #include <src/uvc-sensor.h>
 #include <src/nn/nn-transport-hwm.h>
 
@@ -77,12 +77,14 @@ namespace librealsense
             throw not_implemented_exception( unsupported );
 
         std::lock_guard< std::mutex > lock( _nn_upload_mutex );
+        // Only a stream that runs a network blocks the upload: Occupancy, depth and the rest may keep streaming
         for( size_t i = 0; i < get_sensors_count(); ++i )
-        {
-            auto & sensor = get_sensor( i );
-            if( dynamic_cast< perception_sensor * >( &sensor ) && sensor.is_streaming() )
-                throw wrong_api_call_sequence_exception( "NN upload: stop the Perception sensor before uploading" );
-        }
+            for( auto const & profile : get_sensor( i ).get_active_streams() )
+                if( is_nn_stream( profile->get_stream_type() ) )
+                    throw wrong_api_call_sequence_exception( rsutils::string::from()
+                                                             << "NN upload: stop the "
+                                                             << rs2_stream_to_string( profile->get_stream_type() )
+                                                             << " stream before uploading" );
         if( is_locked_now() )
             throw not_implemented_exception( locked_reason() );
 

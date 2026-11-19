@@ -113,7 +113,8 @@ def test_is_upload_supported( loader ):
 
 def test_unsupported_options( loader ):
     for kwargs, message in ( ( { 'target': rs.nn_target.ddr }, "only the flash target" ),
-                             ( { 'slot': 1 }, "only slot 0" ),
+                             ( { 'slot': 1 }, "slot 1 is not supported" ),
+                             ( { 'slot': 3 }, "slot 3 is not supported" ),
                              ( { 'activate': False }, "without activating" ) ):
         with pytest.raises( RuntimeError, match=message ):
             loader.nn_upload( GARBAGE, **kwargs )
@@ -130,7 +131,7 @@ def test_size_limits( loader ):
 def test_refused_while_streaming( unlocked_loader, perception ):
     sensor, profile = perception
     def upload():
-        with pytest.raises( RuntimeError, match="stop the Perception sensor" ):
+        with pytest.raises( RuntimeError, match="stop the Object Detection stream" ):
             unlocked_loader.nn_upload( GARBAGE )
     assert frames_for( sensor, profile, 2, upload ) > 0
 

@@ -41,7 +41,7 @@ void nn_transport::send_table( uint16_t table_id, uint32_t param1, uint32_t para
                                 << e.what() << ")" );
         }
         if( err )
-            nn::throw_error( err );
+            nn::throw_error( err, nn::slot_of( param3 ) );
         if( progress )
             progress( 0.9f * ( i + 1 ) / n_chunks );
     }

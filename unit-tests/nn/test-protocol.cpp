@@ -37,7 +37,10 @@ TEST_CASE( "chunk numbering" )
     CHECK( nn::target_param( RS2_NN_TARGET_FLASH ) == 1 );
     CHECK( nn::target_param( RS2_NN_TARGET_DDR ) == 2 );
     CHECK( nn::slot_param( 0, true ) == 0x10000 );
+    CHECK( nn::slot_param( 2, true ) == 0x10002 );
     CHECK( nn::slot_param( 3, false ) == 3 );
+    CHECK( nn::slot_of( nn::slot_param( 2, true ) ) == 2 );
+    CHECK( nn::slot_of( nn::slot_param( 0, true ) ) == 0 );
 }
 
 
@@ -64,21 +67,57 @@ TEST_CASE( "upload arguments" )
 {
     CHECK_NOTHROW( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 0, true ) );
     CHECK_NOTHROW( validate_nn_upload_args( nn::MAX_FILE_SIZE, RS2_NN_TARGET_FLASH, 0, true ) );
+    CHECK_NOTHROW( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 2, true ) );
+    CHECK_NOTHROW( validate_nn_upload_args( nn::MAX_FILE_SIZE, RS2_NN_TARGET_FLASH, 2, true ) );
 
     CHECK_THROWS_AS( validate_nn_upload_args( 0, RS2_NN_TARGET_FLASH, 0, true ), invalid_value_exception );
     CHECK_THROWS_AS( validate_nn_upload_args( nn::MAX_FILE_SIZE + 1, RS2_NN_TARGET_FLASH, 0, true ), invalid_value_exception );
+    CHECK_THROWS_AS( validate_nn_upload_args( 0, RS2_NN_TARGET_FLASH, 2, true ), invalid_value_exception );
     CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_DDR, 0, true ), not_implemented_exception );
-    CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 1, true ), not_implemented_exception );
-    CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, -1, true ), not_implemented_exception );
+    CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_DDR, 2, true ), not_implemented_exception );
     CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 0, false ), not_implemented_exception );
+    CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 2, false ), not_implemented_exception );
+    for( int slot : { -1, 1, 3, 0x10000 } )
+    {
+        CAPTURE( slot );
+        CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, slot, true ), not_implemented_exception );
+    }
+
+    auto message = []( int slot ) -> std::string
+    {
+        try
+        {
+            validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, slot, true );
+        }
+        catch( librealsense_exception const & e )
+        {
+            return e.what();
+        }
+        return {};
+    };
+    CHECK( message( 1 ) == "NN upload: slot 1 is not supported" );
+    CHECK( message( 3 ) == "NN upload: slot 3 is not supported" );
 }
 
 
-static std::string thrown_message( int32_t code )
+TEST_CASE( "NN streams" )
+{
+    CHECK( is_nn_stream( RS2_STREAM_OBJECT_DETECTION ) );
+    // Occupancy and the other depth-derived streams don't run a network: an upload is allowed while they stream
+    for( auto stream : { RS2_STREAM_OCCUPANCY, RS2_STREAM_LABELED_POINT_CLOUD, RS2_STREAM_POINT_CLOUD, RS2_STREAM_DEPTH,
+                         RS2_STREAM_COLOR, RS2_STREAM_INFRARED, RS2_STREAM_SAFETY } )
+    {
+        CAPTURE( stream );
+        CHECK_FALSE( is_nn_stream( stream ) );
+    }
+}
+
+
+static std::string thrown_message( int32_t code, int slot = 0 )
 {
     try
     {
-        nn::throw_error( code );
+        nn::throw_error( code, slot );
     }
     catch( librealsense_exception const & e )
     {
@@ -106,6 +145,19 @@ TEST_CASE( "error mapping" )
     CHECK_THAT( nn::error_message( -21 ), ContainsSubstring( "allocate resources" ) );
     CHECK_THAT( nn::error_message( -41 ), ContainsSubstring( "busy" ) );
     CHECK( nn::error_message( -99 ) == "device error -99" );
+}
+
+
+TEST_CASE( "slot-2 error mapping" )
+{
+    // FW without slot 2 answers a slot-2 upload with -1
+    CHECK_THROWS_AS( nn::throw_error( -1, 2 ), not_implemented_exception );
+    CHECK_THAT( thrown_message( -1, 2 ), ContainsSubstring( "Custom NN upload is not supported by this camera's firmware" ) );
+    CHECK_THAT( thrown_message( -1, 0 ), ContainsSubstring( "invalid command (-1)" ) );
+    // The other codes read the same on either slot until HKR assigns the slot-2 ones
+    CHECK( thrown_message( -6, 2 ) == thrown_message( -6, 0 ) );
+    CHECK_THROWS_AS( nn::throw_error( -10, 2 ), invalid_value_exception );
+    CHECK_THAT( thrown_message( -99, 2 ), ContainsSubstring( "device error -99" ) );
 }
 
 

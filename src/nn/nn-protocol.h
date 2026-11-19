@@ -21,6 +21,8 @@ constexpr uint16_t PACKAGE_TABLE_ID = 0x0A04;  // NN_MODEL
 constexpr uint16_t STATUS_TABLE_ID = 0x0A07;   // NN_STATUS
 constexpr uint16_t TABLE_VERSION = 0x0100;
 constexpr uint32_t STATUS_REGION = 2;  // RAM
+constexpr int DETECTION_SLOT = 0;  // Object Detection weights
+constexpr int CUSTOM_SLOT = 2;     // a custom network: code (the NN OEM library) + weights + metadata
 constexpr std::chrono::milliseconds STATUS_POLL_INTERVAL( 100 );
 constexpr std::chrono::seconds COMMIT_TIMEOUT( 60 );  // after the last chunk; measured worst case about 14 s
 
@@ -80,6 +82,7 @@ inline uint32_t target_param( rs2_nn_target target ) { return target == RS2_NN_T
 
 // param3: slot in bits 15:0, activate after store in bit 16
 inline uint32_t slot_param( int slot, bool activate ) { return static_cast< uint16_t >( slot ) | ( activate ? 1u << 16 : 0 ); }
+inline int slot_of( uint32_t param3 ) { return param3 & 0xFFFF; }
 
 inline size_t chunk_count( size_t table_size ) { return ( table_size + CHUNK_SIZE - 1 ) / CHUNK_SIZE; }
 
@@ -88,8 +91,8 @@ inline uint32_t chunk_param( size_t n_chunks, size_t i ) { return static_cast< u
 
 std::string error_message( int32_t code );
 
-// Throws the library exception matching a device error code
-[[noreturn]] void throw_error( int32_t code );
+// Throws the library exception matching a device error code. FW without slot 2 refuses a slot-2 upload with -1.
+[[noreturn]] void throw_error( int32_t code, int slot = DETECTION_SLOT );
 
 }  // namespace nn
 }  // namespace librealsense

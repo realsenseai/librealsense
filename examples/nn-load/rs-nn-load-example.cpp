@@ -77,7 +77,7 @@ int main( int argc, char * argv[] ) try
         }
     } );
 
-    // The upload blocks until the model is installed; the Perception sensor must not be streaming
+    // The upload blocks until the model is installed; no NN stream (Object Detection) may be streaming
     std::cout << "Uploading " << argv[1] << " to " << loader.get_info( RS2_CAMERA_INFO_NAME ) << " " << serial << std::endl;
     bool writing = false;
     loader.nn_upload( package, [&writing]( float progress )
