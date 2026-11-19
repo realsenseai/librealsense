@@ -116,10 +116,8 @@ def test_first_depth_frame_delay(sensor_device):
         time.sleep(1)
 
 
-# D421/D401/D405 do not have a color sensor support.
+# D421 has no color; D401/D405 stream color from the depth sensor.
 @pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D401")
-@pytest.mark.device_exclude("D405")
 def test_first_color_frame_delay(sensor_device):
     dev, ctx = sensor_device
     if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
@@ -130,7 +128,7 @@ def test_first_color_frame_delay(sensor_device):
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
 
-    cs = dev.first_color_sensor()
+    cs = dev.first_depth_sensor() if any(m in product_name for m in ('D401', 'D405')) else dev.first_color_sensor()
     cp = next(p for p in cs.profiles
               if p.fps() == 30
               and p.stream_type() == rs.stream.color
