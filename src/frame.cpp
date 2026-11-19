@@ -91,6 +91,7 @@ void frame::release()
     {
         unpublish();
         on_release();
+        auto keep_alive = owner;  // unpublish_frame moves this frame (and owner) to the freelist, which flush() may clear
         owner->unpublish_frame( this );
     }
 }

@@ -6,6 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <imgui.h>
 
+#include <mutex>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -31,12 +32,16 @@ namespace rs2
 
         // Call while a field is actively being changed (every tick of a slider drag). Flags the group
         // dirty and parks the deadline at +infinity so nothing commits mid-edit.
-        void touch()
+        void touch( bool is_reset = false )
         {
             _dirty = true;
+            _commit_is_reset = is_reset;
             _commit_deadline = std::numeric_limits< double >::max();
             _release_focus_on_commit = false;   // a new interaction supersedes a pending arrow-edit focus drop
         }
+
+        // True while the pending commit is a Reset to Default, so before_commit hooks must not alter the defaults.
+        bool commit_is_reset() const { return _commit_is_reset; }
 
         // Call once a field's edit is finalized (slider released, value submitted, combo picked).
         // A zero delay commits on this frame, without the countdown.
@@ -75,6 +80,7 @@ namespace rs2
         void collapse_deadline_on_focus_loss( bool any_field_active_this_frame );
 
         bool commit_due() const { return _dirty && ImGui::GetTime() >= _commit_deadline; }
+        bool is_dirty() const { return _dirty; }
         void clear_dirty();
 
     private:
@@ -82,6 +88,7 @@ namespace rs2
                                 field_edit_state & edit, const std::string & value_text );
 
         bool _dirty = false;
+        bool _commit_is_reset = false;
         double _commit_deadline = std::numeric_limits< double >::max();
         double _active_delay = commit_delay;   // the delay finalize() last actually used
         bool _just_finalized = false;
@@ -96,13 +103,40 @@ namespace rs2
         T value{};
         bool initialized = false;
 
-        // Seeds `value` from a GET the first time this is called; a no-op afterward. Returns whether
-        // `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
+        // The device value changed behind our back (options-changed callback thread): taken on the next ensure_initialized()
+        void push_external( const T & v )
+        {
+            std::lock_guard< std::mutex > lock( _pending_mutex );
+            _pending = v;
+            _has_pending = true;
+        }
+
+        // `value`, or the pushed external one that ensure_initialized() has not taken yet
+        T latest() const
+        {
+            std::lock_guard< std::mutex > lock( _pending_mutex );
+            return _has_pending ? _pending : value;
+        }
+
+        // Seeds `value` from a GET the first time this is called, and takes a pushed external value unless an edit is
+        // pending. Returns whether `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
         bool ensure_initialized( const std::shared_ptr< rs2::embedded_filter > & filter,
                                  rs2_composite_option_id id,
                                  std::string & error_message,
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
+            if( ! is_dirty() )
+            {
+                std::lock_guard< std::mutex > lock( _pending_mutex );
+                if( _has_pending )
+                {
+                    value = _pending;
+                    _has_pending = false;
+                    initialized = true;
+                    if( on_read )
+                        on_read( value );
+                }
+            }
             if( initialized )
                 return true;
             try
@@ -137,7 +171,7 @@ namespace rs2
                 {
                     value = filter->get_composite_option_range_as< RangeT >( id ).def;
                     sanitize( value );
-                    touch();
+                    touch( true );
                     finalize( 0.0 );
                 }
                 catch( const std::exception & e )
@@ -178,5 +212,10 @@ namespace rs2
             }
             clear_dirty();
         }
+
+    private:
+        mutable std::mutex _pending_mutex;
+        T _pending{};
+        bool _has_pending = false;
     };
 }

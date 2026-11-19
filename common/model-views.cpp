@@ -146,7 +146,7 @@ namespace rs2
         if (image)
         {
             std::ofstream outfile(filename.data(), std::ofstream::binary);
-            outfile.write(static_cast<const char*>(image.get_data()), image.get_height()*image.get_stride_in_bytes());
+            outfile.write(static_cast<const char*>(image.get_data()), image.get_data_size());
 
             outfile.close();
             ret = true;

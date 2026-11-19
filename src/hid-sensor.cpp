@@ -118,11 +118,13 @@ void hid_sensor::open( const stream_profiles & requests )
             cached_fw_imu_sensitivity( stream );
 
     std::vector< platform::hid_profile > configured_hid_profiles;
+    decltype(_configured_profiles) configured_profiles;
+    std::vector<bool> configured_stream(RS2_STREAM_COUNT, false);
     for( auto && request : requests )
     {
         auto && sensor_name = rs2_stream_to_sensor_name( request->get_stream_type() );
-        _configured_profiles.insert( std::make_pair( sensor_name, request ) );
-        _is_configured_stream[request->get_stream_type()] = true;
+        configured_profiles.insert( std::make_pair( sensor_name, request ) );
+        configured_stream[request->get_stream_type()] = true;
         configured_hid_profiles.push_back( platform::hid_profile{
             std::move( sensor_name ),
             fps_to_sampling_frequency(request->get_stream_type(), request->get_framerate()),
@@ -130,6 +132,8 @@ void hid_sensor::open( const stream_profiles & requests )
             needs_imu_sensitivity_write( request->get_stream_type() ) } );
     }
     _hid_device->open( configured_hid_profiles );
+    _configured_profiles = std::move(configured_profiles);
+    _is_configured_stream = std::move(configured_stream);
     if( Is< librealsense::global_time_interface >( _owner ) )
     {
         As< librealsense::global_time_interface >( _owner )->enable_time_diff_keeper( true );
@@ -190,17 +194,30 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
     rs2_time_t last_timestamp = 0;
     raise_on_before_streaming_changes( true );  // Required to be just before actual start allow recording to work
 
-    _hid_device->start_capture(
-        [this, last_frame_number, last_timestamp]( const platform::sensor_data & sensor_data ) mutable
+    auto on_sample = [this, last_frame_number, last_timestamp]( const platform::sensor_data & sensor_data ) mutable
         {
             const auto system_time = time_service::get_time();  // time frame was received from the backend
             auto timestamp_reader = _hid_iio_timestamp_reader.get();
             static const std::string custom_sensor_name = "custom";
             auto && sensor_name = sensor_data.sensor.name;
+            // A backend may deliver a report during event registration. Do not
+            // take the configure lock held by start(), including its rollback.
+            if( ! this->is_streaming() )
+            {
+                LOG_INFO( "HID Frame received when Streaming is not active," << sensor_name << ",Arrived,"
+                                                                           << std::fixed << system_time );
+                return;
+            }
             std::shared_ptr< stream_profile_interface > request;
             {
                 std::lock_guard< std::mutex > lock( _configure_lock );
-                request = _configured_profiles[sensor_name];
+                // stop() and close() can complete while a report waits for this lock.
+                if( ! this->is_streaming() )
+                    return;
+                auto profile = _configured_profiles.find( sensor_name );
+                if( profile == _configured_profiles.end() )
+                    return;
+                request = profile->second;
             }
             bool is_custom_sensor = false;
             static const uint32_t custom_source_id_offset = 16;
@@ -220,14 +237,6 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
 
                 is_custom_sensor = true;
                 timestamp_reader = _custom_hid_timestamp_reader.get();
-            }
-
-            if( ! this->is_streaming() )
-            {
-                auto stream_type = request->get_stream_type();
-                LOG_INFO( "HID Frame received when Streaming is not active," << get_string( stream_type ) << ",Arrived,"
-                                                                             << std::fixed << system_time );
-                return;
             }
 
             const auto && fr = generate_frame_from_data( sensor_data.fo,
@@ -281,7 +290,18 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
 
             // Log callback ended
             log_callback_end( fps, callback_start_time, time_service::get_time(), stream_type, frame_number );
-        } );
+        };
+    try
+    {
+        _hid_device->start_capture( std::move(on_sample) );
+    }
+    catch (...)
+    {
+        _source.flush();
+        _source.reset();
+        raise_on_before_streaming_changes( false );
+        throw;
+    }
     _is_streaming = true;
 }
 

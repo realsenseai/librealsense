@@ -69,6 +69,8 @@ def set_exposure_half_frame_time(sensor, requested_fps):
 
 def test_depth_fps_manual_exposure(test_device):
     dev, ctx = test_device
+    if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
+        require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "depth fps with manual exposure" )
     product_line = dev.get_info(rs.camera_info.product_line)
     camera_name = dev.get_info(rs.camera_info.name)
     os_name = platform.system()
