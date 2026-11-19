@@ -27,7 +27,7 @@ pytestmark = [
 
 
 MAX_DELAY = 1.0  # [sec]
-MAX_DELAY_D585_GMSL = 2.0  # [sec] first stream after a reset takes 1.1-1.6 s on D585 over GMSL
+MAX_DELAY_D585_GMSL = 2.0  # [sec] first stream after a reset takes 1.1-1.6 s on D585 over GMSL; restart uses MAX_DELAY
 
 
 def max_delay_for(dev):
@@ -73,12 +73,12 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
     depth_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     depth_cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
 
-    for run in ("start", "restart after stop"):
+    for run, limit in (("start", max_delay), ("restart after stop", MAX_DELAY)):
         frame_delay = time_to_first_frame(ctx, depth_cfg)
         log.info(f"Delay from pipeline.start() until first depth frame on {run} is: {frame_delay:.3f} [sec] "
-              f"max allowed is: {max_delay:.1f} [sec]")
-        assert frame_delay < max_delay, \
-            f"Depth frame delay on {run} {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
+              f"max allowed is: {limit:.1f} [sec]")
+        assert frame_delay < limit, \
+            f"Depth frame delay on {run} {frame_delay:.3f}s exceeds maximum {limit:.1f}s"
 
     # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
     if is_dds_dev(dev):
@@ -102,9 +102,9 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
     color_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     color_cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
-    for run in ("start", "restart after stop"):
+    for run, limit in (("start", max_delay), ("restart after stop", MAX_DELAY)):
         frame_delay = time_to_first_frame(ctx, color_cfg)
         log.info(f"Delay from pipeline.start() until first color frame on {run} is: {frame_delay:.3f} [sec] "
-              f"max allowed is: {max_delay:.1f} [sec]")
-        assert frame_delay < max_delay, \
-            f"Color frame delay on {run} {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
+              f"max allowed is: {limit:.1f} [sec]")
+        assert frame_delay < limit, \
+            f"Color frame delay on {run} {frame_delay:.3f}s exceeds maximum {limit:.1f}s"
