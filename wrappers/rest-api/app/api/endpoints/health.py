@@ -23,7 +23,10 @@ def _check_debug_sdk_build() -> str:
 # The loaded binary's version, not pip metadata: main.py may load a local build. Wheels before de49033e6
 # have it only on the inner module
 _SDK_VERSION = getattr(getattr(rs, "pyrealsense2", rs), "__full_version__", "unknown")
-SDK_WARNINGS = [w for w in [_check_debug_sdk_build()] if w]
+try:
+    SDK_WARNINGS = [w for w in [_check_debug_sdk_build()] if w]
+except Exception:  # a failed check costs its warning, never the server's start
+    SDK_WARNINGS = []
 
 router = APIRouter()
 
