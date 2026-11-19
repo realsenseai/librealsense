@@ -3,6 +3,7 @@
 // Copyright(c) 2023-4 RealSense, Inc. All Rights Reserved.
 
 #include "hid-sensor.h"
+#include "intent/intent-json.h"
 #include "device.h"
 #include "stream.h"
 #include "image.h"
@@ -169,6 +170,7 @@ static rs2_stream custom_gpio_to_stream_type( uint32_t custom_gpio )
 }
 
 void hid_sensor::start( rs2_frame_callback_sptr callback )
+try
 {
     std::lock_guard< std::mutex > lock( _configure_lock );
     if( _is_streaming )
@@ -176,6 +178,7 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
     else if( ! _is_opened )
         throw wrong_api_call_sequence_exception( "start_streaming(...) failed. Hid device was not opened!" );
 
+    verify_intent_outputs(get_device(), get_active_streams());
     _source.set_callback( std::move( callback ) );
     _source.init( _metadata_parsers );
     _source.set_sensor( _source_owner->shared_from_this() );
@@ -277,6 +280,10 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
             log_callback_end( fps, callback_start_time, time_service::get_time(), stream_type, frame_number );
         } );
     _is_streaming = true;
+}
+catch( const backend_exception & )
+{
+    rethrow_with_intent_rejection( get_device() );
 }
 
 void hid_sensor::stop()

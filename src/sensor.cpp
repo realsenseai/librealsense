@@ -2,6 +2,7 @@
 // Copyright(c) 2015-24 RealSense, Inc. All Rights Reserved.
 
 #include "uvc-sensor.h"
+#include "intent/intent-json.h"
 
 #include "source.h"
 #include "device.h"
@@ -612,6 +613,7 @@ void log_callback_end( uint32_t fps,
 
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
 
+        verify_intent_outputs(get_device(), requests);
         _formats_converter.prepare_to_convert( requests );
 
         const auto & resolved_req = _formats_converter.get_active_source_profiles();
@@ -631,7 +633,10 @@ void log_callback_end( uint32_t fps,
             for (auto&& r : requests)
             {
                 auto p = to_profile(r.get());
-                requests_info << "\tFormat: " + std::string(rs2_format_to_string(p.format)) << ", width: " << p.width << ", height: " << p.height << std::endl;
+                requests_info << "\tstream=" << rs2_stream_to_string(r->get_stream_type())
+                              << " index=" << r->get_stream_index()
+                              << " format=" << rs2_format_to_string(p.format)
+                              << " width=" << p.width << " height=" << p.height << "\n";
             }
             throw recoverable_exception("\nFailed to resolve the request: \n" + requests_info.str() + "\nInto:\n" + e.what(),
                 RS2_EXCEPTION_TYPE_INVALID_VALUE);
@@ -660,6 +665,8 @@ void log_callback_end( uint32_t fps,
     void synthetic_sensor::start( rs2_frame_callback_sptr callback )
     {
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+
+        verify_intent_outputs(get_device(), get_active_streams());
 
         // Set the post-processing callback as the user callback.
         // This callback might be modified by other object.

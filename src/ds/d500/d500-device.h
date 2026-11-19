@@ -72,6 +72,7 @@ namespace librealsense
     class ds_devices_common;
     class d500_info;
     class d500_mipi_device;
+    class intent_transport;
     class d500_enable_aligned_depth_option;
 
     namespace platform {
@@ -189,5 +190,6 @@ namespace librealsense
 
         // Populated in init() only when _is_mipi_device is true.
         std::unique_ptr< d500_mipi_device > _mipi_device;
+        std::shared_ptr<intent_transport> _intent;
     };
 }

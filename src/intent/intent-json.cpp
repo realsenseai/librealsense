@@ -593,7 +593,38 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     }
     return j.dump(2);
 }
-std::string describe_intent_status(const std::vector<uint8_t> &status) {
+std::string intent_output_mismatch(const rsutils::json &document, const std::string &name, int index,
+                                   const char *format, int width, int height, int fps) {
+    std::string mismatch = "UNDECLARED";
+    for (const auto &sensor : document["sensors"])
+        for (const auto &stream : sensor["streams"]) {
+            if (stream["stream"] != name || stream["index"] != index)
+                continue;
+            mismatch.clear();
+            const auto add = [&](const char *field) {
+                if (!mismatch.empty()) mismatch += '|';
+                mismatch += field;
+            };
+            if (stream.contains("state"))
+                add("DISABLED");
+            else {
+                if (stream["format"] != format) add("FORMAT");
+                if (stream["width"] != width) add("WIDTH");
+                if (stream["height"] != height) add("HEIGHT");
+                if (stream["fps"] != fps) add("FPS");
+            }
+        }
+    return mismatch;
+}
+
+std::string intent_format_name(uint32_t format) {
+    for (const auto &definition : rsintent::sdk_formats)
+        if (definition.format == format)
+            return definition.name;
+    return {};
+}
+std::string describe_intent_status(const std::vector<uint8_t> &status,
+                                   const rsintent::Model *requested) {
     static const char *const results[] = {"OK",          "BUSY",            "INVALID",
                                           "INCOMPLETE",  "CONSTRAINT",      "WRONG_STATE",
                                           "STREAM_MISMATCH", "CONTROL_STATE", "READ_ONLY"};
@@ -620,15 +651,21 @@ std::string describe_intent_status(const std::vector<uint8_t> &status) {
         const char *sensor = nullptr;
         for (const auto &s : rsintent::sensors)
             if (s.id == r.sensor)
-                sensor = s.name;
-        const char *branch = nullptr;
+                sensor = s.sdk_name;
+        const rsintent::BranchDefinition *branch = nullptr;
         for (const auto &b : rsintent::branches)
             if (b.id == r.branch && (!branch || b.sku == sku))
-                branch = b.name;
-        if (r.sensor)
-            out << " sensor=" << (sensor ? sensor : std::to_string(r.sensor).c_str());
-        if (r.branch)
-            out << " branch=" << (branch ? branch : std::to_string(r.branch).c_str());
+                branch = &b;
+        if (r.sensor && sensor)
+            out << " sensor=" << sensor;
+        if (branch) {
+            out << " stream=" << branch->sdk_name << " index=" << unsigned(branch->sdk_index);
+            if (requested)
+                if (const auto * stream = rsintent::find(*requested, r.branch))
+                    if (stream->enabled)
+                        out << " format=" << formatName(stream->format);
+        } else if (r.branch)
+            out << " branch_id=" << unsigned(r.branch);
         if (r.record != rsintent::no_record_index)
             out << " record=" << unsigned(r.record);
         if (r.id)

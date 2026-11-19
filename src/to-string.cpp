@@ -488,6 +488,7 @@ const char * get_string( rs2_extension value )
     CASE( PERCEPTION_PROFILE )
     CASE( GPU_FRAME )
     CASE( NN_LOADER )
+    CASE( INTENT_DEVICE )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -710,8 +711,6 @@ std::string const & get_string( rs2_composite_option_id value )
         CASE( DECIMATION_FILTER_DPP )
         CASE( TEMPORAL_FILTER_DPP )
         CASE( HDRD_CONTROL )
-        CASE( GLOBAL_INTENT )
-        CASE( GLOBAL_INTENT_STATUS )
 #undef CASE
         return arr;
     }();

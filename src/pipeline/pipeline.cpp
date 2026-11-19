@@ -101,43 +101,54 @@ namespace librealsense
             if (!profile->_multistream.get_profiles().size())
                 throw librealsense::wrong_api_call_sequence_exception("No streams are selected!");
 
-            if (conf->intent_enabled())
-                declare_pipeline_intent(*profile->get_device(), profile->get_active_streams());
-            auto synced_streams_ids = on_start(profile);
-
-            rs2_frame_callback_sptr callbacks = get_callback(synced_streams_ids);
-
+            auto previous = std::make_shared<config>(*conf);
+            const bool owns_intent = conf->intent_enabled();
             auto dev = profile->get_device();
-            if (auto playback = As<librealsense::playback_device>(dev))
+            if (owns_intent)
+                declare_pipeline_intent(*dev, profile->get_active_streams());
+            try
             {
-                _playback_stopped_token = playback->playback_status_changed.subscribe( [this, callbacks](rs2_playback_status status)
-                {
-                    if (status == RS2_PLAYBACK_STATUS_STOPPED)
-                    {
-                        _dispatcher.invoke([this, callbacks](dispatcher::cancellable_timer t)
-                        {
-                            //If the pipeline holds a playback device, and it reached the end of file (stopped)
-                            //Then we restart it
-                            if (_active_profile && _prev_conf->get_repeat_playback())
-                            {
-                                _active_profile->_multistream.open();
-                                _active_profile->_multistream.start(callbacks);
-                            }
-                        });
-                    }
-                } );
-            }
+                auto synced_streams_ids = on_start(profile);
 
-            _dispatcher.start();
-            if( dev->start_sensors_when_opened() )
-                profile->_multistream.open_and_start( callbacks );
-            else
-            {
-                profile->_multistream.open();
-                profile->_multistream.start( callbacks );
+                rs2_frame_callback_sptr callbacks = get_callback(synced_streams_ids);
+
+                if (auto playback = As<librealsense::playback_device>(dev))
+                {
+                    _playback_stopped_token = playback->playback_status_changed.subscribe( [this, callbacks](rs2_playback_status status)
+                    {
+                        if (status == RS2_PLAYBACK_STATUS_STOPPED)
+                        {
+                            _dispatcher.invoke([this, callbacks](dispatcher::cancellable_timer t)
+                            {
+                                //If the pipeline holds a playback device, and it reached the end of file (stopped)
+                                //Then we restart it
+                                if (_active_profile && _prev_conf->get_repeat_playback())
+                                {
+                                    _active_profile->_multistream.open();
+                                    _active_profile->_multistream.start(callbacks);
+                                }
+                            });
+                        }
+                    } );
+                }
+
+                _dispatcher.start();
+                if( dev->start_sensors_when_opened() )
+                    profile->_multistream.open_and_start( callbacks );
+                else
+                {
+                    profile->_multistream.open();
+                    profile->_multistream.start( callbacks );
+                }
+                _active_profile = profile;
+                _prev_conf = std::move(previous);
             }
-            _active_profile = profile;
-            _prev_conf = std::make_shared<config>(*conf);
+            catch (...)
+            {
+                if (owns_intent)
+                    clear_pipeline_intent(*dev);
+                throw;
+            }
         }
 
         void pipeline::stop()
@@ -170,6 +181,9 @@ namespace librealsense
                 catch (...)
                 {
                 } // Stop will throw if device was disconnected. TODO - refactoring anticipated
+
+                if (_prev_conf->intent_enabled())
+                    clear_pipeline_intent(*_active_profile->get_device());
 
                 // shared pointers initialized when pipeline running with _active_profile
                 // should be reset with _active_profile too

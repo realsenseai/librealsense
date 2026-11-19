@@ -6,7 +6,13 @@ namespace rs2 {
 // Explicit opt-in wrapper; construction does not change device configuration.
 class intent_device : public device {
   public:
-    explicit intent_device(const device &dev) : device(dev.get()) {}
+    explicit intent_device(const device &dev) : device(dev.get()) {
+        if (!_dev) return;
+        rs2_error *e = nullptr;
+        const bool supported = rs2_is_device_extendable_to(_dev.get(), RS2_EXTENSION_INTENT_DEVICE, &e);
+        error::handle(e);
+        if (!supported) _dev.reset();
+    }
     std::string get_intent() const {
         rs2_error *e = nullptr;
         const rs2_raw_data_buffer *p = rs2_get_intent(get().get(), &e);

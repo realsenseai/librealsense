@@ -398,6 +398,11 @@ namespace librealsense
 
     bool d500_device::extend_to( rs2_extension extension_type, void ** ptr )
     {
+        if( extension_type == RS2_EXTENSION_INTENT_DEVICE && _intent && ptr )
+        {
+            *ptr = _intent.get();
+            return true;
+        }
         if( extension_type == RS2_EXTENSION_UPDATE_DEVICE && _mipi_device && ptr )
         {
             *ptr = static_cast< update_device_interface * >( _mipi_device.get() );
@@ -884,10 +889,7 @@ namespace librealsense
 
     void d500_device::register_dpp_embedded_filters()
     {
-        if (_pid == ds::D585_2C_PID || _pid == ds::D585_3C_PID ||
-            _pid == ds::D585F_PID || _pid == ds::D585_2C_PROTO_PID
-                                || _pid == ds::D585_3C_PROTO_PID)
-            register_intent_options(dynamic_cast<d500_depth_sensor&>(get_depth_sensor()));
+        _intent = probe_intent_transport(dynamic_cast<d500_depth_sensor&>(get_depth_sensor()));
         // MIPI publishes these CIDs later than USB. Older firmware on either transport ignores
         // the composite protocol entirely, so we skip registration below the transport's gate.
         const auto min_fw = _is_mipi_device
