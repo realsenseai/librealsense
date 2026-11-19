@@ -78,7 +78,7 @@ def find_built_exe( source, name ):
         # CMake puts executables under <build>/<CONFIG>/ — on Linux via
         # CMAKE_RUNTIME_OUTPUT_DIRECTORY in CMake/unix_config.cmake, on Windows via the
         # Visual Studio multi-config generator appending the config name automatically.
-        for cfg in ('Release', 'Debug'):
+        for cfg in ('Release', 'RelWithDebInfo', 'Debug'):
             exe = os.path.join( build, cfg, name )
             tried.append( exe )
             if os.path.isfile( exe ):
