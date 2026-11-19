@@ -92,6 +92,13 @@ namespace librealsense
         return find_pcl_xyz_tuple( width, height, fps ) != nullptr;
     }
 
+    bool is_labeled_point_cloud_size( uint32_t width, uint32_t height, bool safety_layout )
+    {
+        if( safety_layout )
+            return width == 2880 && ( height == 1040 || height == 260 || height == 32 );
+        return width == 640 && height == 360;
+    }
+
     // The transport profile is GREY (Y8); the payload is XYZ32F. Validate the frame against the
     // committed profile, then relabel it to the requested XYZ32F profile without copying, so the
     // metadata and the buffer are kept. Invalid frames are dropped.
@@ -382,12 +389,9 @@ namespace librealsense
             if( p.format != rs_fourcc( 'G', 'R', 'E', 'Y' ) )
                 return;
 
-            if( safety_layout )
-            {
-                if( p.width == 2880 && ( p.height == 1040 || p.height == 260 || p.height == 32 ) )
-                    type = RS2_STREAM_LABELED_POINT_CLOUD;
-            }
-            else if( is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+            if( is_labeled_point_cloud_size( p.width, p.height, safety_layout ) )
+                type = RS2_STREAM_LABELED_POINT_CLOUD;
+            else if( ! safety_layout && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
                 type = RS2_STREAM_POINT_CLOUD;
         } );
 
