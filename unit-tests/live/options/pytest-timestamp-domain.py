@@ -5,6 +5,7 @@ import pytest
 import pyrealsense2 as rs
 import time
 import logging
+from rspy.snippets import is_d585_dual_rgb
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -78,7 +79,7 @@ def test_color_timestamp_domain_off(test_device):
     device, ctx = test_device
     product_name = device.get_info(rs.camera_info.name)
     try:
-        color_sensor = device.first_color_sensor()
+        color_sensor = device.first_depth_sensor() if is_d585_dual_rgb(product_name) else device.first_color_sensor()  # Dual RGB colors stream from the depth sensor
     except RuntimeError:
         if 'D421' in product_name or 'D405' in product_name:  # Cameras with no color sensor may fail.
             pytest.skip("No color sensor")
@@ -91,7 +92,7 @@ def test_color_timestamp_domain_on(test_device):
     device, ctx = test_device
     product_name = device.get_info(rs.camera_info.name)
     try:
-        color_sensor = device.first_color_sensor()
+        color_sensor = device.first_depth_sensor() if is_d585_dual_rgb(product_name) else device.first_color_sensor()  # Dual RGB colors stream from the depth sensor
     except RuntimeError:
         if 'D421' in product_name or 'D405' in product_name:  # Cameras with no color sensor may fail.
             pytest.skip("No color sensor")

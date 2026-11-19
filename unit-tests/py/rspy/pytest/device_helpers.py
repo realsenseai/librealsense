@@ -6,7 +6,7 @@
 import logging
 from typing import List
 
-from rspy import devices
+from rspy import devices, d585_config
 
 log = logging.getLogger('librealsense')
 
@@ -23,6 +23,14 @@ def split_cli_patterns(patterns):
     for p in patterns or []:
         out.extend(s.strip() for s in p.split(',') if s.strip())
     return out
+
+
+def _exclude_patterns(markers, cli_excludes):
+    """device_exclude marker patterns followed by the (already split) --exclude-device ones"""
+    patterns = [m.args[0] for m in markers if m.name == 'device_exclude' and m.args]
+    for pat in patterns:
+        log.debug(f"Excluding devices matching pattern: {pat}")
+    return patterns + list(cli_excludes)
 
 
 def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
@@ -45,10 +53,7 @@ def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
     cli_excludes = split_cli_patterns(cli_excludes)
 
     # --- exclusion set ---
-    exclude_patterns = [m.args[0] for m in markers if m.name == 'device_exclude' and m.args]
-    for pat in exclude_patterns:
-        log.debug(f"Excluding devices matching pattern: {pat}")
-    exclude_patterns.extend(cli_excludes)
+    exclude_patterns = _exclude_patterns(markers, cli_excludes)
     excluded_sns: set = set()
     for pattern in exclude_patterns:
         excluded_sns.update(devices.by_spec(pattern, []))
@@ -226,12 +231,22 @@ def resolve_device_each_serials(metafunc):
 
     all_serials = []
     passes = _build_sn_filter(all_markers, cli_includes, cli_excludes)
+    exclude_patterns = _exclude_patterns(all_markers, split_cli_patterns(cli_excludes))
+
+    def add_with_extras(sn, with_base=True):
+        """a camera with extra configurations gets an instance per configuration (the same camera) after its base one"""
+        for serial in ([sn] if with_base else []) + d585_config.extra_instances(sn, exclude_patterns):
+            if serial not in all_serials:
+                all_serials.append(serial)
 
     for marker in device_each_markers:
         for pattern in marker.args:
             for sn in devices.by_spec(pattern, []):
-                if passes(sn) and sn not in all_serials:
-                    all_serials.append(sn)
+                if passes(sn):
+                    add_with_extras(sn)
+            for sn in d585_config.switchable_to(pattern):   # a pattern naming only the extra configuration selects only that instance
+                if passes(sn):
+                    add_with_extras(sn, with_base=False)
 
     # Each single-spec ``device()`` marker independently contributes one parametrized
     # instance (the first matching device, or a sentinel if none).  Multiple stacked
@@ -252,8 +267,7 @@ def resolve_device_each_serials(metafunc):
                 found_sn = sn
                 break
         if found_sn is not None:
-            if found_sn not in all_serials:
-                all_serials.append(found_sn)
+            add_with_extras(found_sn)
         elif had_raw_match or _pattern_excluded(pattern, cli_excludes):
             # Excluded on the CLI (e.g. the map-check reported it missing): a skip,
             # not an unattributed failure, even though nothing of that pattern enumerated
@@ -281,8 +295,7 @@ def resolve_device_each_serials(metafunc):
                 return f"MISSING-{sn[len(_MISSING_SENTINEL_PREFIX):]}"
             if sn.startswith(_SKIP_SENTINEL_PREFIX):
                 return f"SKIP-{sn[len(_SKIP_SENTINEL_PREFIX):]}"
-            dev = devices.get(sn)
-            return f"{dev.name}-{sn}" if dev else sn
+            return d585_config.test_id(sn)
 
         ids = [_serial_id(sn) for sn in all_serials]
         metafunc.fixturenames.append('_test_device_serial')
