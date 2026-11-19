@@ -13,10 +13,12 @@ pytestmark = [
 FPS = 30
 DURATION = 10.0
 
-def test_actual_fps_within_tolerance_from_startup(module_device_setup):
+def test_actual_fps_within_tolerance_from_startup(test_device):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, FPS)
-    pipe = rs.pipeline()
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)  # global time on by default - no warmup sleep on purpose
 
     md = rs.frame_metadata_value.actual_fps

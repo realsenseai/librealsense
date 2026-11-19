@@ -61,6 +61,7 @@ All Python tests run under pytest. `run-unit-tests.py` is kept only for C++ test
 
    The first test in a file recycles the device via the hub; later tests in the file reuse it.
 4. **Write the test body**:
+   - **Pin every pipeline to the device under test**: `cfg.enable_device(dev.get_info(rs.camera_info.serial_number))` (or `pipe.set_device(dev)`). The fixture context sees every connected camera, and on hubless rigs (GMSL / Jetson, DDS) the other cameras stay visible, so an unpinned pipeline streams the first camera that can serve the config — the test then fails, or passes on the wrong camera. This holds for `rs.pipeline(ctx)` too, and for helpers that build their own pipeline (pass `dev` in).
    - Logging: `import logging; log = logging.getLogger(__name__)`.
    - Hard stop: `assert`. To keep looping and report every failure: `from pytest_check import check` (`check.equal`, `check.is_true`, `check.almost_equal(a, b, abs=tol)`).
    - Minimum FW: `require_min_fw_version(dev, rsutils.version(5, 15, 0, 0), "FEATURE")` from `rspy.pytest.device_helpers` — no inline version checks.
@@ -87,6 +88,7 @@ def test_depth_streaming(test_device):
     dev, ctx = test_device
     pipe = rs.pipeline(ctx)
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
     pipe.start(cfg)
     try:

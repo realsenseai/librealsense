@@ -17,11 +17,13 @@ FRAMES_TO_COLLECT = 3
 
 
 @pytest.mark.parametrize("fps", [5, 15, 30])
-def test_depth_and_ir_streaming(test_context, fps):
+def test_depth_and_ir_streaming(test_device, fps):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, 0, 1280, 720, rs.format.z16, fps)
     cfg.enable_stream(rs.stream.infrared, 1, 1280, 720, rs.format.y8, fps)
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     iterations = 0
     while iterations < FRAMES_TO_COLLECT:

@@ -16,10 +16,12 @@ pytestmark = [
 FRAMES_TO_COLLECT = 3
 
 
-def _check_imu_streaming(test_context, stream, fps):
+def _check_imu_streaming(test_device, stream, fps):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(stream, 0, rs.format.motion_xyz32f, fps)
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     iterations = 0
     while iterations < FRAMES_TO_COLLECT:
@@ -30,10 +32,10 @@ def _check_imu_streaming(test_context, stream, fps):
 
 
 @pytest.mark.parametrize("fps", [100, 200])
-def test_accel_streaming(test_context, fps):
-    _check_imu_streaming(test_context, rs.stream.accel, fps)
+def test_accel_streaming(test_device, fps):
+    _check_imu_streaming(test_device, rs.stream.accel, fps)
 
 
 @pytest.mark.parametrize("fps", [200, 400])
-def test_gyro_streaming(test_context, fps):
-    _check_imu_streaming(test_context, rs.stream.gyro, fps)
+def test_gyro_streaming(test_device, fps):
+    _check_imu_streaming(test_device, rs.stream.gyro, fps)
