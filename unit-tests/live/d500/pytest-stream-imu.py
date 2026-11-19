@@ -27,6 +27,7 @@ def _check_imu_streaming(test_device, stream, fps):
             pytest.skip( f"{stream} at {fps} Hz is D585 USB only" )
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), f"{stream} at {fps} Hz" )
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(stream, 0, rs.format.motion_xyz32f, fps)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
