@@ -4,6 +4,7 @@
 # RGB and Depth must stay internally synced on D585 while the decimation / temporal embedded filters run.
 # The depth/color timestamp delta must stay within tolerance and the frames must pair up in the same frameset.
 
+import statistics
 import pytest
 import pyrealsense2 as rs
 import pyrsutils as rsutils
@@ -17,7 +18,7 @@ pytestmark = [
     pytest.mark.context( "nightly" ),
 ]
 
-MAX_DELTA_MS = 5.0
+P95_DELTA_MS = 4.0
 MIN_PAIRED_RATIO = 0.9
 STREAM_SECONDS = 10
 WARMUP_FRAMESETS = 15
@@ -113,7 +114,10 @@ def test_rgb_depth_sync( test_device, filter_setup ):
     finally:
         pipe.stop()
     assert len( deltas ) >= MIN_PAIRED_RATIO * framesets, f"only {len( deltas )}/{framesets} framesets hold both depth and color"
-    log.info( f"max depth/color delta {max( deltas ):.2f} ms over {len( deltas )} framesets" )
     if applied_bit:
         assert filtered > len( deltas ) // 2, "depth frames do not report the filter as applied"
-    assert max( deltas ) <= MAX_DELTA_MS, f"depth/color timestamp delta {max( deltas ):.2f} ms exceeds {MAX_DELTA_MS} ms"
+    ordered = sorted( deltas )
+    median, p95 = statistics.median( ordered ), ordered[int( 0.95 * ( len( ordered ) - 1 ) )]
+    stats = f"depth/color delta over {len( deltas )} framesets: median {median:.2f} ms, p95 {p95:.2f} ms, max {ordered[-1]:.2f} ms"
+    log.info( stats )
+    assert p95 <= P95_DELTA_MS, f"{stats}; p95 exceeds {P95_DELTA_MS} ms"
