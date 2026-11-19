@@ -26,7 +26,7 @@ pytestmark = [
 
 
 MAX_DELAY = 1.0  # [sec]
-MAX_DELAY_D585_GMSL = 1.5  # [sec] first stream after a reset takes ~1.1 s on D585 over GMSL
+MAX_DELAY_D585_GMSL = 2.0  # [sec] first stream after a reset takes 1.1-1.6 s on D585 over GMSL
 
 
 def max_delay_for(dev):
