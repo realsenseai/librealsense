@@ -52,4 +52,4 @@ def test_distinct_app_names_capped( rum_report ):
     rum_report()
     run_child( f"for i in range( {MAX_APPS + 8} ): rs.rum.set_app_name( f'cap-{{i}}' )\n"
                "c = rs.context(); del c" )
-    assert len( [ name for name in saved_apps() if name.startswith( "cap-" ) ] ) == MAX_APPS
+    assert len( saved_apps() ) == MAX_APPS

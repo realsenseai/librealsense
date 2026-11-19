@@ -430,6 +430,9 @@ void rum_collector::merge_saved_report()
     auto apps = j.value( "apps", json::object() );
     for( auto ait = apps.begin(); ait != apps.end(); ++ait )
         _app_counts[ ait.key() ] += ait.value().get< int >();
+    // Saved names keep their place; names first seen this run go if that puts the report over the cap
+    for( auto it = _app_counts.begin(); _app_counts.size() > max_apps && it != _app_counts.end(); )
+        it = apps.find( it->first ) == apps.end() ? _app_counts.erase( it ) : std::next( it );
 }
 
 
