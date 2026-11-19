@@ -5,6 +5,7 @@
 #include "uvc-parser.h"
 #include "uvc-streamer.h"
 
+#include <algorithm>
 #include <rsutils/string/from.h>
 
 #define UVC_AE_MODE_D0_MANUAL   ( 1 << 0 )
@@ -228,32 +229,23 @@ namespace librealsense
 
         control_range rs_uvc_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
         {
-            bool status;
-            int max;
-            int min;
-            int step;
-            int def;
-            status = uvc_get_ctrl(xu.unit, control, &max, sizeof(int32_t),
-                                  UVC_GET_MAX);
-            if (!status)
-                throw std::runtime_error("uvc_get_ctrl(UVC_GET_MAX) failed");
+            // Keep four-byte scalar ranges. Larger XUs need their full wire payload.
+            constexpr int scalar_size = sizeof(int32_t);
+            const int size = std::max(len, scalar_size);
+            const bool require_full_payload = len > scalar_size;
+            auto read_range = [&](uvc_req_code request, const char * name)
+            {
+                std::vector<uint8_t> data(size);
+                if (!uvc_get_ctrl(xu.unit, control, data.data(), size, request, require_full_payload))
+                    throw std::runtime_error(std::string("uvc_get_ctrl(") + name + ") failed");
+                return data;
+            };
 
-            status = uvc_get_ctrl(xu.unit, control, &min, sizeof(int32_t),
-                                  UVC_GET_MIN);
-            if (!status)
-                throw std::runtime_error("uvc_get_ctrl(UVC_GET_MIN) failed");
-
-            status = uvc_get_ctrl(xu.unit, control, &step, sizeof(int32_t),
-                                  UVC_GET_RES);
-            if (!status)
-                throw std::runtime_error("uvc_get_ctrl(UVC_GET_RES) failed");
-
-            status = uvc_get_ctrl(xu.unit, control, &def, sizeof(int32_t),
-                                  UVC_GET_DEF);
-            if (!status)
-                throw std::runtime_error("uvc_get_ctrl(UVC_GET_DEF) failed");
-
-            control_range result(min, max, step, def);
+            control_range result;
+            result.max = read_range(UVC_GET_MAX, "UVC_GET_MAX");
+            result.min = read_range(UVC_GET_MIN, "UVC_GET_MIN");
+            result.step = read_range(UVC_GET_RES, "UVC_GET_RES");
+            result.def = read_range(UVC_GET_DEF, "UVC_GET_DEF");
             return result;
         }
 
@@ -617,14 +609,15 @@ namespace librealsense
                 throw std::runtime_error("insufficient data writen to USB");
         }
 
-        bool rs_uvc_device::uvc_get_ctrl(uint8_t unit, uint8_t ctrl, void *data, int len, uvc_req_code req_code) const
+        bool rs_uvc_device::uvc_get_ctrl(uint8_t unit, uint8_t ctrl, void *data, int len,
+                                         uvc_req_code req_code, bool require_full_payload) const
         {
             usb_status sts = RS2_USB_STATUS_OTHER;
+            uint32_t transferred = 0;
             _action_dispatcher.invoke_and_wait([&, this](dispatcher::cancellable_timer c)
             {
                 if (_messenger)
                 {
-                    uint32_t transferred;
                     sts = _messenger->control_transfer(
                             UVC_REQ_TYPE_GET, req_code,
                             ctrl << 8,
@@ -637,7 +630,8 @@ namespace librealsense
             if (sts == RS2_USB_STATUS_NO_DEVICE)
                 throw std::runtime_error("usb device disconnected");
 
-            return sts == RS2_USB_STATUS_SUCCESS;
+            return sts == RS2_USB_STATUS_SUCCESS
+                && (!require_full_payload || transferred == static_cast<uint32_t>(len));
         }
 
         bool rs_uvc_device::uvc_set_ctrl(uint8_t unit, uint8_t ctrl, void *data, int len)
