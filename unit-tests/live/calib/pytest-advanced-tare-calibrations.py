@@ -49,13 +49,14 @@ def tare_calibration_json(tare_json_file, host_assistance):
     return tare_json
 
 
-def calculate_target_z():
+def calculate_target_z(dev):
     number_of_images = 50  # The required number of frames is 10+
     warmup_frames = 30     # Allow AE to stabilize before capturing (1 sec at 30fps)
     timeout_s = 30
     target_size = [175, 100]
 
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.infrared, 1, 1280, 720, rs.format.y8, 30)
 
     q = rs.frame_queue(capacity=number_of_images, keep_frames=True)
@@ -77,8 +78,7 @@ def calculate_target_z():
 
     ctx = rs.context()
     pipe = rs.pipeline(ctx)
-    pp = pipe.start(cfg, cb)
-    dev = pp.get_device()
+    pipe.start(cfg, cb)
 
     try:
         stime = time.time()
@@ -261,7 +261,7 @@ def test_advanced_tare_calibration(test_device):
         host_assistance = False
         if (_target_z is None):
             try:
-                _target_z = calculate_target_z()
+                _target_z = calculate_target_z(dev)
                 assert _target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX
             except Exception as e:
                 log.warning(f"calculate_target_z failed ({e}); will measure average depth as fallback baseline")
