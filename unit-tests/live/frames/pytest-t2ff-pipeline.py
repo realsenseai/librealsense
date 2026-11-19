@@ -79,10 +79,9 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
               f"max allowed is: {limit:.1f} [sec]")
         assert frame_delay < limit, \
             f"Depth frame delay on {run} {frame_delay:.3f}s exceeds maximum {limit:.1f}s"
-
-    # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
-    if is_dds_dev(dev):
-        time.sleep(1)
+        # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
+        if is_dds_dev(dev):
+            time.sleep(1)
 
 
 def test_pipeline_first_color_frame_delay(pipeline_device):
@@ -108,3 +107,5 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
               f"max allowed is: {limit:.1f} [sec]")
         assert frame_delay < limit, \
             f"Color frame delay on {run} {frame_delay:.3f}s exceeds maximum {limit:.1f}s"
+        if is_dds_dev(dev):
+            time.sleep(1)  # let the DDS stream close before the restart

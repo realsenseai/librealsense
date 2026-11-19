@@ -26,6 +26,8 @@ pytestmark = [
     pytest.mark.device_each("D500*"),
 ]
 
+MAX_DELAY = 1  # [sec]
+
 
 @pytest.fixture(scope="module")
 def sensor_device(test_device):
@@ -93,7 +95,7 @@ def test_device_creation_time(module_device_setup):
 def test_first_depth_frame_delay(sensor_device):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1.5 if is_d585_on_gmsl(dev) else 1  # slow first start after reset on D585 GMSL, not on restart
+    max_delay = 1.5 if is_d585_on_gmsl(dev) else MAX_DELAY  # slow first start after reset on D585 GMSL, not on restart
     os_name = platform.system()
 
     log.info(f"Testing first depth frame delay on {product_name} device - {os_name} OS")
@@ -105,16 +107,15 @@ def test_first_depth_frame_delay(sensor_device):
               and p.format() == rs.format.z16
               and p.is_default())
 
-    for run, limit in (("start", max_delay), ("restart after stop", 1)):
+    for run, limit in (("start", max_delay), ("restart after stop", MAX_DELAY)):
         delay = time_to_first_frame(ds, dp, limit)
         assert delay != -1, f"Depth frames did not arrive for {limit + 1} second(s) on {run}"
         log.info(f"Time until first depth frame on {run} is: {delay:.3f} [sec] max allowed is: {limit:.1f} [sec]")
         assert delay < limit, \
             f"Depth frame delay on {run} {delay:.3f}s exceeds maximum {limit:.1f}s"
-
-    # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
-    if is_dds_dev(dev):
-        time.sleep(1)
+        # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
+        if is_dds_dev(dev):
+            time.sleep(1)
 
 
 # D421/D401/D405 do not have a color sensor support.
@@ -126,7 +127,7 @@ def test_first_color_frame_delay(sensor_device):
     if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "first color frame delay" )
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    max_delay = MAX_DELAY
     os_name = platform.system()
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
@@ -144,3 +145,5 @@ def test_first_color_frame_delay(sensor_device):
         log.info(f"Time until first color frame on {run} is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
         assert delay < max_delay, \
             f"Color frame delay on {run} {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+        if is_dds_dev(dev):
+            time.sleep(1)  # let the DDS stream close before the restart
