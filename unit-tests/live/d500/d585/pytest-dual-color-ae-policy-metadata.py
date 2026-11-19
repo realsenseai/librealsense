@@ -11,17 +11,19 @@ import pyrsutils as rsutils
 import time
 import logging
 from rspy.pytest.device_helpers import require_min_fw_version
+from profiles_helper import profile
 log = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.device_each( "Dual RGB" ),
+    pytest.mark.device_each( "D585 Dual RGB" ),
+    pytest.mark.device_each( "D585 Proto Dual RGB" ),
+    pytest.mark.context( "nightly" ),
 ]
 
 AE_POLICY = rs.frame_metadata_value.ae_policy
 AE_MODE = rs.option.auto_exposure_mode
 MIN_FW_USB = rsutils.version( "7.58.45946.14332" )
 MIN_FW_GMSL = rsutils.version( "7.62.0.0" )
-FPS = 30
 FRAMES_TO_CHECK = 15
 SETTLE_FRAMES = 5
 TIMEOUT_S = 10
@@ -42,17 +44,6 @@ def depth_sensor(test_device):
     original = sensor.get_option( AE_MODE )
     yield sensor
     sensor.set_option( AE_MODE, original )   # collect_policies always closes the sensor it opened
-
-
-def profile(sensor, stream_type, index=0, size=None):
-    # Streams of one session must share a resolution or some of them get starved
-    for p in sensor.get_stream_profiles():
-        v = p.as_video_stream_profile()
-        if p.stream_type() == stream_type and p.stream_index() == index and p.fps() == FPS \
-                and p.format() not in (rs.format.raw16, rs.format.yuyv, rs.format.y16) \
-                and (size is None or (v.width(), v.height()) == size):
-            return p
-    pytest.fail( f"Device publishes no {stream_type} {index} profile at {FPS} FPS" )
 
 
 def collect_policies(sensor, profiles):
@@ -83,15 +74,13 @@ def collect_policies(sensor, profiles):
 
 
 def test_depth_and_ir_only_report_depth_priority(depth_sensor):
-    depth = profile( depth_sensor, rs.stream.depth )
-    size = ( depth.as_video_stream_profile().width(), depth.as_video_stream_profile().height() )
-    profiles = [depth, profile( depth_sensor, rs.stream.infrared, 1, size )]
+    profiles = [profile( depth_sensor, rs.stream.depth, 0, rs.format.z16 ), profile( depth_sensor, rs.stream.infrared, 1, rs.format.y8 )]
     policies = collect_policies( depth_sensor, profiles )
     assert all( v == {DEPTH_PRIORITY} for v in policies.values() ), policies
 
 
 def test_color_only_reports_color_priority(depth_sensor):
-    policies = collect_policies( depth_sensor, [profile( depth_sensor, rs.stream.color, 1 )] )
+    policies = collect_policies( depth_sensor, [profile( depth_sensor, rs.stream.color, 1, rs.format.rgb8 )] )
     assert all( v == {COLOR_PRIORITY} for v in policies.values() ), policies
 
 
@@ -103,6 +92,6 @@ def test_color_only_reports_color_priority(depth_sensor):
 ] )
 def test_depth_and_color_report_the_selected_policy(depth_sensor, requested, expected):
     depth_sensor.set_option( AE_MODE, requested )
-    profiles = [profile( depth_sensor, rs.stream.depth ), profile( depth_sensor, rs.stream.color, 1 )]
+    profiles = [profile( depth_sensor, rs.stream.depth, 0, rs.format.z16 ), profile( depth_sensor, rs.stream.color, 1, rs.format.rgb8 )]
     policies = collect_policies( depth_sensor, profiles )
     assert all( v == {expected} for v in policies.values() ), policies

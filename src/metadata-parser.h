@@ -186,49 +186,6 @@ namespace librealsense
         return parser;
     }
 
-    /**\brief Parses a single trailing byte that has no struct of its own, at a fixed offset of the metadata blob.
-     *  The byte belongs to a layout identified by the md_type of one of its structs, so frames carrying another
-     *  layout do not match. Values outside [min, max] (e.g. "not available") are reported as not supported. */
-    class md_trailing_byte_parser : public md_attribute_parser_base
-    {
-    public:
-        md_trailing_byte_parser( unsigned long long layout_md_offset, md_type layout_md_type,
-                                 unsigned long long byte_offset, uint8_t min_value, uint8_t max_value )
-            : _layout_md_offset( layout_md_offset )
-            , _layout_md_type( layout_md_type )
-            , _byte_offset( byte_offset )
-            , _min_value( min_value )
-            , _max_value( max_value )
-        {
-        }
-
-        bool find( const frame & frm, rs2_metadata_type * p_value ) const override
-        {
-            auto const & blob = frm.additional_data.metadata_blob;
-            if( frm.additional_data.metadata_size <= _byte_offset )
-                return false;  // the byte is beyond the payload FW actually sent
-
-            auto const * header = reinterpret_cast< const md_header * >( blob.data() + _layout_md_offset );
-            if( header->md_type_id != _layout_md_type )
-                return false;
-
-            uint8_t const value = blob[_byte_offset];
-            if( value < _min_value || value > _max_value )
-                return false;
-
-            if( p_value )
-                *p_value = value;
-            return true;
-        }
-
-    private:
-        unsigned long long _layout_md_offset;  // offset of a struct header that identifies the layout
-        md_type            _layout_md_type;
-        unsigned long long _byte_offset;
-        uint8_t            _min_value;
-        uint8_t            _max_value;
-    };
-
     template<class S, class Attribute, typename Flag>
     class md_attribute_parser : public md_always_enabled_param_parser<S, Attribute>
     {

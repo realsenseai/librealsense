@@ -30,6 +30,35 @@ namespace librealsense
     static const firmware_version MIN_FW_COLORED_IR_AE_POLICY( "7.58.45946.14332" );
     static const firmware_version MIN_FW_AE_POLICY_METADATA_GMSL( "7.62.0.0" );
 
+    // The FW appends the applied AE policy (1-3) as a single byte after the known structs of each layout; 0 is n/a.
+    // The layout is identified by the md_type of its control struct, as depth and RGB frames share the sensor.
+    class md_ae_policy_parser : public md_attribute_parser_base
+    {
+    public:
+        md_ae_policy_parser( unsigned long long control_offset, md_type control_type, unsigned long long byte_offset )
+            : _control_offset( control_offset ), _control_type( control_type ), _byte_offset( byte_offset ) {}
+
+        bool find( const frame & frm, rs2_metadata_type * p_value ) const override
+        {
+            auto const & blob = frm.additional_data.metadata_blob;
+            if( frm.additional_data.metadata_size <= _byte_offset )
+                return false;  // beyond the payload the FW sent
+            if( reinterpret_cast< const md_header * >( blob.data() + _control_offset )->md_type_id != _control_type )
+                return false;
+            uint8_t const value = blob[_byte_offset];
+            if( value < RS2_COLORED_IR_AUTO_EXPOSURE_DEPTH_PRIORITY || value > RS2_COLORED_IR_AUTO_EXPOSURE_HYBRID )
+                return false;
+            if( p_value )
+                *p_value = value;
+            return true;
+        }
+
+    private:
+        unsigned long long _control_offset;
+        md_type _control_type;
+        unsigned long long _byte_offset;
+    };
+
     // Image and calibration encodings published by the color pins.
     // The 16-bit raw can have several spellings: RW16 over USB (V4L2 passes it through, WMF normalizes it to BYR2)
     // and BA10 or GR16 over GMSL, depending on the d4xx driver version.
@@ -387,28 +416,20 @@ namespace librealsense
         ds_color_common color_md( get_raw_depth_sensor(), depth_sensor, _fw_version, _hw_monitor, this );
         color_md.register_metadata();
 
-        // The FW appends the applied AE policy (1-3, 0 = n/a) after the known structs of each layout, on USB and GMSL alike.
-        // Offsets are from the start of the metadata blob.
         if( _fw_version >= ( _is_mipi_device ? MIN_FW_AE_POLICY_METADATA_GMSL : MIN_FW_COLORED_IR_AE_POLICY ) )
         {
+            // FW contract, from the start of the blob: the depth byte follows the structs and a crc32, the RGB byte follows its structs
             static constexpr unsigned long long DEPTH_AE_POLICY_OFFSET = 236;
-            static constexpr unsigned long long RGB_AE_POLICY_OFFSET = metadata_raw_mode_offset + sizeof( md_rgb_normal_mode );
+            static constexpr unsigned long long RGB_AE_POLICY_OFFSET = 244;
             auto const depth_control_offset = metadata_raw_mode_offset + offsetof( md_depth_mode, depth_y_mode )
                                             + offsetof( md_depth_y_normal_mode, intel_depth_control );
-            auto const rgb_control_offset = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode )
-                                          + offsetof( md_rgb_normal_mode, intel_rgb_control );
-            // Copied to locals: make_shared binds by reference, which would need a definition of the trait's static member
-            md_type const depth_layout = md_type_trait< md_depth_control >::type;
-            md_type const rgb_layout = md_type_trait< md_rgb_control >::type;
-            uint8_t const first_policy = RS2_COLORED_IR_AUTO_EXPOSURE_DEPTH_PRIORITY;
-            uint8_t const last_policy = RS2_COLORED_IR_AUTO_EXPOSURE_HYBRID;
 
             depth_sensor.register_metadata( RS2_FRAME_METADATA_AE_POLICY,
-                std::make_shared< md_trailing_byte_parser >( depth_control_offset, depth_layout,
-                                                             DEPTH_AE_POLICY_OFFSET, first_policy, last_policy ) );
+                std::make_shared< md_ae_policy_parser >( depth_control_offset, md_type::META_DATA_INTEL_DEPTH_CONTROL_ID,
+                                                         DEPTH_AE_POLICY_OFFSET ) );
             depth_sensor.register_metadata( RS2_FRAME_METADATA_AE_POLICY,
-                std::make_shared< md_trailing_byte_parser >( rgb_control_offset, rgb_layout,
-                                                             RGB_AE_POLICY_OFFSET, first_policy, last_policy ) );
+                std::make_shared< md_ae_policy_parser >( md_prop_offset, md_type::META_DATA_INTEL_RGB_CONTROL_ID,
+                                                         RGB_AE_POLICY_OFFSET ) );
         }
     }
 
