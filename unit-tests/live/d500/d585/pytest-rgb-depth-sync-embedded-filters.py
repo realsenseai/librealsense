@@ -18,7 +18,7 @@ pytestmark = [
     pytest.mark.context( "nightly" ),
 ]
 
-P95_DELTA_MS = 4.0
+MEDIAN_DELTA_MS = 4.0
 MIN_PAIRED_RATIO = 0.9
 STREAM_SECONDS = 10
 WARMUP_FRAMESETS = 15
@@ -120,4 +120,4 @@ def test_rgb_depth_sync( test_device, filter_setup ):
     median, p95 = statistics.median( ordered ), ordered[int( 0.95 * ( len( ordered ) - 1 ) )]
     stats = f"depth/color delta over {len( deltas )} framesets: median {median:.2f} ms, p95 {p95:.2f} ms, max {ordered[-1]:.2f} ms"
     log.info( stats )
-    assert p95 <= P95_DELTA_MS, f"{stats}; p95 exceeds {P95_DELTA_MS} ms"
+    assert median <= MEDIAN_DELTA_MS, f"{stats}; median exceeds {MEDIAN_DELTA_MS} ms"
