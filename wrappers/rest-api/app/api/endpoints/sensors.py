@@ -4,9 +4,8 @@
 """
 REST API endpoints for sensor enumeration and per-sensor streaming control.
 
-The streaming endpoints use the RealSense sensor API, which provides finer-grained
-control than the pipeline-based /streams/* endpoints, allowing individual sensors
-(depth, color, IMU) to be started/stopped independently.
+Each sensor is driven as the SDK's rs2::sensor: open -> start -> stop -> close, one route each.
+Unlike the pipeline's /stream/* endpoints, each sensor (depth, color, IMU) runs on its own.
 """
 
 from fastapi import APIRouter, Depends, Path
@@ -47,7 +46,7 @@ def open_sensor(
     camera: Camera = Depends(get_camera),
 ):
     """
-    Open a sensor with profiles from its `supported_stream_profiles` (several for e.g. depth + IR),
+    Open a sensor with profiles from its `stream_profiles` (several for e.g. depth + IR),
     as the SDK's sensor.open() does; start it next.
     """
     return camera.open_sensor(sensor_index, request.profiles)
