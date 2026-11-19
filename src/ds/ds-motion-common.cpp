@@ -464,7 +464,8 @@ namespace librealsense
             (_device_capabilities & ds::ds_caps::CAP_BMI_088) != ds::ds_caps::CAP_UNDEFINED)
         {
                accel_fps_rates = { odr::IMU_FPS_100, odr::IMU_FPS_200 };
-            bool const is_d5x5 = ds::d5x5_family_pids.count( _owner->get_pid() ) > 0;
+            bool const is_d5x5 = ds::d5x5_family_pids.count( _owner->get_pid() ) > 0
+                              && _fw_version >= firmware_version( "7.62.0.0" );
             if( is_d5x5 || ( _owner->supports_info( RS2_CAMERA_INFO_PRODUCT_LINE )
                 && _owner->get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) == "D400" ) )
             {
