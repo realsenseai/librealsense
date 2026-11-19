@@ -230,9 +230,9 @@ namespace librealsense
         control_range rs_uvc_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
         {
             // Keep four-byte scalar ranges. Larger XUs need their full wire payload.
-            constexpr int scalar_size = sizeof(int32_t);
-            const int size = std::max(len, scalar_size);
-            const bool require_full_payload = len > scalar_size;
+            constexpr int SCALAR_SIZE = sizeof(int32_t);
+            const int size = std::max(len, SCALAR_SIZE);
+            const bool require_full_payload = len > SCALAR_SIZE;
             auto read_range = [&](uvc_req_code request, const char * name)
             {
                 std::vector<uint8_t> data(size);
