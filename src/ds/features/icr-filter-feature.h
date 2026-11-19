@@ -34,8 +34,6 @@ public:
     std::shared_ptr< embedded_filter_interface > get_filter() const { return _filter; }
 
 private:
-    icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
-                        std::shared_ptr< composite_option_interface > control, bool allow_x4_with_decimation );
     std::shared_ptr< embedded_filter_interface > _filter;
 };
 
