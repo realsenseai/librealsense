@@ -138,6 +138,18 @@ describe('API Client', () => {
     it('stops sensor streaming', async () => {
       await expect(apiClient.stopSensor(mockDevice.device_id, 0)).resolves.toBeUndefined()
     })
+
+    it('closes a sensor that was opened but not started', async () => {
+      const steps: string[] = []
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/:step', ({ params }) => {
+        steps.push(params.step as string)
+        return params.step === 'stop' ? HttpResponse.json({ detail: 'not streaming' }, { status: 400 }) : HttpResponse.json(null)
+      }))
+
+      await apiClient.stopSensor(mockDevice.device_id, 0)
+
+      expect(steps).toEqual(['stop', 'close'])
+    })
   })
 
   describe('Firmware', () => {

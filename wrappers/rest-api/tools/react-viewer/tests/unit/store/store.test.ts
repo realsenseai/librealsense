@@ -403,11 +403,11 @@ expect(state.streamConfigs.filter(c => c.sensor_index === depthId).map(c => [c.s
       expect(isStreaming(state)).toBe(false)
     })
 
-    it('shows a sensor whose stop failed as stopped: it was stopped already, or the device is gone', async () => {
+    it('shows a sensor whose stop failed as stopped: the device is gone', async () => {
       serveActive([rowOf('depth', 'z16', 848, 30)])
       await loadSensors()
-      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/stop', () =>
-        HttpResponse.json({ detail: 'not streaming' }, { status: 400 })))
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/:step', () =>
+        HttpResponse.json({ detail: 'Not found' }, { status: 404 })))
 
       await useAppStore.getState().stopSensorStreaming(mockDevice.device_id, depthId)
 

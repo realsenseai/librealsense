@@ -186,7 +186,8 @@ class ApiClient {
   /** Stop the sensor, then close it, as the SDK's sensor does */
   async stopSensor(deviceId: string, sensorIndex: number): Promise<void> {
     const path = `/devices/${deviceId}/sensors/${sensorIndex}`
-    await this.client.post(`${path}/stop`)
+    // Opened but not started (e.g. by another client): stop is refused, close still frees it
+    await this.client.post(`${path}/stop`).catch(() => {})
     await this.client.post(`${path}/close`)
   }
 
