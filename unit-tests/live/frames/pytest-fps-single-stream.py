@@ -14,6 +14,7 @@ import fps_helper
 import platform
 import logging
 from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.snippets import is_d585_dual_rgb
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -112,7 +113,7 @@ def test_color_fps(test_device, exposure):
     try:
         cs = dev.first_color_sensor()
     except RuntimeError:
-        if 'D405' in product_name or 'D401' in product_name or 'Dual RGB' in product_name:
+        if 'D405' in product_name or 'D401' in product_name or is_d585_dual_rgb(product_name):
             cs = dev.first_depth_sensor()
         elif 'D421' in product_name:
             pytest.skip(f"Device {product_name} has no color sensor")
