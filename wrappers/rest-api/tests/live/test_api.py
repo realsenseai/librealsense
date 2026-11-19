@@ -194,6 +194,26 @@ class TestRealSenseAPIIntegration:
         finally:
             client.post(f"{url}/stop")
 
+    def test_sdk_refuses_sensor_calls_out_of_order_rs(self):
+        """The SDK's own order, open -> start -> stop -> close: start before open and close while streaming are 400"""
+        client = real_client()
+        device_id = first_device_id(client)
+
+        sensor = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]
+        default = next(p for p in sensor["stream_profiles"] if p["default"])
+        url = f"/api/v1/devices/{device_id}/sensors/{sensor['sensor_index']}"
+
+        assert client.post(f"{url}/start").status_code == 400
+        assert client.post(f"{url}/open", json={"profiles": [default]}).status_code == 200
+        try:
+            assert client.post(f"{url}/start").status_code == 200
+            try:
+                assert client.post(f"{url}/close").status_code == 400
+            finally:
+                client.post(f"{url}/stop")
+        finally:
+            client.post(f"{url}/close")
+
     def test_options_endpoint_rs(self):
         """Test the options endpoints with real devices"""
         client = real_client()
