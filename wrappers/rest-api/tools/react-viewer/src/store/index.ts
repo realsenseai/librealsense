@@ -616,11 +616,14 @@ const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p 
         is_streaming: false, pendingOp: 'stopping' } } })))
     try {
       await apiClient.stopSensor(deviceId, sensorIndex)
-    } catch (error) {
-      // A failed stop never leaves it streaming: it was stopped already, or the device is gone
-      set({ error: `Failed to stop sensor: ${error instanceof Error ? error.message : 'Unknown error'}` })
-    } finally {
       get().applyStreaming(deviceId, { [sensorIndex]: [] })
+    } catch (error) {
+      set({ error: `Failed to stop sensor: ${error instanceof Error ? error.message : 'Unknown error'}` })
+      // Still held, or the device is gone: show what the server has
+      const sensors = await apiClient.getSensors(deviceId).catch(() => [])
+      set((s) => patchDevice(s, deviceId, (ds) => ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus,
+        [sensorIndex]: { ...ds.sensorStreamingStatus[sensorIndex], pendingOp: null } } })))
+      get().applyStreaming(deviceId, { [sensorIndex]: sensors.find(s => s.sensor_index === sensorIndex)?.active_streams ?? [] })
     }
   },
 
@@ -767,8 +770,8 @@ const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p 
         for (const change of settings.optionChanges) {
           // The chatbot names the sensor ("RGB Camera"); the API takes its index
           const match = deviceState.sensors?.find(s => s.name === change.sensorId)
-          const sensorIndex = match ? match.sensor_index : change.sensorId
-          await get().setControl(deviceId, `sensors/${sensorIndex}/options`, change.optionId, change.value)
+          if (!match) throw new Error(`No sensor named "${change.sensorId}"`)
+          await get().setControl(deviceId, `sensors/${match.sensor_index}/options`, change.optionId, change.value)
         }
       }
       

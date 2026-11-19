@@ -117,7 +117,7 @@ ${formatSensors(sensors)}
 ${formatStreamConfigs(streamConfigs)}
 
 **Available Options:**
-${formatOptions(controls)}
+${formatOptions(controls, sensors)}
 `
     deviceDescriptions.push(desc)
   }
@@ -154,7 +154,7 @@ function formatStreamConfigs(configs: StreamConfig[]): string {
   ).join('\n')
 }
 
-function formatOptions(controls: Record<string, ControlGroup>): string {
+function formatOptions(controls: Record<string, ControlGroup>, sensors: SensorInfo[]): string {
   const formatted: string[] = []
 
   // A sensor's own controls only: the chatbot sets options by sensor and option name.
@@ -163,7 +163,9 @@ function formatOptions(controls: Record<string, ControlGroup>): string {
     // Only show key options to keep context manageable
     const keyOptions = group.options.filter(o => isKeyOption(optionLabel(o.option_id)))
     if (keyOptions.length) {
-      formatted.push(`  sensor ${group.sensorIndex}:`)
+      // By name, as the sensors above and as the chatbot's sensorId
+      const name = sensors.find(s => s.sensor_index === group.sensorIndex)?.name ?? `sensor ${group.sensorIndex}`
+      formatted.push(`  ${name}:`)
       keyOptions.forEach(o => {
         formatted.push(
           `    - ${optionLabel(o.option_id)}: ${o.current_value} [${o.min_value}-${o.max_value}]`
