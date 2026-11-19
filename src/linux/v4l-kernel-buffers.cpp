@@ -67,15 +67,11 @@ namespace librealsense
             }
             else if( _userptr_dma )
             {
-                // Memory the capture hardware writes into directly (videobuf2-dma-contig USERPTR, e.g. the
-                // Tegra VI behind the SMMU). It must be ordinary pageable memory the kernel can pin, so not
-                // rs_frame_zc_alloc(): CUDA host allocations are device mappings get_user_pages() refuses.
-                // The kernel keeps it CPU-cached and syncs the cache on every dequeue, unlike its own MMAP
-                // buffers, which user space maps uncached. It also rejects a USERPTR length that is not a
-                // multiple of the cache line, so the length given to QBUF is rounded up (_length, used for
-                // the frame-size checks, is unchanged).
+                // Pageable memory the kernel can pin for DMA (not CUDA host memory, which it can't pin).
+                // QBUF needs a cache-line multiple length; _length stays exact for the frame-size checks.
+                constexpr uint32_t cache_line = 64;
                 const size_t page = static_cast< size_t >( sysconf( _SC_PAGESIZE ) );
-                _qbuf_length = ( _length + 63u ) & ~63u;
+                _qbuf_length = ( _length + cache_line - 1 ) & ~( cache_line - 1 );
                 const size_t alloc_len = ( size_t( _qbuf_length ) + page - 1 ) & ~( page - 1 );
                 void * p = nullptr;
                 if( posix_memalign( &p, page, alloc_len ) != 0 || ! p )

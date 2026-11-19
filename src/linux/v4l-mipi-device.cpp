@@ -65,8 +65,7 @@ namespace librealsense
             }
             catch( const std::exception & e )
             {
-                // The driver refused our USERPTR buffers (e.g. a platform where the capture engine cannot DMA
-                // into them). Fall back to its own MMAP buffers: slower CPU reads, but streaming works.
+                // The driver rejected our USERPTR buffers: use its MMAP buffers (slower CPU reads, but it streams)
                 LOG_WARNING( "MIPI " << _name << ": USERPTR capture buffers rejected (" << e.what()
                                      << "), falling back to MMAP" );
                 const size_t num = _buffers.size();
