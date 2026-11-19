@@ -32,30 +32,16 @@ exposure_modes = pytest.mark.parametrize("exposure", ["manual", pytest.param("au
 
 def set_exposure_half_frame_time(sensor, requested_fps):
     """Set sensor exposure to half the frame time for the given requested_fps.
-    Returns the exposure value that was set (or None if not supported/failed).
+    Returns the exposure in microseconds, or None if the sensor has no exposure option.
     """
     if not sensor.supports(rs.option.exposure):
         return None
-    try:
-        r = sensor.get_option_range(rs.option.exposure)
-        frame_time_s = 1.0 / float(requested_fps)
-        desired_s = frame_time_s / 2.0
-
-        # RGB sensors take 100 microsecond units; depth sensors (also D405/D401 color) take microseconds
-        desired_units = desired_s * 1e6 / (100.0 if sensor.is_color_sensor() else 1.0)
-
-        if desired_units < r.min:
-            desired_units = r.min
-        if desired_units > r.max:
-            desired_units = r.max
-
-        try:
-            sensor.set_option(rs.option.exposure, desired_units)
-        except Exception:
-            sensor.set_option(rs.option.exposure, int(desired_units))
-        return desired_s * 1e6  # return in microseconds
-    except Exception:
-        return None
+    r = sensor.get_option_range(rs.option.exposure)
+    desired_us = 1e6 / requested_fps / 2
+    # RGB sensors take 100 microsecond units; depth sensors (also D405/D401 color) take microseconds
+    desired_units = round(desired_us / (100.0 if sensor.is_color_sensor() else 1.0))
+    sensor.set_option(rs.option.exposure, min(max(desired_units, r.min), r.max))
+    return desired_us
 
 
 def check_fps_ladder(sensor, exposure, label, matches, tolerance_at_5fps=0.05):
