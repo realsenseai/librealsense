@@ -24,13 +24,15 @@ def verify_frames_received(pipe, count):
 
 
 ########################### SRS - 3.3.1.14.b ##############################################
-def test_pause_resume_no_impact_on_streaming(test_context):
+def test_pause_resume_no_impact_on_streaming(test_device):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
     cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
     cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     profile = pipe.start(cfg)
     
     try:
@@ -61,13 +63,15 @@ def test_pause_resume_no_impact_on_streaming(test_context):
 
 
 ########################### SRS - 3.3.1.14.c ##############################################
-def test_resume_to_maintenance_keeps_video_streaming(test_context):
+def test_resume_to_maintenance_keeps_video_streaming(test_device):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
     cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
     cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     profile = pipe.start(cfg)
 
     try:
@@ -105,11 +109,13 @@ def test_resume_to_maintenance_keeps_video_streaming(test_context):
 
 
 ########################### SRS - 3.3.1.14.c ##############################################
-def test_resume_to_maintenance_keeps_safety_streaming(test_context):
+def test_resume_to_maintenance_keeps_safety_streaming(test_device):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
 
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     profile = pipe.start(cfg)
 
     try:
