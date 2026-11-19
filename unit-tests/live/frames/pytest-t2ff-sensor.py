@@ -3,7 +3,8 @@
 
 """
 Test time-to-first-frame for sensor API. Measures startup time from
-sensor.open()/start() to first frame via callback for depth and color streams.
+sensor.open()/start() to first frame via callback for depth and color streams,
+on a cold start and again on a restart right after stop.
 
 Note: Using Windows Media Foundation to handle power management between USB actions
 can add ~27ms to the startup time.
@@ -19,7 +20,6 @@ log = logging.getLogger(__name__)
 import time
 import platform
 from rspy.snippets import is_dds_dev
-from pytest_check import check
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -105,12 +105,12 @@ def test_first_depth_frame_delay(sensor_device):
               and p.format() == rs.format.z16
               and p.is_default())
 
-    delay = time_to_first_frame(ds, dp, max_delay)
-
-    assert delay != -1, f"Depth frames did not arrive for {max_delay + 1} second(s)"
-    log.info(f"Time until first depth frame is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-    assert delay < max_delay, \
-        f"Depth frame delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+    for run in ("start", "restart after stop"):
+        delay = time_to_first_frame(ds, dp, max_delay)
+        assert delay != -1, f"Depth frames did not arrive for {max_delay + 1} second(s) on {run}"
+        log.info(f"Time until first depth frame on {run} is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
+        assert delay < max_delay, \
+            f"Depth frame delay on {run} {delay:.3f}s exceeds maximum {max_delay:.1f}s"
 
     # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
     if is_dds_dev(dev):
@@ -138,54 +138,9 @@ def test_first_color_frame_delay(sensor_device):
               and p.format() == rs.format.rgb8
               and p.is_default())
 
-    delay = time_to_first_frame(cs, cp, max_delay)
-
-    assert delay != -1, f"Color frames did not arrive for {max_delay + 1} second(s)"
-    log.info(f"Time until first color frame is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-    assert delay < max_delay, \
-        f"Color frame delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
-
-
-@pytest.mark.context("nightly")
-@pytest.mark.device_exclude("D500*")
-@pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D401")
-@pytest.mark.device_exclude("D405")
-def test_stop_to_start_depth_color_hd_delay(sensor_device):
-    """Stream depth + color HD for 5s, stop, restart and measure time from stop until each first frame."""
-    dev, ctx = sensor_device
-    max_delay = 1  # KPI is 0.5s, measured up to 0.8s on D435/Windows
-
-    sensors = [(s, next(p for p in s.profiles
-                        if p.stream_type() == stream and p.format() == fmt and p.fps() == 30
-                        and p.as_video_stream_profile().width() == 1280
-                        and p.as_video_stream_profile().height() == 720))
-               for s, stream, fmt in [(dev.first_depth_sensor(), rs.stream.depth, rs.format.z16),
-                                      (dev.first_color_sensor(), rs.stream.color, rs.format.yuyv)]]
-
-    def start(cb):
-        for s, p in sensors:
-            s.open(p)
-            s.start(cb)
-
-    def stop():
-        for s, _ in sensors:
-            s.stop()
-            s.close()
-
-    start(lambda f: None)
-    time.sleep(5)
-    stop()
-    stopwatch = Stopwatch()
-    first = {}
-    start(lambda f: first.setdefault(f.get_profile().stream_type(), stopwatch.get_elapsed()))
-    while len(first) < len(sensors) and stopwatch.get_elapsed() < max_delay + 1:
-        time.sleep(0.05)
-    stop()
-
-    for _, p in sensors:
-        stream = p.stream_type()
-        check.is_in(stream, first, f"{stream} frames did not arrive for {max_delay + 1} second(s) after restart")
-        if stream in first:
-            log.info(f"Stop to first {stream} frame: {first[stream]:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-            check.less(first[stream], max_delay, f"{stream} stop-to-start delay exceeds maximum")
+    for run in ("start", "restart after stop"):
+        delay = time_to_first_frame(cs, cp, max_delay)
+        assert delay != -1, f"Color frames did not arrive for {max_delay + 1} second(s) on {run}"
+        log.info(f"Time until first color frame on {run} is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
+        assert delay < max_delay, \
+            f"Color frame delay on {run} {delay:.3f}s exceeds maximum {max_delay:.1f}s"

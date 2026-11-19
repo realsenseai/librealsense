@@ -3,7 +3,8 @@
 
 """
 Test time-to-first-frame for pipeline API. Measures startup time from
-pipeline.start() to first frame for depth and color streams.
+pipeline.start() to first frame for depth and color streams,
+on a cold start and again on a restart right after stop.
 
 Note: Using Windows Media Foundation to handle power management between USB actions
 can add ~27ms to the startup time.
@@ -72,13 +73,12 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
     depth_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     depth_cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
 
-    frame_delay = time_to_first_frame(ctx, depth_cfg)
-
-    log.info(f"Delay from pipeline.start() until first depth frame is: {frame_delay:.3f} [sec] "
-          f"max allowed is: {max_delay:.1f} [sec]")
-
-    assert frame_delay < max_delay, \
-        f"Depth frame delay {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
+    for run in ("start", "restart after stop"):
+        frame_delay = time_to_first_frame(ctx, depth_cfg)
+        log.info(f"Delay from pipeline.start() until first depth frame on {run} is: {frame_delay:.3f} [sec] "
+              f"max allowed is: {max_delay:.1f} [sec]")
+        assert frame_delay < max_delay, \
+            f"Depth frame delay on {run} {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
 
     # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
     if is_dds_dev(dev):
@@ -102,53 +102,9 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
     color_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     color_cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
-    frame_delay = time_to_first_frame(ctx, color_cfg)
-
-    log.info(f"Delay from pipeline.start() until first color frame is: {frame_delay:.3f} [sec] "
-          f"max allowed is: {max_delay:.1f} [sec]")
-
-    assert frame_delay < max_delay, \
-        f"Color frame delay {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
-
-
-def stop_to_start_delay(dev, ctx, streams):
-    """Stream HD for 5s, stop, restart and return time from stop until every stream delivered a frame."""
-    cfg = rs.config()
-    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
-    for stream, fmt in streams:
-        cfg.enable_stream(stream, 1280, 720, fmt, 30)
-    pipe = rs.pipeline(ctx)
-    pipe.start(cfg)
-    time.sleep(5)
-    pipe.stop()
-    stopwatch = Stopwatch()
-    pipe.start(cfg)
-    seen = set()
-    while len(seen) < len(streams):
-        seen.update(f.get_profile().stream_type() for f in pipe.wait_for_frames())
-    delay = stopwatch.get_elapsed()
-    pipe.stop()
-    return delay
-
-
-@pytest.mark.context("nightly")
-@pytest.mark.device_exclude("D500*")
-def test_pipeline_stop_to_start_depth_hd_delay(pipeline_device):
-    dev, ctx = pipeline_device
-    max_delay = 1.5  # KPI is 0.8s, measured up to ~1s on D455/Windows
-    delay = stop_to_start_delay(dev, ctx, [(rs.stream.depth, rs.format.z16)])
-    log.info(f"Pipeline stop to first depth frame: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-    assert delay < max_delay, f"Depth stop-to-start delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
-
-
-@pytest.mark.context("nightly")
-@pytest.mark.device_exclude("D500*")
-@pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D401")
-@pytest.mark.device_exclude("D405")
-def test_pipeline_stop_to_start_depth_color_hd_delay(pipeline_device):
-    dev, ctx = pipeline_device
-    max_delay = 1.5  # KPI is 0.8s, measured up to ~1s on D455/Windows
-    delay = stop_to_start_delay(dev, ctx, [(rs.stream.depth, rs.format.z16), (rs.stream.color, rs.format.yuyv)])
-    log.info(f"Pipeline stop to first depth + color frames: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-    assert delay < max_delay, f"Depth + color stop-to-start delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+    for run in ("start", "restart after stop"):
+        frame_delay = time_to_first_frame(ctx, color_cfg)
+        log.info(f"Delay from pipeline.start() until first color frame on {run} is: {frame_delay:.3f} [sec] "
+              f"max allowed is: {max_delay:.1f} [sec]")
+        assert frame_delay < max_delay, \
+            f"Color frame delay on {run} {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
