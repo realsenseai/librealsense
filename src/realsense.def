@@ -536,3 +536,4 @@ EXPORTS
 
     rs2_get_intent
     rs2_set_intent
+    rs2_config_enable_intent

@@ -18,6 +18,24 @@ struct RejectReason {
     uint16_t id;     // constraint/rule for CONSTRAINT, ctl_id for CONTROL_STATE, else 0
     uint16_t detail; // ParseDetail for INVALID/INCOMPLETE, StreamMismatch bits for A1
 };
+constexpr uint8_t status_layout_i1 = 1;
+constexpr uint8_t status_layout_i2 = 2;
+
+inline bool supportedStatusLayout(uint8_t version) {
+    return version == status_layout_i1 || version == status_layout_i2;
+}
+
+inline bool validStatusResult(uint8_t version, uint8_t result, uint8_t mask) {
+    if (version == status_layout_i1)
+        return result <= READ_ONLY;
+    constexpr uint8_t known = REJECT_A1 | REJECT_A2 | REJECT_A3;
+    if (version != status_layout_i2 || (mask & ~known))
+        return false;
+    if (result == ADMISSION_REJECT)
+        return mask == REJECT_A3 || (mask && !(mask & REJECT_A3));
+    return result <= READ_ONLY && !mask;
+}
+
 // Result codes that carry a REJECT_REASON (design v0.4 section 7.8 kind list).
 inline bool hasReason(uint8_t code) {
     return code == INVALID || code == INCOMPLETE || code == CONSTRAINT || code == STREAM_MISMATCH ||

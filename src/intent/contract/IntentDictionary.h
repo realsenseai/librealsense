@@ -4,7 +4,7 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "dc42de855af6a26a7cdeff9d9b05912a6af1edb3576f6e266972aaf5aa18a123";
+static const char dictionary_sha256[] = "a35563755365e577176da5a89854314ec6c154406714111429b10d114f5809cf";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
@@ -65,6 +65,7 @@ static const unsigned status_error_detail_offset = 16U;
 static const unsigned status_patch_offset = 18U;
 static const unsigned status_rule_revision_offset = 20U;
 static const unsigned status_total_reasons_offset = 52U;
+static const unsigned status_reject_mask_offset = 54U;
 static const unsigned reason_kind_offset = 0U;
 static const unsigned reason_sensor_offset = 1U;
 static const unsigned reason_record_offset = 2U;
@@ -81,6 +82,7 @@ enum Result : uint8_t {
     STREAM_MISMATCH = 6,
     CONTROL_STATE = 7,
     READ_ONLY = 8,
+    ADMISSION_REJECT = 9,
     INTERNAL = 255,
 };
 enum ParseDetail : uint16_t {
@@ -126,6 +128,11 @@ enum StreamMismatch : uint16_t {
     MISMATCH_HEIGHT = 16,
     MISMATCH_FPS = 32,
     MISMATCH_STALE = 64,
+};
+enum AdmissionRejectMask : uint8_t {
+    REJECT_A1 = 1,
+    REJECT_A2 = 2,
+    REJECT_A3 = 4,
 };
 enum StatusFlags : uint8_t {
     STATUS_SKIPPED_ITEMS = 1,

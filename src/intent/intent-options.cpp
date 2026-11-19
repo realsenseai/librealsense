@@ -1,5 +1,5 @@
 // License: Apache 2.0. Copyright (C) 2026 RealSense, Inc.
-#include "contract/IntentProtocol.h"
+#include "contract/IntentStatus.h"
 #include "intent-json.h"
 #include "intent-tlv.h"
 #include <mutex>
@@ -37,7 +37,7 @@ class intent_transport {
 
     std::vector<uint8_t> discovery(const std::vector<uint8_t> &version) const {
         const size_t length = rsintent::read16(version.data() + rsintent::status_discovery_length_offset);
-        if (version[rsintent::status_format_version_offset] != 1U ||
+        if (!rsintent::supportedStatusLayout(version[rsintent::status_format_version_offset]) ||
             length < 16U || length > rsintent::status_discovery_capacity)
             throw invalid_value_exception("Intent STATUS has invalid discovery section");
         const auto start = version.begin() + rsintent::status_discovery_offset;
@@ -303,7 +303,7 @@ std::string intent_rejection(device_interface &device) noexcept {
             const auto status = intent->status();
             const auto result = status[rsintent::status_result_offset];
             if (result == rsintent::CONSTRAINT || result == rsintent::STREAM_MISMATCH ||
-                result == rsintent::CONTROL_STATE)
+                result == rsintent::CONTROL_STATE || result == rsintent::ADMISSION_REJECT)
                 return " (Intent " + describe_intent_status(status) +
                        "; diagnostic may be stale or from another client)";
         }

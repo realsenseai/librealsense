@@ -263,13 +263,19 @@ void attachLayouts(json &j, const std::vector<intent_tlv::Record> &records, unsi
         }
     }
 }
+bool valid_status(const std::vector<uint8_t> &status) {
+    return status.size() == rsintent::status_size &&
+        status[rsintent::status_major_offset] == rsintent::major &&
+        rsintent::validStatusResult(status[rsintent::status_format_version_offset],
+                                    status[rsintent::status_result_offset],
+                                    status[rsintent::status_reject_mask_offset]);
+}
 } // namespace
 std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vector<uint8_t> &status,
                                        const std::vector<uint8_t> &firmware,
                                        const std::vector<uint8_t> &discovery) {
     const json j = json::parse(text);
-    if (!status.empty() && (status.size() != rsintent::status_size || status[rsintent::status_major_offset] != rsintent::major ||
-                           status[rsintent::status_result_offset] > rsintent::READ_ONLY))
+    if (!status.empty() && !valid_status(status))
         throw std::invalid_argument("Intent: firmware major mismatch or invalid status");
     if (!firmware.empty() && (firmware.size() != rsintent::wire_size || firmware[0] != rsintent::major))
         throw std::invalid_argument("Intent: firmware major mismatch or invalid GET_CUR");
@@ -494,8 +500,7 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     const auto clean = intent_tlv::transfer(wire, intent_tlv::filter(records));
     rsintent::Request request = {};
     if (rsintent::decode(clean.data(), clean.size(), request).code != rsintent::OK ||
-        status.size() != rsintent::status_size || status[rsintent::status_major_offset] != rsintent::major ||
-        status[rsintent::status_result_offset] > rsintent::READ_ONLY ||
+        !valid_status(status) ||
         status[rsintent::status_reason_count_offset] > rsintent::max_reject_reasons)
         throw std::invalid_argument("Intent: invalid firmware response");
     warn_version(status);
@@ -562,10 +567,11 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
                    {"reasons", json::array()}};
     const size_t textLength = rsintent::read16(status.data() + rsintent::status_text_length_offset);
     const size_t discoveryLength = rsintent::read16(status.data() + rsintent::status_discovery_length_offset);
-    if (status[rsintent::status_format_version_offset] != 1U ||
-        textLength >= rsintent::status_text_capacity || discoveryLength > rsintent::status_discovery_capacity ||
+    if (textLength >= rsintent::status_text_capacity || discoveryLength > rsintent::status_discovery_capacity ||
         status[rsintent::status_conformance_offset] > rsintent::CONFORMANCE_MISMATCH)
         throw std::invalid_argument("Intent: malformed STATUS sections");
+    if (status[rsintent::status_format_version_offset] == rsintent::status_layout_i2)
+        j["status"]["reject_mask"] = status[rsintent::status_reject_mask_offset];
     j["status"]["conformance"] = status[rsintent::status_conformance_offset];
     j["status"]["host_token_supported"] = false;
     j["status"]["total_reasons"] = rsintent::read16(status.data() + rsintent::status_total_reasons_offset);
@@ -627,7 +633,7 @@ std::string describe_intent_status(const std::vector<uint8_t> &status,
                                    const rsintent::Model *requested) {
     static const char *const results[] = {"OK",          "BUSY",            "INVALID",
                                           "INCOMPLETE",  "CONSTRAINT",      "WRONG_STATE",
-                                          "STREAM_MISMATCH", "CONTROL_STATE", "READ_ONLY"};
+                                          "STREAM_MISMATCH", "CONTROL_STATE", "READ_ONLY", "ADMISSION_REJECT"};
     static const char *const mismatches[] = {"UNDECLARED", "DISABLED", "FORMAT", "WIDTH",
                                              "HEIGHT",     "FPS",      "STALE"};
     const auto result = [&](uint8_t code) {
@@ -639,6 +645,9 @@ std::string describe_intent_status(const std::vector<uint8_t> &status,
     const uint16_t sku = rsintent::read16(status.data() + rsintent::status_sku_offset);
     std::ostringstream out;
     out << "last_result=" << result(status[rsintent::status_result_offset]);
+    if (status[rsintent::status_format_version_offset] == rsintent::status_layout_i2 &&
+        status[rsintent::status_result_offset] == rsintent::ADMISSION_REJECT)
+        out << " reject_mask=" << unsigned(status[rsintent::status_reject_mask_offset]);
     if (status[rsintent::status_result_offset] == rsintent::INVALID || status[rsintent::status_result_offset] == rsintent::INCOMPLETE)
         out << " at byte " << rsintent::read16(status.data() + rsintent::status_error_offset_offset);
     const unsigned count = status[rsintent::status_reason_count_offset];
