@@ -4,15 +4,18 @@
 
 #include <src/ds/features/icr-filter-feature.h>
 #include <src/ds/d500/d500-device.h>
+#include <src/ds/d500/d500-private.h>
 #include <src/ds/d500/icr-embedded-filter.h>
 #include <src/ds/ds-private.h>
 #include <src/ds/composite-xu-option.h>
+#include <src/firmware-version.h>
 #include <src/uvc-sensor.h>
 #include <src/core/video.h>
 #include <src/librealsense-exception.h>
 #include <rsutils/string/from.h>
 
 #include <librealsense2/h/rs_composite_option.h>
+#include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_icr_control.h>
 
 #include <cstddef>
@@ -50,11 +53,50 @@ static std::shared_ptr< video_stream_profile_interface > find_depth_profile( con
     return nullptr;
 }
 
+static bool supports_x4_with_decimation( const d500_device & owner, bool is_mipi )
+{
+    auto const pid = owner.get_pid();
+    return ! is_mipi
+        && ( pid == ds::D585_2C_PID || pid == ds::D585_3C_PID
+             || pid == ds::D585_2C_PROTO_PID || pid == ds::D585_3C_PROTO_PID )
+        && firmware_version( owner.get_info( RS2_CAMERA_INFO_FIRMWARE_VERSION ) ) >= firmware_version( "7.62.47221.0" );
+}
+
+static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
+{
+    for( auto & filter : depth_sensor.get_supported_embedded_filters() )
+    {
+        if( filter->supports_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) )
+        {
+            rs2_decimation_filter_dpp_config cfg;
+            std::vector< uint8_t > raw;
+            try
+            {
+                raw = filter->get_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ).get_raw();
+            }
+            catch( const std::exception & e )
+            {
+                LOG_WARNING( "Decimation state unavailable, treating it as disabled: " << e.what() );
+                return false;
+            }
+            if( raw.size() != sizeof( cfg ) )
+                return false;
+            std::memcpy( &cfg, raw.data(), sizeof( cfg ) );
+            return cfg.enabled != 0;
+        }
+        if( filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_DECIMATION )
+            return filter->supports_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED )
+                && filter->get_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED ).query() != 0;
+    }
+    return false;
+}
+
 // FW rejects unsupported ICR profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
 // needs a replug) - so the SDK checks the ICR profile limits first: the explicit profile exclusions, FPS up to 30,
 // and integral Secondary dimensions of at least 128 pixels wide for Downscale (480x270 x4 is out as 270 is not
 // divisible by 4, 424x240 x4 as its Secondary is 106 wide).
-static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth )
+static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
+                                  const sensor_interface & depth_sensor, bool allow_x4_with_decimation )
 {
     if( ! icr_control || size != sizeof( rs2_icr_control ) )
         return;
@@ -76,7 +118,9 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
     if( cfg.mode != RS2_ICR_MODE_DOWNSCALE_HDR )
         return;
     uint32_t const ratio = cfg.downscale_ratio == 2 ? 4 : 2;
-    // ICR merges the producer frames before embedded Decimation.
+    if( ratio == 4 && ! allow_x4_with_decimation && embedded_decimation_enabled( depth_sensor ) )
+        throw invalid_value_exception(
+            "Improved Close Range Depth Downscale x4 with embedded Decimation requires D585 USB firmware 7.62.47221 or newer" );
     if( w % ratio != 0 || h % ratio != 0 )
         throw invalid_value_exception( rsutils::string::from()
             << "Improved Close Range Depth Downscale x" << ratio << " requires Depth dimensions divisible by " << ratio
@@ -91,9 +135,11 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
 class icr_option : public composite_option_interface
 {
 public:
-    icr_option( std::shared_ptr< composite_option_interface > control, const sensor_interface & depth_sensor )
+    icr_option( std::shared_ptr< composite_option_interface > control, const sensor_interface & depth_sensor,
+                bool allow_x4_with_decimation )
         : _xu( std::move( control ) )
         , _depth_sensor( depth_sensor )
+        , _allow_x4_with_decimation( allow_x4_with_decimation )
     {
     }
 
@@ -111,9 +157,14 @@ public:
         std::memcpy( &cfg, data, sizeof( cfg ) );
         range_check_or_throw( cfg );
         if( auto depth = find_depth_profile( _depth_sensor.get_active_streams() ) )
-            icr_allowed_or_throw( &cfg, sizeof( cfg ), *depth );
+            validate_profile( &cfg, sizeof( cfg ), *depth );
 
         _xu->set_raw( &cfg, sizeof( cfg ) );  // FW ignores the read-only min depth fields
+    }
+
+    void validate_profile( const void * data, size_t size, const video_stream_profile_interface & depth ) const
+    {
+        icr_allowed_or_throw( data, size, depth, _depth_sensor, _allow_x4_with_decimation );
     }
     // {min, max, step, def}, each a complete payload with its own envelope. Read once: the range does not change
     std::vector< uint8_t > get_raw_range() const override
@@ -169,6 +220,7 @@ private:
 
     std::shared_ptr< composite_option_interface > _xu;
     const sensor_interface & _depth_sensor;
+    const bool _allow_x4_with_decimation;
     mutable std::mutex _range_mutex;
     mutable std::vector< uint8_t > _range;
 };
@@ -186,15 +238,23 @@ icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor &
                               ds::DS5_HKR_ICR_CONTROL,
                               static_cast< uint32_t >( sizeof( rs2_icr_control ) ),
                               "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_icr_control.h",
-                              icr_desc ) )
+                              icr_desc ),
+                          supports_x4_with_decimation( owner, is_mipi ) )
 {
     depth_sensor.add_embedded_filter( _filter );
 }
 
 icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
                                         std::shared_ptr< composite_option_interface > control )
+    : icr_filter_feature( owner, depth_sensor, std::move( control ), false )
 {
-    auto option = std::make_shared< icr_option >( std::move( control ), depth_sensor );
+}
+
+icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
+                                        std::shared_ptr< composite_option_interface > control,
+                                        bool allow_x4_with_decimation )
+{
+    auto option = std::make_shared< icr_option >( std::move( control ), depth_sensor, allow_x4_with_decimation );
     _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
 
     // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened
@@ -214,7 +274,7 @@ icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface &
                 LOG_WARNING( "Improved Close Range state unavailable, skipping profile check: " << e.what() );
                 return;
             }
-            icr_allowed_or_throw( raw.data(), raw.size(), *depth );
+            option->validate_profile( raw.data(), raw.size(), *depth );
         } );
 }
 

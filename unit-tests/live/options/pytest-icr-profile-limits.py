@@ -228,9 +228,13 @@ def test_enable_while_streaming(filters, mode):
 
 @pytest.mark.context("nightly")
 @pytest.mark.device_type("USB")
+@pytest.mark.device_exclude("D555")
+@pytest.mark.device_exclude("D585F")
 @pytest.mark.parametrize("temporal_enabled", (0, 1))
-def test_downscale_x4_with_decimation_stream_smoke(filters, temporal_enabled):
+def test_downscale_x4_with_decimation_stream_smoke(test_device, filters, temporal_enabled):
     """Check stream startup and delivery with the controls set, not whether firmware applies every filter."""
+    dev, _ = test_device
+    require_min_fw_version(dev, rsutils.version(7, 62, 47221, 0), "ICR Downscale x4 with Decimation")
     sensor, icr, decimation = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
