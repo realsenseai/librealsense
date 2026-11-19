@@ -136,7 +136,8 @@ namespace librealsense
 
         std::shared_ptr<synthetic_sensor> create_hid_device(std::shared_ptr<context> ctx,
                                                             const std::vector<platform::hid_device_info>& all_hid_infos,
-                                                            std::shared_ptr<time_diff_keeper> tf_keeper);
+                                                            std::shared_ptr<time_diff_keeper> tf_keeper,
+                                                            bool all_imu_rates = false);
 
         void init_motion(bool is_infos_empty, const stream_interface& depth_stream);
 

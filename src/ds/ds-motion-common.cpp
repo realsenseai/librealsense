@@ -445,7 +445,8 @@ namespace librealsense
 
     std::shared_ptr<synthetic_sensor> ds_motion_common::create_hid_device( std::shared_ptr<context> ctx, 
                                                                            const std::vector<platform::hid_device_info>& all_hid_infos, 
-                                                                           std::shared_ptr<time_diff_keeper> tf_keeper )
+                                                                           std::shared_ptr<time_diff_keeper> tf_keeper,
+                                                                           bool all_imu_rates )
     {
         if (all_hid_infos.empty())
         {
@@ -464,8 +465,8 @@ namespace librealsense
             (_device_capabilities & ds::ds_caps::CAP_BMI_088) != ds::ds_caps::CAP_UNDEFINED)
         {
                accel_fps_rates = { odr::IMU_FPS_100, odr::IMU_FPS_200 };
-            if( _owner->supports_info( RS2_CAMERA_INFO_PRODUCT_LINE )
-                && _owner->get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) == "D400" )
+            if( all_imu_rates || ( _owner->supports_info( RS2_CAMERA_INFO_PRODUCT_LINE )
+                && _owner->get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) == "D400" ) )
             {
                 // D400 new BMI's also support rate of 400 for the accelerometer
                 accel_fps_rates.push_back( odr::IMU_FPS_400 );
@@ -473,6 +474,12 @@ namespace librealsense
         }
         else // Applies to BMI_055 and unrecognized sensors
             accel_fps_rates = { odr::IMU_FPS_63,odr::IMU_FPS_250 };
+
+        if( all_imu_rates )
+        {
+            _sensor_name_and_hid_profiles.push_back( { gyro_sensor_name, { RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_GYRO, 0, 1, 1, int( odr::IMU_FPS_100 ) } } );
+            _fps_and_sampling_frequency_per_rs2_stream[RS2_STREAM_GYRO].emplace( unsigned( odr::IMU_FPS_100 ), hid_fps_translation.at( odr::IMU_FPS_100 ) );
+        }
 
         for (auto&& elem : accel_fps_rates)
         {
