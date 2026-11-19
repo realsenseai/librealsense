@@ -149,6 +149,6 @@ def test_bad_package_rejected( unlocked_loader ):
     assert all( 0 <= p < 1 for p in progress )   # never reports completion
     assert progress == sorted( progress )
 
-    # The device is ready for the next upload. Whether the stored model survives depends on where the device rejects the
-    # package (before or during the commit), so detections are not checked here.
+    # The device is ready for the next upload. GARBAGE has no package magic, so the FW rejects it before the commit: the
+    # stored model survives (checked on a D585, FW 7.61.47203: its detections on a DDT-injected scene unchanged after).
     assert unlocked_loader.is_upload_supported() == ( True, "" )
