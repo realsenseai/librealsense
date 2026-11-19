@@ -25,6 +25,9 @@ def test_readout_shaping_set_get(test_device_wrapped):
 
     pipe = rs.pipeline()
     cfg = rs.config()
+    # The value reads back only while this device streams; without enable_device the
+    # pipeline picks the first connected device.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     def apply(value):
         # Set the value, stream a few frames so the FW applies it at a frame boundary, read it back.
