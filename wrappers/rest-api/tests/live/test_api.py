@@ -199,9 +199,9 @@ class TestRealSenseAPIIntegration:
         client = real_client()
         device_id = first_device_id(client)
 
-        sensor_id = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]["sensor_id"]
+        sensor_index = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]["sensor_index"]
 
-        response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_id}/options")
+        response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_index}/options")
         assert response.status_code == 200
 
         options = response.json()
@@ -213,7 +213,7 @@ class TestRealSenseAPIIntegration:
             assert key in option
 
         option_id = option["option_id"]
-        response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_id}/options/{option_id}/")
+        response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_index}/options/{option_id}/")
         assert response.status_code == 200
         assert response.json()["option_id"] == option_id
 

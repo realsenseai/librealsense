@@ -11,7 +11,7 @@ class StreamProfile(BaseModel):
     width: int  # 0 for motion, as the SDK reports it
     height: int
     fps: int
-    default: bool = False  # the SDK's is_default: the server tells it, an open request may leave it out
+    default: bool = False  # the SDK's is_default
 
 class SensorOpenRequest(BaseModel):
     profiles: List[StreamProfile]  # from the sensor's stream_profiles, e.g. depth + IR

@@ -9,7 +9,7 @@
 
 import { test, expect, dismissToasts } from './fixtures'
 import type { Locator, Page } from '@playwright/test'
-import type { DeviceInfo, SensorInfo } from '../../src/api/types'
+import type { DeviceInfo, OptionInfo, SensorInfo } from '../../src/api/types'
 
 // Start/stop is rendered once per sensor module, so it has to be scoped to the module
 // holding the depth toggle - .first() can land on the colour sensor's disabled button.
@@ -140,13 +140,16 @@ test.describe('@real-device Real Device Tests', () => {
     await page.goto('/')
 
     const sensorsUrl = `${baseURL}/api/v1/devices/${device.device_id}/sensors/`
-    const sensors = await (await fetch(sensorsUrl)).json()
-    const sensor = sensors.find((s: SensorInfo) => s.options.some(o => o.option_id === 'exposure'))
-    expect(sensor, 'no sensor exposes an exposure control').toBeTruthy()
-    const exposure = sensor!.options.find(o => o.option_id === 'exposure')!
+    const sensors: SensorInfo[] = await (await fetch(sensorsUrl)).json()
+    const options: OptionInfo[][] = await Promise.all(sensors.map(async (s) =>
+      (await fetch(`${sensorsUrl}${s.sensor_index}/options/`)).json()))
+    const i = options.findIndex((o) => o.some((x) => x.option_id === 'exposure'))
+    expect(i, 'no sensor exposes an exposure control').toBeGreaterThanOrEqual(0)
+    const sensor = sensors[i]
+    const exposure = options[i].find((x) => x.option_id === 'exposure')!
     const target = Math.min(exposure.max_value, Math.round(Number(exposure.default_value) * 2))
 
-    const sensorModule = await openControls(page, device, sensor!.name, 'exposure')
+    const sensorModule = await openControls(page, device, sensor.name, 'exposure')
 
     // No need to switch auto-exposure off first: the SDK registers exposure as an
     // auto_disabling_control on both depth and colour, so writing it turns AE off.
@@ -158,7 +161,7 @@ test.describe('@real-device Real Device Tests', () => {
     // BE + SDK took it...
     await expect
       .poll(async () => {
-        const url = `${sensorsUrl}${sensor!.sensor_id}/options/exposure/`
+        const url = `${sensorsUrl}${sensor.sensor_index}/options/exposure/`
         return (await (await fetch(url)).json()).current_value
       }, { timeout: 10000 })
       .toBe(target)
@@ -166,7 +169,7 @@ test.describe('@real-device Real Device Tests', () => {
     // ...and the FE shows it after a reload, i.e. read back from the server rather than
     // left over from the fill. Asserting the slider before this only re-reads our typing.
     await page.reload()
-    const reopened = await openControls(page, device, sensor!.name, 'exposure')
+    const reopened = await openControls(page, device, sensor.name, 'exposure')
     await expect(reopened.locator('[data-testid="option-exposure"] input[type="range"]'))
       .toHaveValue(String(target))
   })

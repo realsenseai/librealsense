@@ -43,6 +43,12 @@ def test_get_sensor_by_index(setup_mock_managers):
     assert client.get("/api/v1/devices/device1/sensors/nonexistent").status_code == 422
 
 
+def test_sensor_routes_refuse_a_negative_index(setup_mock_managers):
+    """Python would take -1 as the last sensor"""
+    for action in ("open", "start", "stop", "close"):
+        assert client.post(f"/api/v1/devices/device1/sensors/-1/{action}", json={"profiles": []}).status_code == 422
+
+
 def test_sensor_lists_each_profile(setup_mock_managers):
     profiles = client.get("/api/v1/devices/device1/sensors/0").json()["stream_profiles"]
     assert [(p["width"], p["height"], p["fps"], p["default"]) for p in profiles] == [

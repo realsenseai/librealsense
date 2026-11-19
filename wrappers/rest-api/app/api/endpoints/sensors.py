@@ -9,8 +9,8 @@ control than the pipeline-based /streams/* endpoints, allowing individual sensor
 (depth, color, IMU) to be started/stopped independently.
 """
 
-from fastapi import APIRouter, Depends
-from typing import List
+from fastapi import APIRouter, Depends, Path
+from typing import Annotated, List
 
 from app.models.sensor import SensorInfo, SensorOpenRequest
 from app.api.dependencies import get_camera, get_sensor
@@ -42,7 +42,7 @@ def get_sensor_info(
 
 @router.post("/{sensor_index}/open")
 def open_sensor(
-    sensor_index: int,
+    sensor_index: Annotated[int, Path(ge=0)],
     request: SensorOpenRequest,
     camera: Camera = Depends(get_camera),
 ):
@@ -55,7 +55,7 @@ def open_sensor(
 
 @router.post("/{sensor_index}/start")
 def start_sensor(
-    sensor_index: int,
+    sensor_index: Annotated[int, Path(ge=0)],
     camera: Camera = Depends(get_camera),
 ):
     """Start streaming from an opened sensor, as the SDK's sensor.start() does."""
@@ -64,7 +64,7 @@ def start_sensor(
 
 @router.post("/{sensor_index}/stop")
 def stop_sensor(
-    sensor_index: int,
+    sensor_index: Annotated[int, Path(ge=0)],
     camera: Camera = Depends(get_camera),
 ):
     """Stop streaming from a sensor, as the SDK's sensor.stop() does; it stays open. Others keep streaming."""
@@ -73,7 +73,7 @@ def stop_sensor(
 
 @router.post("/{sensor_index}/close")
 def close_sensor(
-    sensor_index: int,
+    sensor_index: Annotated[int, Path(ge=0)],
     camera: Camera = Depends(get_camera),
 ):
     """Close a stopped sensor, freeing it, as the SDK's sensor.close() does."""
