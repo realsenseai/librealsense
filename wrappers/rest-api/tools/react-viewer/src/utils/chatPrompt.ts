@@ -10,6 +10,7 @@ export interface ProposedSettings {
   deviceSerial: string
   streamConfigs?: StreamConfig[]
   optionChanges?: Array<{
+    sensorIndex?: number  // as the REST API addresses a sensor; names need not be unique
     sensorId: string
     optionId: string
     value: number | boolean | string
@@ -56,6 +57,7 @@ When proposing settings changes, include them in a JSON block that can be parsed
   ],
   "optionChanges": [
     {
+      "sensorIndex": 0,
       "sensorId": "sensor_name",
       "optionId": "option_name",
       "value": 50
@@ -141,7 +143,7 @@ function formatSensors(sensors: SensorInfo[]): string {
       return `${type} (${resolutions} @ ${fps} fps)`
     })
     
-    return `  - ${s.name}:\n      ${streamDetails.join('\n      ') || 'No streams'}`
+    return `  - ${s.name} (sensor ${s.sensor_index}):\n      ${streamDetails.join('\n      ') || 'No streams'}`
   }).join('\n')
 }
 
@@ -163,9 +165,8 @@ function formatOptions(controls: Record<string, ControlGroup>, sensors: SensorIn
     // Only show key options to keep context manageable
     const keyOptions = group.options.filter(o => isKeyOption(optionLabel(o.option_id)))
     if (keyOptions.length) {
-      // By name, as the sensors above and as the chatbot's sensorId
-      const name = sensors.find(s => s.sensor_index === group.sensorIndex)?.name ?? `sensor ${group.sensorIndex}`
-      formatted.push(`  ${name}:`)
+      const name = sensors.find(s => s.sensor_index === group.sensorIndex)?.name
+      formatted.push(`  ${name ? `${name} (sensor ${group.sensorIndex})` : `sensor ${group.sensorIndex}`}:`)
       keyOptions.forEach(o => {
         formatted.push(
           `    - ${optionLabel(o.option_id)}: ${o.current_value} [${o.min_value}-${o.max_value}]`

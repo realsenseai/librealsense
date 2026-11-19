@@ -314,6 +314,21 @@ describe('AppStore', () => {
       return useAppStore.getState().deviceStates[mockDevice.device_id]
     }
 
+    it("applies a chatbot option change to the sensor at its index, whatever name it gives", async () => {
+      await loadSensors()
+      let written = ''
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/options/:optionId/', ({ params }) => {
+        written = `${params.sensorIndex}/${params.optionId}`
+        return HttpResponse.json(null)
+      }))
+      useAppStore.setState({ pendingSettings: { deviceSerial: mockDevice.serial_number,
+        optionChanges: [{ sensorIndex: 1, sensorId: 'no such name', optionId: 'exposure', value: 5 }] } })
+
+      await useAppStore.getState().applyProposedSettings()
+
+      expect(written).toBe('1/exposure')
+    })
+
     function captureStart() {
       const bodies: unknown[] = []
       server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorIndex/open', async ({ request }) => {

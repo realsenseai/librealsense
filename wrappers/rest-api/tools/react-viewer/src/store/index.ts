@@ -768,9 +768,10 @@ const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p 
       // Apply option changes
       if (settings.optionChanges) {
         for (const change of settings.optionChanges) {
-          // The chatbot names the sensor ("RGB Camera"); the API takes its index
-          const match = deviceState.sensors?.find(s => s.name === change.sensorId)
-          if (!match) throw new Error(`No sensor named "${change.sensorId}"`)
+          // The API takes a sensor's index; its name ("RGB Camera") is only a fallback, as names need not be unique
+          const match = deviceState.sensors?.find(s => s.sensor_index === change.sensorIndex)
+            ?? deviceState.sensors?.find(s => s.name === change.sensorId)
+          if (!match) throw new Error(`No sensor ${change.sensorIndex ?? `named "${change.sensorId}"`}`)
           await get().setControl(deviceId, `sensors/${match.sensor_index}/options`, change.optionId, change.value)
         }
       }
