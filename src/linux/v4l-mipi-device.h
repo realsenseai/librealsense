@@ -15,6 +15,13 @@ namespace librealsense
         public:
             v4l_mipi_device(const uvc_device_info& info, bool use_memory_map = true);
 
+            // True when video capture should use USERPTR buffers we allocate instead of the driver's MMAP
+            // buffers. The Tegra VI driver's MMAP buffers (videobuf2-dma-contig) are mapped uncached in user
+            // space, so every CPU read of a zero-copy frame runs ~10-18x slower than cached memory. Only
+            // zero-copy capture hands those buffers to consumers (otherwise each frame is copied out once),
+            // so this follows the same switch: CUDA/HIP zero-copy build on an integrated GPU.
+            static bool use_userptr_capture();
+
             virtual ~v4l_mipi_device();
 
             bool get_pu(rs2_option opt, int32_t& value) const override;
@@ -25,9 +32,12 @@ namespace librealsense
             control_range get_pu_range(rs2_option option) const override;
             void set_metadata_attributes(buffers_mgr& buf_mgr, __u32 bytesused, uint8_t* md_start) override;
             bool is_platform_jetson() const override;
+            // Same as with MMAP video buffers: metadata comes from the metadata node, never the video buffer.
+            bool has_metadata() const override { return false; }
 
         protected:
             void streamoff() const override;
+            void map_device_descriptor() override;
         };
     }  // namespace platform
 }  // namespace librealsense
