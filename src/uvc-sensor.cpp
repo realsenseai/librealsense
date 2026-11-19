@@ -433,8 +433,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                                        && ! msp  // split IMU reports share one buffer, requeued after the last copy (v4l-uvc-device.cpp)
                                        && ! align64
                                        && expected_size == sizeof( uint8_t ) * f.frame_size
-                                       && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT
-                                       && ! _incremental_streams;  // closing one pin doesn't wait for a frame already being captured on it
+                                       && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;
                     frame_holder fh = _source.alloc_frame(
                         { req_profile_base->get_stream_type(), req_profile_base->get_stream_index(), extension },
                         expected_size,
