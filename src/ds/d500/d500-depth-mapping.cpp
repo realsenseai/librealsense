@@ -261,6 +261,7 @@ namespace librealsense
         std::string physical_port;
         if( ! perception_devs.empty() )
         {
+            _is_muxed = true;
             mapping_dev = std::make_shared< platform::multi_pins_uvc_device >( perception_devs );
             physical_port = mapping_dev->get_device_location();
             LOG_DEBUG( "Perception streams are multiplexed on " << physical_port );
@@ -369,7 +370,7 @@ namespace librealsense
         // Depth mapping params share the Mapping XU with segmentation, so the same products get both;
         // register_options() registers the XU
         if( ! _is_d585s )
-            _raw_depth_mapping_ep = raw_mapping_ep;
+            _params_xu_host = _is_muxed ? get_raw_depth_sensor() : raw_mapping_ep;
 
         // The mapping function reports every EP12 output as GREY; the PCL XYZ tuples are the
         // device point cloud, not occupancy (D5xx layout only).
@@ -1060,16 +1061,16 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
 
     std::string d500_depth_mapping::get_depth_mapping_params() const
     {
-        if( ! _raw_depth_mapping_ep )
+        if( ! _params_xu_host )
             throw not_implemented_exception( "Depth mapping params are not supported on this device" );
         std::lock_guard< std::mutex > lock( _depth_mapping_params_mutex );
-        auto reply = read_depth_mapping_reply( *_raw_depth_mapping_ep );
+        auto reply = read_depth_mapping_reply( *_params_xu_host );
         return depth_mapping_reply_field( reply, "params" ).dump();
     }
 
     void d500_depth_mapping::set_depth_mapping_params( const std::string & params_json_str ) const
     {
-        if( ! _raw_depth_mapping_ep )
+        if( ! _params_xu_host )
             throw not_implemented_exception( "Depth mapping params are not supported on this device" );
 
         ds::depth_mapping_params_header header;
@@ -1085,7 +1086,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
 
         // Held across SET_CUR and the GET that explains a failure, so that GET reads this call's result
         std::lock_guard< std::mutex > lock( _depth_mapping_params_mutex );
-        auto & raw_ep = *_raw_depth_mapping_ep;
+        auto & raw_ep = *_params_xu_host;
         std::vector< uint8_t > data( ds::DEPTH_MAPPING_PARAMS_LEN, 0 );
         std::memcpy( data.data(), &header, sizeof( header ) );
         std::copy( params_json_str.begin(), params_json_str.end(), data.begin() + sizeof( header ) );

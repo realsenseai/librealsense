@@ -59,7 +59,10 @@ namespace librealsense
         std::shared_ptr<stream_interface> _occupancy_stream;
         std::shared_ptr<stream_interface> _point_cloud_stream;
         std::shared_ptr<stream_interface> _pcl_stream;  // device point cloud (RS2_STREAM_POINT_CLOUD)
-        std::shared_ptr<uvc_sensor> _raw_depth_mapping_ep;
+        // The sensor whose node publishes the depth mapping params XU: the Mapping interface over USB, the depth
+        // node over GMSL, where the perception streams are muxed slots with no controls of their own
+        std::shared_ptr<uvc_sensor> _params_xu_host;
+        bool _is_muxed = false;
         bool _depth_mapping_active = false;
         // True for D585S (mapping on MI 13, 2880-wide payloads), false for every other
         // D5xx (mapping on MI 11, OCCG 320x256 and LPCL 640x360).
