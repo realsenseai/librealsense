@@ -17,8 +17,8 @@ namespace librealsense {
 
 float3 * points::get_vertices()
 {
-    get_frame_data();  // call GetData to ensure data is in main memory
-    return (float3*)data.data();
+    // Not `data`: it is empty when the pixels live in an external (zero-copy) buffer
+    return (float3 *)get_frame_data();
 }
 
 std::tuple< uint8_t, uint8_t, uint8_t >
@@ -160,21 +160,20 @@ size_t points::get_vertex_count() const
 {
     if( is_device_cloud() )
     {
-        size_t count = data.size() / sizeof( float3 );
+        size_t count = get_frame_data_size() / sizeof( float3 );
         auto vsp = dynamic_cast< video_stream_profile_interface * >( get_stream().get() );
         if( vsp )
             count = std::min( count, size_t( vsp->get_width() ) * vsp->get_height() );
         return count;
     }
-    return data.size() / ( sizeof( float3 ) + sizeof( int2 ) );
+    return get_frame_data_size() / ( sizeof( float3 ) + sizeof( int2 ) );
 }
 
 float2 * points::get_texture_coordinates()
 {
     if( is_device_cloud() )
         return nullptr;
-    get_frame_data();  // call GetData to ensure data is in main memory
-    auto xyz = (float3 *)data.data();
+    auto xyz = get_vertices();
     auto ijs = (float2 *)( xyz + get_vertex_count() );
     return ijs;
 }
