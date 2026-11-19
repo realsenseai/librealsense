@@ -38,6 +38,7 @@ namespace librealsense
         protected:
             void streamoff() const override;
             void map_device_descriptor() override;
+            void prepare_capture_buffers() override;
         };
     }  // namespace platform
 }  // namespace librealsense
