@@ -93,7 +93,7 @@ def test_device_creation_time(module_device_setup):
 def test_first_depth_frame_delay(sensor_device):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1.5 if is_d585_on_gmsl(dev) else 1  # slow first start after reset on D585 GMSL
+    max_delay = 1.5 if is_d585_on_gmsl(dev) else 1  # slow first start after reset on D585 GMSL, not on restart
     os_name = platform.system()
 
     log.info(f"Testing first depth frame delay on {product_name} device - {os_name} OS")
@@ -105,12 +105,12 @@ def test_first_depth_frame_delay(sensor_device):
               and p.format() == rs.format.z16
               and p.is_default())
 
-    for run in ("start", "restart after stop"):
-        delay = time_to_first_frame(ds, dp, max_delay)
-        assert delay != -1, f"Depth frames did not arrive for {max_delay + 1} second(s) on {run}"
-        log.info(f"Time until first depth frame on {run} is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-        assert delay < max_delay, \
-            f"Depth frame delay on {run} {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+    for run, limit in (("start", max_delay), ("restart after stop", 1)):
+        delay = time_to_first_frame(ds, dp, limit)
+        assert delay != -1, f"Depth frames did not arrive for {limit + 1} second(s) on {run}"
+        log.info(f"Time until first depth frame on {run} is: {delay:.3f} [sec] max allowed is: {limit:.1f} [sec]")
+        assert delay < limit, \
+            f"Depth frame delay on {run} {delay:.3f}s exceeds maximum {limit:.1f}s"
 
     # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
     if is_dds_dev(dev):
