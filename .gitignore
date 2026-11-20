@@ -111,3 +111,4 @@ unit-tests/logs/health.json
 unit-tests/logs/health.txt
 unit-tests/logs/health-exclude.txt
 unit-tests/logs/health.html
+.review/
