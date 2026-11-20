@@ -1,8 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Shared helpers for the D401 GMSL dual-RGB tests. On D401 GMSL depth, IR and both color streams
-# live on the depth sensor; Color 1 exists only on FW with the raw (CSI pass-through) path.
+# Shared helpers for the D401 dual-RGB tests, on GMSL and over USB (where it enumerates as a D405). Depth,
+# IR and both color streams live on the depth sensor; Color 1 exists only on FW with the raw path.
 
 import time
 import pytest
@@ -51,15 +51,16 @@ def has_color1( sensor ):
 
 
 def skip_without_color1( dev ):
-    """Skip unless the device publishes Color 1. That needs both FW 5.17.4.13+ (the SDK's gate) and a MIPI
-    driver exposing the raw format, so checking the result covers both, whichever driver version added it."""
+    """Skip unless the device publishes Color 1. On GMSL that needs both FW 5.17.4.13+ (the SDK's gate) and a
+    MIPI driver exposing the raw format; over USB, FW that advertises the raw pins. Checking the result covers
+    all of these, whichever FW/driver version added it. A plain D405 never publishes it and always skips."""
     if has_color1( dev.first_depth_sensor() ):
         return
     def info( i ):
         return dev.get_info( i ) if dev.supports( i ) else "unknown"
     pytest.skip( f"No Color 1 profile on FW {info( rs.camera_info.firmware_version )}, MIPI driver "
-                 f"{info( rs.camera_info.mipi_driver_version )}: raw dual-RGB needs FW 5.17.4.13+ and a MIPI "
-                 f"driver with the raw format" )
+                 f"{info( rs.camera_info.mipi_driver_version )}: raw dual-RGB needs FW with the raw path "
+                 f"(GMSL: 5.17.4.13+ and a MIPI driver with the raw format)" )
 
 
 def stream( sensor, profiles, duration=DURATION_S ):
@@ -80,7 +81,7 @@ def stream( sensor, profiles, duration=DURATION_S ):
         try:
             time.sleep( duration )
         finally:
-            # Always stop: a GMSL stream left open can wedge the camera until a power cycle. Log a stop
+            # Always stop: a stream left open (on GMSL especially) can wedge the camera until a power cycle. Log a stop
             # error instead of raising it, so it can't replace a test failure already propagating.
             try:
                 sensor.stop()

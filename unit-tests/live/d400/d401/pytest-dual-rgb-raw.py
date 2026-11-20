@@ -1,8 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# D401 GMSL raw dual-RGB: both imagers stream as Color 0 / Color 1 through the raw (CSI pass-through)
-# path. Kept apart from the ISP-mode tests: switching raw <-> ISP needs a hardware reset, which the
+# D401 raw dual-RGB (GMSL, or USB as D405): both imagers stream as Color 0 / Color 1 through the raw
+# (CSI pass-through / RW10) path. Kept apart from the ISP-mode tests: switching raw <-> ISP needs a hardware reset, which the
 # test infra does only between files. Nightly: gating runs the golden FW/driver, which predate the
 # raw path, so only the nightly with the latest FW/driver can run these.
 
@@ -13,7 +13,8 @@ from d401_helper import COLOR0, COLOR1, DEPTH, IR2
 
 pytestmark = [
     pytest.mark.device_each( "D401" ),
-    pytest.mark.device_type( "GMSL" ),
+    # A D401 over USB enumerates as a D405 (PID 0x0B5B) and gets the same raw path when its FW advertises it
+    pytest.mark.device_each( "D405" ),
     pytest.mark.context( "nightly" ),
 ]
 
