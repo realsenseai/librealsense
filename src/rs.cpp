@@ -844,6 +844,19 @@ int rs2_rum_is_cloud_enabled(rs2_error** error) BEGIN_API_CALL
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(0)
 
+void rs2_rum_set_app_name(const char* name, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(name);
+    std::string app( name );
+    // Validated even without ENABLE_STATS, so an app behaves the same on every build
+    if( app.empty() || app.size() > RS2_RUM_MAX_APP_NAME_LENGTH
+        || app.find_first_not_of( "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-" ) != std::string::npos )
+        throw librealsense::invalid_value_exception( "RUM app name must be 1-" + std::to_string( RS2_RUM_MAX_APP_NAME_LENGTH )
+                                                     + " characters from [A-Za-z0-9._-]; got '" + app + "'" );
+    librealsense::rum::hooks::on_app_name( app );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, name)
+
 void rs2_open(rs2_sensor* sensor, const rs2_stream_profile* profile, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);

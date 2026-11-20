@@ -55,6 +55,9 @@ public:
     // Record a raised notification, tallied per category (top-level, not per-device).
     void record_notification( std::string const & category );
 
+    // Record an application run by its self-reported name; each name counts once per process.
+    void record_app( std::string const & name );
+
     // Write the current report to the local file. No network.
     void flush();
 
@@ -103,6 +106,8 @@ private:
     std::map< std::string, device_stat > _devices;    // "<name>-<connection>" -> tallies
     std::set< std::string > _recommended_filters;     // gate for record_filter
     std::map< std::string, int > _notification_counts;
+    std::map< std::string, int > _app_counts;         // app name -> runs
+    std::set< std::string > _apps_this_session;       // RAM only - one count per name per process
 };
 
 

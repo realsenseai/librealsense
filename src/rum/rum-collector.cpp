@@ -38,6 +38,9 @@ static constexpr int rum_schema_version = 1;
 // The server rejects a body over this; an uncapped report would grow past it and never be sent again.
 static constexpr size_t max_report_bytes = 64 * 1024;
 
+// App names are free text, so cap how many distinct ones a report can hold.
+static constexpr size_t max_apps = 32;
+
 
 // Report file: <app-data>/rum/rum.json. Forward slashes work on Windows and POSIX.
 std::string report_path()
@@ -234,6 +237,20 @@ void rum_collector::record_notification( std::string const & category )
 }
 
 
+void rum_collector::record_app( std::string const & name )
+{
+    std::lock_guard< std::mutex > lk( _mutex );
+    if( ! _apps_this_session.insert( name ).second )
+        return;
+    if( ! _app_counts.count( name ) && _app_counts.size() >= max_apps )
+    {
+        LOG_WARNING( "RUM report already holds " << max_apps << " app names; not recording '" << name << "'" );
+        return;
+    }
+    ++_app_counts[name];
+}
+
+
 std::string rum_collector::get_report()
 {
     std::lock_guard< std::mutex > lk( _mutex );
@@ -309,6 +326,10 @@ json rum_collector::build_report() const
         notification["count"] = entry.second;
         report["notifications"].push_back( notification );
     }
+
+    report["apps"] = json::object();
+    for( auto const & entry : _app_counts )
+        report["apps"][entry.first] = entry.second;
     return report;
 }
 
@@ -405,6 +426,13 @@ void rum_collector::merge_saved_report()
         if( ! category.empty() )
             _notification_counts[ category ] += e.value( "count", 0 );
     }
+
+    auto apps = j.value( "apps", json::object() );
+    for( auto ait = apps.begin(); ait != apps.end(); ++ait )
+        _app_counts[ ait.key() ] += ait.value().get< int >();
+    // Saved names keep their place; names first seen this run go if that puts the report over the cap
+    for( auto it = _app_counts.begin(); _app_counts.size() > max_apps && it != _app_counts.end(); )
+        it = apps.find( it->first ) == apps.end() ? _app_counts.erase( it ) : std::next( it );
 }
 
 

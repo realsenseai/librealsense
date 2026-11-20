@@ -114,6 +114,7 @@ private:
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-software-device" );
     window app(1280, 1500, "RealSense Capture Example");
     glfw_state app_state;
     register_glfw_callbacks(app, app_state);

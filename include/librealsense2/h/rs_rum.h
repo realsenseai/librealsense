@@ -48,6 +48,16 @@ void rs2_rum_set_cloud_enabled(int enabled, rs2_error** error);
 */
 int rs2_rum_is_cloud_enabled(rs2_error** error);
 
+#define RS2_RUM_MAX_APP_NAME_LENGTH 32
+
+/**
+* Name the application in the RUM report, so usage can be told apart per app. Call once at startup;
+* each distinct name is counted once per process run. A no-op when the SDK is built without ENABLE_STATS.
+* \param[in]  name   1 to RS2_RUM_MAX_APP_NAME_LENGTH characters from [A-Za-z0-9._-]
+* \param[out] error  If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_rum_set_app_name(const char* name, rs2_error** error);
+
 #ifdef __cplusplus
 }
 #endif

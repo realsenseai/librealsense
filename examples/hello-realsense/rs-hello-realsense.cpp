@@ -10,6 +10,7 @@
 // and taking advantage of depth data
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-hello-realsense" );
     auto settings = rs2::cli( "hello-realsense example" )
         .process( argc, argv );
 

@@ -62,6 +62,7 @@ static std::vector< uint8_t > read_file( const std::string & path )
 int main( int argc, char ** argv )
 try
 {
+    rs2::rum::set_app_name( "rs-nn-load" );
     using rs2::cli;
     cli cmd( "librealsense rs-nn-load tool" );
 

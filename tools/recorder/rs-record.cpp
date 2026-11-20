@@ -17,6 +17,7 @@
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-record" );
     // Parse command line arguments
     using rs2::cli;
     cli cmd( "librealsense rs-record example tool" );
