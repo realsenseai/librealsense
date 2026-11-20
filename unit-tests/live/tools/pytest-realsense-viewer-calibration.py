@@ -12,6 +12,7 @@ pytestmark = [
     pytest.mark.device_exclude("D585S"),  # other D500 cameras not verified yet
     pytest.mark.context("nightly"),
     pytest.mark.context("gui"),
+    pytest.mark.requires( fw="7.62" ),   # older FW makes the viewer pop up an ICR schema error that blocks the GUI
     pytest.mark.timeout(400),
     pytest.mark.flaky(reruns=0),
 ]
