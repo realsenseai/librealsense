@@ -26,6 +26,7 @@ namespace librealsense
          {fourcc('Y','U','Y','V'), RS2_FORMAT_YUYV},
          {fourcc('U','Y','V','Y'), RS2_FORMAT_UYVY},
          {fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
+         {fourcc('H','2','6','4'), RS2_FORMAT_H264},
          {fourcc('R','W','1','6'), RS2_FORMAT_RAW16},
          {fourcc('B','Y','R','2'), RS2_FORMAT_RAW16},
          {fourcc('B','A','1','0'), RS2_FORMAT_RAW16},
@@ -42,6 +43,7 @@ namespace librealsense
         {fourcc('B','A','1','0'), RS2_STREAM_COLOR},
         {fourcc('G','R','1','6'), RS2_STREAM_COLOR},
         {fourcc('M','J','P','G'), RS2_STREAM_COLOR},
+        {fourcc('H','2','6','4'), RS2_STREAM_COLOR},
         {fourcc('M','4','2','0'), RS2_STREAM_COLOR},
         {fourcc('N','V','1','2'), RS2_STREAM_COLOR}
     };
@@ -209,6 +211,7 @@ namespace librealsense
         color_ep.register_processing_block(  // Color Raw (Bayer 10-bit embedded in 16-bit) for calibration
             processing_block_factory::create_id_pbf( RS2_FORMAT_RAW16, RS2_STREAM_COLOR ) );
         color_ep.register_processing_block( processing_block_factory::create_id_pbf( RS2_FORMAT_MJPEG, RS2_STREAM_COLOR ) );
+        color_ep.register_processing_block( processing_block_factory::create_id_pbf( RS2_FORMAT_H264, RS2_STREAM_COLOR ) );
     }
 
     void d500_color::register_options()
