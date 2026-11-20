@@ -17,8 +17,11 @@ int main(int argc, char * argv[]) try
     // Declare rates printer for showing streaming rates of the enabled streams.
     rs2::rates_printer printer;
 
+    rs2::context ctx;
+    wait_for_devices( ctx );
+
     // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
+    rs2::pipeline pipe( ctx );
     rs2::config cfg;
 
     // Enable all camera streams
