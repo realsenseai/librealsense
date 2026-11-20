@@ -50,11 +50,14 @@ def color(sensor, index, fmt=rs.format.rgb8):
     return profile( sensor, rs.stream.color, index, fmt )
 
 
-def stream(sensor, profiles):
-    """Stream the profiles for DURATION_S; return {stream name: [frame numbers]} in arrival order."""
+def stream(sensor, profiles, sizes=None):
+    """Stream the profiles for DURATION_S; return {stream name: [frame numbers]} in arrival order. Frame data sizes
+    go to `sizes` by stream name when given."""
     frames = {}
     def on_frame(f):
         frames.setdefault( f.get_profile().stream_name(), [] ).append( f.get_frame_number() )
+        if sizes is not None:
+            sizes.setdefault( f.get_profile().stream_name(), set() ).add( f.get_data_size() )
     sensor.open( profiles )
     sensor.start( on_frame )
     time.sleep( DURATION_S )
@@ -84,22 +87,35 @@ def test_both_colors_enumerated(depth_sensor):
     assert colors[1] == colors[2], "Color 1 and Color 2 publish different profiles"
 
 
-@pytest.mark.parametrize( "fmt", [rs.format.rgb8, rs.format.nv12] )
+def check_compressed(sizes, name, fmt):
+    """Compressed frames arrive at their encoded size: under width*height and varying, not padded."""
+    if fmt in (rs.format.mjpeg, rs.format.h264):
+        assert 0 < max( sizes[name] ) < W * H, f"{name} {fmt} frames are not compressed: {max( sizes[name] )} bytes"
+        assert len( sizes[name] ) > 1, f"{name} {fmt} frame sizes should vary, all were {sizes[name]}"
+
+
+@pytest.mark.parametrize( "fmt", [rs.format.rgb8, rs.format.nv12, rs.format.mjpeg, rs.format.h264] )
 def test_both_colors_stream(depth_sensor, fmt):
-    frames = stream( depth_sensor, [color( depth_sensor, 1, fmt ), color( depth_sensor, 2, fmt )] )
+    sizes = {}
+    frames = stream( depth_sensor, [color( depth_sensor, 1, fmt ), color( depth_sensor, 2, fmt )], sizes )
     assert set( frames ) == {"Color 1", "Color 2"}, f"unexpected streams delivered: {sorted( frames )}"
     n1 = check_stream( frames, "Color 1" )
     n2 = check_stream( frames, "Color 2" )
     assert abs( n1 - n2 ) <= FPS * DURATION_S * 0.1, f"Color 1 ({n1}) and Color 2 ({n2}) rates differ"
+    check_compressed( sizes, "Color 1", fmt )
+    check_compressed( sizes, "Color 2", fmt )
 
 
+@pytest.mark.parametrize( "fmt", [rs.format.rgb8, rs.format.mjpeg, rs.format.h264] )
 @pytest.mark.parametrize( "index", [1, 2] )
-def test_one_color_streams_alone(depth_sensor, index):
+def test_one_color_streams_alone(depth_sensor, index, fmt):
     """Requesting one color stream delivers that stream only, at its full rate."""
     name = f"Color {index}"
-    frames = stream( depth_sensor, [color( depth_sensor, index )] )
+    sizes = {}
+    frames = stream( depth_sensor, [color( depth_sensor, index, fmt )], sizes )
     assert set( frames ) == {name}, f"unexpected streams delivered: {sorted( frames )}"
     check_stream( frames, name )
+    check_compressed( sizes, name, fmt )
 
 
 def test_colors_in_different_raw_formats(test_device, depth_sensor):
