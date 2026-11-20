@@ -10,6 +10,10 @@
 
 #include <cstring>
 
+#ifdef RS2_USE_CUDA_ZEROCOPY
+#include "../cuda/cuda-frame-memory.h"  // rs_frame_zc_enabled
+#endif
+
 #include <errno.h>
 #include <sys/ioctl.h>
 
@@ -19,7 +23,55 @@ namespace librealsense
     {
         v4l_mipi_device::v4l_mipi_device(const uvc_device_info& info, bool use_memory_map):
             v4l_uvc_meta_device(info,use_memory_map)
-        {}
+        {
+            // USERPTR video buffers here are DMA targets of the capture hardware (see buffer). The metadata
+            // node stays on MMAP: its buffers are tiny and the SDK never hands them to consumers.
+            _userptr_dma = true;
+            _md_use_memory_map = true;
+        }
+
+        bool v4l_mipi_device::use_userptr_capture()
+        {
+#ifdef RS2_USE_CUDA_ZEROCOPY
+            return rs_frame_zc_enabled();
+#else
+            return false;
+#endif
+        }
+
+        void v4l_mipi_device::map_device_descriptor()
+        {
+            v4l_uvc_meta_device::map_device_descriptor();
+            // The USERPTR path supports single-planar capture only; keep MMAP for a multi-planar node.
+            if( ! _use_memory_map && _dev.buf_type != V4L2_BUF_TYPE_VIDEO_CAPTURE )
+            {
+                LOG_DEBUG( "MIPI " << _name << ": multi-planar capture, using MMAP buffers" );
+                _use_memory_map = true;
+            }
+        }
+
+        void v4l_mipi_device::prepare_capture_buffers()
+        {
+            try
+            {
+                v4l_uvc_meta_device::prepare_capture_buffers();
+            }
+            catch( const std::exception & e )
+            {
+                if( _use_memory_map )
+                    throw;
+                // The driver rejected our USERPTR buffers: redo all buffers with its MMAP ones (slower CPU reads)
+                LOG_WARNING( "MIPI " << _name << ": USERPTR capture buffers rejected (" << e.what()
+                                     << "), falling back to MMAP" );
+                const size_t num = _buffers.size();
+                negotiate_kernel_buffers( 0 );  // also drops any buffer already queued
+                allocate_io_buffers( 0 );
+                _use_memory_map = true;
+                negotiate_kernel_buffers( num );
+                allocate_io_buffers( num );
+                v4l_uvc_meta_device::prepare_capture_buffers();
+            }
+        }
 
         v4l_mipi_device::~v4l_mipi_device()
         {}

@@ -39,6 +39,7 @@ namespace librealsense
             v4l2_buf_type _md_type = LOCAL_V4L2_BUF_TYPE_META_CAPTURE;
 
             std::vector<std::shared_ptr<buffer>> _md_buffers;
+            bool _md_use_memory_map;            // metadata node I/O; same as the video node unless a subclass says otherwise
 
         private:
             bool _md_capabilities_assigned;

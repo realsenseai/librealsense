@@ -160,3 +160,59 @@ def test_capture_zero_copy_covers_depth(test_device):
         log.info("zero-copy capture ACTIVE for both depth and color")
     finally:
         pipe.stop()
+
+
+@pytest.mark.device_type("GMSL")
+def test_gmsl_zero_copy_frames_are_cached(test_device):
+    """RSDEV-16739: a zero-copy frame points at the capture buffer, so on GMSL that buffer must be
+    CPU-cached. The Tegra VI driver's own MMAP buffers are mapped uncached, and reading a frame from
+    them is ~10x slower than from ordinary memory, which made CPU consumers (e.g. point cloud) drop
+    frames. The MIPI backend captures into its own cached USERPTR buffers instead.
+
+    Compares the time to copy the frame out against copying the same amount of ordinary, not
+    recently touched memory."""
+    import time
+    dev, ctx = test_device
+    if not hasattr(rs.frame, "get_gpu_data_or_upload"):
+        pytest.skip("pyrealsense2 built without the GPU-frame API")
+
+    pipe = rs.pipeline(ctx)
+    cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
+    cfg.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, FPS)
+    try:
+        pipe.start(cfg)
+    except RuntimeError as e:
+        pytest.skip("device cannot stream depth at 1280x720: {}".format(e))
+    try:
+        for _ in range(WARMUP):
+            pipe.wait_for_frames()
+        frame_ms, ordinary_ms = [], []
+        pool = np.ones(64 << 20, dtype=np.uint8)  # bigger than the CPU caches
+        offset = 0
+        for _ in range(20):
+            depth = pipe.wait_for_frames().get_depth_frame()
+            if not depth:
+                continue
+            gpu_data = depth.get_gpu_data_or_upload()
+            if gpu_data is None:
+                pytest.skip("no CUDA / RS2_USE_CUDA_ZEROCOPY build")
+            if gpu_data[1]:
+                pytest.skip("depth frame is not zero-copy on this build/platform")
+            data = np.asanyarray(depth.get_data()).view(np.uint8).reshape(-1)
+            t = time.perf_counter()
+            data.copy()
+            frame_ms.append((time.perf_counter() - t) * 1000)
+            offset = (offset + data.size) % (pool.size - data.size)
+            t = time.perf_counter()
+            pool[offset:offset + data.size].copy()
+            ordinary_ms.append((time.perf_counter() - t) * 1000)
+        depth = data = None  # release the last frame before stop()
+        assert len(frame_ms) >= 10, "too few depth frames received"
+        frame_med, ordinary_med = float(np.median(frame_ms)), float(np.median(ordinary_ms))
+        log.info("copy of a zero-copy depth frame: %.3f ms, of ordinary memory: %.3f ms", frame_med, ordinary_med)
+        assert frame_med < 4 * ordinary_med, \
+            "reading a zero-copy frame took {:.2f} ms vs {:.2f} ms for ordinary memory: the capture " \
+            "buffer is not CPU-cached".format(frame_med, ordinary_med)
+    finally:
+        pipe.stop()
