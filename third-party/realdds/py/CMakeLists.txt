@@ -7,7 +7,7 @@ set( PYREALDDS_FILES
     pyrealdds.cpp
     )
 
-pybind11_add_module( ${PROJECT_NAME} SHARED ${PYREALDDS_FILES} )
+pybind11_add_module( ${PROJECT_NAME} MODULE ${PYREALDDS_FILES} )
 
 target_link_libraries( ${PROJECT_NAME} PRIVATE realdds )
 set_target_properties( ${PROJECT_NAME}
