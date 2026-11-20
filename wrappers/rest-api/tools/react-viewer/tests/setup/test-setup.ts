@@ -71,18 +71,18 @@ beforeAll(() => {
   }
 
   // Mock IntersectionObserver
-  global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  global.IntersectionObserver = vi.fn().mockImplementation(function () { return {
     observe: vi.fn(),
     unobserve: vi.fn(),
     disconnect: vi.fn(),
-  })) as any
+  } }) as any
 
   // Mock ResizeObserver
-  global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  global.ResizeObserver = vi.fn().mockImplementation(function () { return {
     observe: vi.fn(),
     unobserve: vi.fn(),
     disconnect: vi.fn(),
-  })) as any
+  } }) as any
 })
 
 afterAll(() => {
