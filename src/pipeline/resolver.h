@@ -195,13 +195,15 @@ namespace librealsense
                 void stop()
                 {
                     for (auto&& sensor : _results)
-                        sensor.second->stop();
+                        if( sensor.second->is_streaming() )
+                            sensor.second->stop();
                 }
 
                 void close()
                 {
                     for (auto&& sensor : _results)
-                        sensor.second->close();
+                        if( ! sensor.second->get_active_streams().empty() )
+                            sensor.second->close();
                 }
                 std::map<index_type, std::shared_ptr<stream_profile_interface>> get_profiles() const
                 {
