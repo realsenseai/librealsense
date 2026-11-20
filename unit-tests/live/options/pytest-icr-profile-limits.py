@@ -6,7 +6,7 @@ unsupported Depth profile; the nightly tests, which stream, also check that ever
 and that enabling the filter while streaming follows the same rules."""
 
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import pytest
 import pyrealsense2 as rs
 from rspy.timer import Timer
@@ -116,13 +116,16 @@ def filters(test_device):
         pytest.fail("FW 7.62 or newer must expose the Improved Close Range Depth and Decimation filters")
     original_icr = icr.get_composite_option(ICR)
     original_decimation = _decimation_enabled(decimation)
-    _set_decimation(decimation, 0)
-    _set_icr(icr, "downscale_x2", 0)
-    yield sensor, icr, decimation
-    if sensor.get_active_streams():  # an unsupported profile that opened by mistake; never started
-        sensor.close()
-    icr.set_composite_option(ICR, original_icr)
-    _set_decimation(decimation, original_decimation)
+    with ExitStack() as restore:
+        restore.callback(_set_decimation, decimation, original_decimation)
+        _set_decimation(decimation, 0)
+        restore.callback(icr.set_composite_option, ICR, original_icr)
+        _set_icr(icr, "downscale_x2", 0)
+        try:
+            yield sensor, icr, decimation
+        finally:
+            if sensor.get_active_streams():  # an unsupported profile that opened by mistake; never started
+                sensor.close()
 
 
 def _profiles_by_support(sensor, mode):
@@ -224,7 +227,9 @@ def test_enable_while_streaming(filters, mode):
     assert enabled == (mode in LIVE_ENABLE), f"{mode} {_describe(supported[0])}: filter {'not ' if not enabled else ''}enabled"
 
 
-def test_downscale_x4_with_decimation_rejected(filters):
+@pytest.mark.context("nightly")
+def test_downscale_x4_with_decimation_stream_smoke(filters):
+    """Check SDK admission and depth frame delivery with ICR x4 and Decimation configured."""
     sensor, icr, decimation = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
@@ -232,5 +237,14 @@ def test_downscale_x4_with_decimation_rejected(filters):
 
     _set_decimation(decimation, 1)
     _set_icr(icr, "downscale_x4", 1)
-    with pytest.raises(RuntimeError, match="cannot be combined with the embedded Decimation filter"):
-        sensor.open(profile)
+    queue = rs.frame_queue(10)
+    with _streaming(sensor, profile, queue.enqueue):
+        frame_numbers = []
+        for _ in range(30):
+            frame = queue.wait_for_frame(5000)
+            video = frame.as_video_frame()
+            assert frame.get_profile().format() == rs.format.z16
+            assert (video.width(), video.height()) == (640, 360)
+            assert frame.get_data_size() == 640 * 360 * 2
+            frame_numbers.append(frame.get_frame_number())
+        assert all(b > a for a, b in zip(frame_numbers, frame_numbers[1:])), f"frame numbers not increasing: {frame_numbers}"
