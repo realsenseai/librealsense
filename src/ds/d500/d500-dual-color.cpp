@@ -27,7 +27,7 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
-    // Image and calibration encodings published by the color pins.
+    // Image, compressed and calibration encodings published by the color pins.
     // The 16-bit raw can have several spellings: RW16 over USB (V4L2 passes it through, WMF normalizes it to BYR2)
     // and BA10 or GR16 over GMSL, depending on the d4xx driver version.
     static const std::map< uint32_t, rs2_format > color_pin_formats = {
@@ -35,6 +35,8 @@ namespace librealsense
         { rs_fourcc( 'N', 'V', '1', '2' ), RS2_FORMAT_NV12 },
         { rs_fourcc( 'Y', 'U', 'Y', '2' ), RS2_FORMAT_YUYV },
         { rs_fourcc( 'Y', 'U', 'Y', 'V' ), RS2_FORMAT_YUYV },
+        { rs_fourcc( 'M', 'J', 'P', 'G' ), RS2_FORMAT_MJPEG },
+        { rs_fourcc( 'H', '2', '6', '4' ), RS2_FORMAT_H264 },
         { rs_fourcc( 'B', 'A', '1', '0' ), RS2_FORMAT_RAW16 },
         { rs_fourcc( 'R', 'W', '1', '6' ), RS2_FORMAT_RAW16 },
         { rs_fourcc( 'B', 'Y', 'R', '2' ), RS2_FORMAT_RAW16 },
@@ -80,8 +82,8 @@ namespace librealsense
                                                       [target]() { return std::make_shared< m420_converter >( target ); } );
         }
 
-        // Expose native image and calibration encodings as passthrough color profiles.
-        for( auto native : { RS2_FORMAT_NV12, RS2_FORMAT_M420, RS2_FORMAT_YUYV, RS2_FORMAT_RAW16 } )
+        // Expose native image, compressed and calibration encodings as passthrough color profiles.
+        for( auto native : { RS2_FORMAT_NV12, RS2_FORMAT_M420, RS2_FORMAT_YUYV, RS2_FORMAT_MJPEG, RS2_FORMAT_H264, RS2_FORMAT_RAW16 } )
             depth_sensor.register_processing_block( { { native, RS2_STREAM_COLOR } },
                                                       { { native, RS2_STREAM_COLOR, 1 }, { native, RS2_STREAM_COLOR, 2 } },
                                                       []() { return std::make_shared< identity_processing_block >(); } );
