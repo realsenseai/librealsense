@@ -19,6 +19,21 @@ pytestmark = [
 _module_state = {}
 
 
+def _get_option_after_set(dev, sensor, option, expected):
+    """Read `option` back after it was set. A DDS device (e.g. D555) handles the command asynchronously:
+    wait 1 s before reading, and if the value is not the expected one yet, 1 s more before reading again."""
+    if is_dds_dev(dev):
+        time.sleep(1)
+    value = sensor.get_option(option)
+    if value != expected and is_dds_dev(dev):
+        log.debug(f"{option} read {value}, expected {expected}: reading again after 1 s")
+        time.sleep(1)
+        value = sensor.get_option(option)
+        if value != expected:
+            log.warning(f"{option} still reads {value}, expected {expected}, 2 s after it was set")
+    return value
+
+
 def test_visual_preset_support(test_device_wrapped):
     """Prerequisite: no use continuing if there is no preset support."""
     dev, ctx = test_device_wrapped
@@ -33,13 +48,11 @@ def test_set_presets(test_device_wrapped):
     dev, ctx = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.high_accuracy))
-    if is_dds_dev(dev):
-        time.sleep(1)  # Command is handled in the DDS device, not host. It may take some time to be fully handled.
-    assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.high_accuracy
+    assert _get_option_after_set(dev, depth_sensor, rs.option.visual_preset, rs.rs400_visual_preset.high_accuracy) \
+        == rs.rs400_visual_preset.high_accuracy
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
-    if is_dds_dev(dev):
-        time.sleep(1)
-    assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.default
+    assert _get_option_after_set(dev, depth_sensor, rs.option.visual_preset, rs.rs400_visual_preset.default) \
+        == rs.rs400_visual_preset.default
 
 
 def test_save_load_preset(test_device_wrapped):
@@ -89,7 +102,7 @@ def test_setting_color_options(test_device_wrapped):
         pytest.skip("Color sensor does not support hue option")
 
     color_sensor.set_option(rs.option.hue, 123)
-    assert color_sensor.get_option(rs.option.hue) == 123
+    assert _get_option_after_set(dev, color_sensor, rs.option.hue, 123) == 123
 
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
     if product_line == "D400":
