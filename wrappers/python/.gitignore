@@ -10,3 +10,4 @@ dist
 _version.py
 
 !pyrealsense2/__init__.py
+!pyrealsense2/py.typed
