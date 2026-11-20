@@ -92,6 +92,13 @@ namespace librealsense
         return find_pcl_xyz_tuple( width, height, fps ) != nullptr;
     }
 
+    bool is_labeled_point_cloud_size( uint32_t width, uint32_t height, bool safety_layout )
+    {
+        if( safety_layout )
+            return width == 2880 && ( height == 1040 || height == 260 || height == 32 );
+        return width == 640 && height == 360;
+    }
+
     // The transport profile is GREY (Y8); the payload is XYZ32F. Validate the frame against the
     // committed profile, then relabel it to the requested XYZ32F profile without copying, so the
     // metadata and the buffer are kept. Invalid frames are dropped.
@@ -371,19 +378,22 @@ namespace librealsense
         if( ! _is_d585s )
             _raw_depth_mapping_ep = raw_mapping_ep;
 
-        // The mapping function reports every EP12 output as GREY; the PCL XYZ tuples are the
-        // device point cloud, not occupancy (D5xx layout only).
-        if( ! _is_safety_layout )
+        // The Mapping interface shares GREY between occupancy and point cloud.
+        // Classify the stream without changing its format for UVC negotiation.
+        raw_mapping_ep->set_stream_id_resolver( [safety_layout = _is_safety_layout](
+            const std::vector< platform::stream_profile > &,
+            const platform::stream_profile & p,
+            rs2_stream & type,
+            std::vector< int > & )
         {
-            raw_mapping_ep->set_stream_id_resolver( []( const std::vector< platform::stream_profile > &,
-                                                        const platform::stream_profile & p,
-                                                        rs2_stream & type,
-                                                        std::vector< int > & )
-                {
-                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
-                        type = RS2_STREAM_POINT_CLOUD;
-                } );
-        }
+            if( p.format != rs_fourcc( 'G', 'R', 'E', 'Y' ) )
+                return;
+
+            if( is_labeled_point_cloud_size( p.width, p.height, safety_layout ) )
+                type = RS2_STREAM_LABELED_POINT_CLOUD;
+            else if( ! safety_layout && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+                type = RS2_STREAM_POINT_CLOUD;
+        } );
 
         auto mapping_ep = std::make_shared<d500_depth_mapping_sensor>(this,
             raw_mapping_ep,

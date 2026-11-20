@@ -19,12 +19,14 @@ def test_sc_streaming(test_device, stream):
     dev, ctx = test_device
     cfg = rs.config()
     cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
-    cfg.enable_stream(stream)
+    if stream == rs.stream.labeled_point_cloud:
+        cfg.enable_stream(stream, 2880, 1040, rs.format.y8, 30)
+    else:
+        cfg.enable_stream(stream)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
-    iterations = 0
-    while iterations < FRAMES_TO_COLLECT:
-        iterations += 1
-        f = pipe.wait_for_frames()
-    assert iterations == FRAMES_TO_COLLECT
-    pipe.stop()
+    try:
+        for _ in range(FRAMES_TO_COLLECT):
+            assert pipe.wait_for_frames().first_or_default(stream)
+    finally:
+        pipe.stop()
