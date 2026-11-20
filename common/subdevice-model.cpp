@@ -2424,29 +2424,55 @@ namespace rs2
         ss << "...";
         viewer.not_model->add_log(ss.str());
 
+        auto enqueue = [&](frame f, int id)
+        {
+            {
+                std::lock_guard< std::mutex > lock( viewer.ppf.frames_queue_mutex );
+                auto queue = viewer.ppf.frames_queue.find( id );
+                if( queue == viewer.ppf.frames_queue.end() )
+                    return;
+
+                queue->second.enqueue( f );
+            }
+
+            on_frame();
+        };
+
+        // H.264 can be rendered only once decoded, and the decoder needs every access unit in order, so decode here,
+        // ahead of the queues that drop frames. Decoded frames come on a profile of their own, mapped to the stream shown;
+        // the device cannot match that profile, so they bypass the syncer.
+        auto h264 = std::make_shared< std::map< int, rs2::h264_decoder > >();
+        if( rs2::h264_decoder::is_supported() )
+            for( auto & p : profiles )
+                if( p.format() == RS2_FORMAT_H264 )
+                {
+                    int const id = p.unique_id();
+                    auto & decoder = ( *h264 )[id];
+                    decoder.start( [&, id, enqueue, mapped = -1]( frame f ) mutable
+                        {
+                            if( f.get_profile().unique_id() != mapped )
+                            {
+                                mapped = f.get_profile().unique_id();
+                                std::lock_guard< std::mutex > lock( viewer.streams_mutex );
+                                viewer.streams_origin[mapped] = id;
+                            }
+                            enqueue( f, id );
+                        } );
+                }
+
         s->open(profiles);
         try {
-            s->start([&, syncer](frame f)
+            s->start([&, syncer, enqueue, h264](frame f)
                 {
+                    auto id = f.get_profile().unique_id();
+                    auto decoder = h264->find( id );
+                    if( decoder != h264->end() )
+                        decoder->second.invoke( f );
                     // The condition here must match the condition inside render_loop()!
-                    if (viewer.synchronization_enable)
-                    {
-                        syncer->invoke(f);
-                    }
+                    else if( viewer.synchronization_enable )
+                        syncer->invoke( f );
                     else
-                    {
-                        auto id = f.get_profile().unique_id();
-                        {
-                            std::lock_guard< std::mutex > lock( viewer.ppf.frames_queue_mutex );
-                            auto queue = viewer.ppf.frames_queue.find( id );
-                            if( queue == viewer.ppf.frames_queue.end() )
-                                return;
-
-                            queue->second.enqueue( f );
-                        }
-
-                        on_frame();
-                    }
+                        enqueue( f, id );
                 });
         }
 
