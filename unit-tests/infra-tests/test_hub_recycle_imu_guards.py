@@ -2,21 +2,20 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 """
-Test for the no-hub guard added to unit-tests/live/hw-reset/pytest-hub-recycle-imu.py.
+Test for the no-hub guard of unit-tests/live/hw-reset/pytest-hub-recycle-imu.py.
 
-The live test now skips (rather than fails) when devices.hub is None, so plain
-local runs without an Acroname/Ykush/UniFi don't surface a misleading failure.
+The module skips (rather than fails) when devices.hub is None, so plain local runs without an
+Acroname/Ykush/UniFi don't surface a misleading failure. The guard is a module skipif, so the
+camera is never powered for it.
 
-The test file uses kebab-case, so we load it via importlib and call the function
-directly with a fake device + a stubbed rspy.devices module.
+The test file uses kebab-case, so we load it via importlib with rspy.devices.hub patched.
 """
 
 import importlib.util
-import types
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
+from rspy import devices
 
 try:
     import pyrealsense2 as rs
@@ -33,20 +32,10 @@ def _load_test_module():
     return module
 
 
-def _fake_dev_with_motion(sn='111'):
-    sensor = MagicMock()
-    sensor.get_info.return_value = "Motion Module"
-    dev = MagicMock()
-    dev.query_sensors.return_value = [sensor]
-    dev.get_info.return_value = sn
-    return dev
-
-
-def test_hub_none_skips(monkeypatch):
-    """No hub anywhere -> skip cleanly (true on Jetson, Windows dev, clean Linux, etc.)."""
-    mod = _load_test_module()
-    monkeypatch.setattr(mod, 'devices', types.SimpleNamespace(hub=None))
-    with pytest.raises(pytest.skip.Exception, match="no hub configured"):
-        mod.test_hub_recycle_imu_presence(
-            (_fake_dev_with_motion(), MagicMock()), 'nightly'
-        )
+@pytest.mark.parametrize("hub, skipped", [(None, True), (object(), False)])
+def test_skipped_only_without_hub(monkeypatch, hub, skipped):
+    """No hub anywhere (Jetson, Windows dev, clean Linux, etc.) -> the module skips cleanly."""
+    monkeypatch.setattr(devices, 'hub', hub)
+    skipif = next(m for m in _load_test_module().pytestmark if m.name == 'skipif')
+    assert skipif.args == (skipped,)
+    assert "no hub configured" in skipif.kwargs['reason']

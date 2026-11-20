@@ -145,8 +145,9 @@ def test_rgb_and_depth_values_are_independent(depth_sensor):
 
 def test_rgb_options_work_while_streaming(test_device, depth_sensor):
     # Hybrid streaming: depth and both color streams at once
-    _, ctx = test_device
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device( dev.get_info( rs.camera_info.serial_number ) )
     cfg.enable_stream( rs.stream.depth, 640, 480, rs.format.z16, 30 )
     cfg.enable_stream( rs.stream.color, 1, 640, 480, rs.format.rgb8, 30 )
     cfg.enable_stream( rs.stream.color, 2, 640, 480, rs.format.rgb8, 30 )
@@ -170,12 +171,14 @@ def test_rgb_options_work_while_streaming(test_device, depth_sensor):
         pipe.stop()
 
 
-def color_frames_with_metadata( ctx, apply_options, is_settled ):
+def color_frames_with_metadata( test_device, apply_options, is_settled ):
     """
     Stream depth and both color streams, apply the options, and return the latest frame of each color stream once
     is_settled( frame ) holds for both: the metadata follows the option by a few frames.
     """
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device( dev.get_info( rs.camera_info.serial_number ) )
     cfg.enable_stream( rs.stream.depth, 640, 480, rs.format.z16, 30 )
     cfg.enable_stream( rs.stream.color, 1, 640, 480, rs.format.rgb8, 30 )
     cfg.enable_stream( rs.stream.color, 2, 640, 480, rs.format.rgb8, 30 )
@@ -205,8 +208,6 @@ def metadata( frame, key ):
 # Skipped until the firmware fix: the actual exposure and gain it reports do not follow the options
 @pytest.mark.skip( reason="firmware actual exposure/gain metadata differs from the setpoint" )
 def test_color_frame_metadata_reports_rgb_exposure_and_gain(test_device, depth_sensor):
-    _, ctx = test_device
-
     def apply_options():
         depth_sensor.set_option( RGB_AE, 0 )
         depth_sensor.set_option( RGB_EXPOSURE, 30 )
@@ -217,18 +218,17 @@ def test_color_frame_metadata_reports_rgb_exposure_and_gain(test_device, depth_s
     def is_settled( f ):
         return f.supports_frame_metadata( rs.frame_metadata_value.actual_exposure )                and abs( f.get_frame_metadata( rs.frame_metadata_value.actual_exposure ) - exposure ) <= 1                and f.get_frame_metadata( rs.frame_metadata_value.gain_level ) == 48
 
-    for index, f in color_frames_with_metadata( ctx, apply_options, is_settled ).items():
+    for index, f in color_frames_with_metadata( test_device, apply_options, is_settled ).items():
         assert abs( metadata( f, rs.frame_metadata_value.actual_exposure ) - exposure ) <= 1, f"color {index}"
         assert metadata( f, rs.frame_metadata_value.gain_level ) == 48, f"color {index}"
 
 
 @pytest.mark.xfail( reason="the firmware reports a constant auto-exposure state in the color metadata", strict=False )
 def test_color_frame_metadata_reports_rgb_ae_state(test_device, depth_sensor):
-    _, ctx = test_device
     for ae in (1, 0):
         def is_settled( f ):
             return f.supports_frame_metadata( rs.frame_metadata_value.auto_exposure )                    and f.get_frame_metadata( rs.frame_metadata_value.auto_exposure ) == ae
 
-        colors = color_frames_with_metadata( ctx, lambda: depth_sensor.set_option( RGB_AE, ae ), is_settled )
+        colors = color_frames_with_metadata( test_device, lambda: depth_sensor.set_option( RGB_AE, ae ), is_settled )
         for index, f in colors.items():
             assert metadata( f, rs.frame_metadata_value.auto_exposure ) == ae, f"color {index}, AE {ae}"

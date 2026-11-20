@@ -30,6 +30,9 @@ pytestmark = [
     pytest.mark.device_type("USB"),   # hub-recycle is meaningful only on USB
     pytest.mark.context("nightly"),
     pytest.mark.timeout(300),
+    pytest.mark.requires(sensor="Motion Module"),
+    # enable_only(recycle=True) without a hub falls back to an in-band hw_reset, which defeats the purpose
+    pytest.mark.skipif(devices.hub is None, reason="no hub configured - hub-recycle requires a real port power-cycle"),
 ]
 
 
@@ -52,16 +55,6 @@ def test_hub_recycle_imu_presence( test_device, test_context_var ):
     dev, ctx = test_device
     sn = dev.get_info( rs.camera_info.serial_number )
 
-    # The device_type("USB") marker filters out non-USB cameras at collection
-    # time. The Motion-Module check below is what we can't express as a marker
-    # today: skip cleanly for D4xx/D5xx products that don't carry an IMU.
-    if not any( "Motion" in n for n in _sensor_names( dev ) ):
-        pytest.skip( f"{dev.get_info( rs.camera_info.name )} has no Motion Module - test does not apply" )
-
-    if devices.hub is None:
-        pytest.skip( "no hub configured - hub-recycle requires a real port power-cycle; "
-                     "enable_only(recycle=True) would fall back to an in-band hw_reset, "
-                     "which defeats the purpose of this test" )
     if devices.get( sn ).port is None:
         pytest.fail( f"Hub is present but could not resolve a port for serial {sn} - "
                      "refusing to recycle all ports to avoid disturbing other devices on the hub." )

@@ -66,10 +66,13 @@ from rspy.pytest.device_helpers import (
     resolve_device_each_serials,
     select_target_device,
     split_cli_patterns,
+    unmet_requirement,
     _MISSING_SENTINEL_PREFIX,
     _SKIP_SENTINEL_PREFIX,
 )
-from rspy.pytest.collection import filter_and_sort_items, assert_module_fixtures_are_per_camera
+from rspy.pytest.collection import (
+    filter_and_sort_items, assert_module_fixtures_are_per_camera, assert_requires_markers_valid,
+)
 from rspy.pytest.plugins import check_required_plugins
 
 log = logging.getLogger('librealsense')
@@ -357,6 +360,10 @@ def pytest_configure(config):
         "markers", "device_type_exclude(type): skip test if device connection type matches (e.g., GMSL, USB, DDS)"
     )
     config.addinivalue_line(
+        "markers", "requires(fw=, option=, sensor=): module-level, when every test needs it; skips a camera that "
+                   "lacks the FW / option / sensor before powering it"
+    )
+    config.addinivalue_line(
         "markers", "dds: test requires a DDS-enabled build (selected by --tag dds / -m dds)"
     )
     config.addinivalue_line(
@@ -430,6 +437,7 @@ def pytest_generate_tests(metafunc):
 def pytest_collection_modifyitems(session, config, items):
     """Auto-skip nightly/dds tests, filter --live, sort by priority."""
     assert_module_fixtures_are_per_camera(session, items)
+    assert_requires_markers_valid(items)
     test_dirs = config.getoption("--test-dir", default=[])
     if test_dirs:
         abs_dirs = [os.path.abspath(p) for p in test_dirs]
@@ -840,6 +848,12 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     #  hub, port OFF         -> don't recycle; enabling it here IS the power-on (teardown-off +
     #                           setup-on = the cycle). Avoids re-disabling an already-off port.
     serials = serial_number if isinstance(serial_number, list) else [serial_number]
+    # Checked while the port is still off, so a camera that lacks a requirement costs no power cycle
+    requires = list(request.node.iter_markers("requires"))
+    unmet = next(filter(None, (unmet_requirement(devices.get(sn), requires) for sn in serials)), None)
+    if unmet:
+        _emit_test_header(item_id)
+        pytest.skip(unmet)
     if no_reset:
         recycle = False
     elif devices.hub is None:

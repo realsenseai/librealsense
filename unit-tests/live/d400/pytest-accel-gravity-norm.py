@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.context("nightly"),
+    pytest.mark.requires(sensor="Motion Module"),
 ]
 
 GRAVITY = 9.80665
@@ -26,10 +27,7 @@ LOW, HIGH = 0.8 * GRAVITY, 1.2 * GRAVITY
 
 def test_accel_norm_is_gravity(test_device):
     dev, _ = test_device
-    sensor = next((s for s in dev.query_sensors()
-                   if any(p.stream_type() == rs.stream.accel for p in s.get_stream_profiles())), None)
-    if sensor is None:
-        pytest.skip("device has no accelerometer")
+    sensor = dev.first_motion_sensor()
 
     fw = dev.get_info(rs.camera_info.firmware_version)
     accel = [p for p in sensor.get_stream_profiles() if p.stream_type() == rs.stream.accel]

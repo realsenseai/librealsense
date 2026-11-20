@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
+    pytest.mark.requires(option=rs.option.readout_shaping),
 ]
 
 
@@ -16,8 +17,6 @@ def test_readout_shaping_set_get(test_device_wrapped):
     # verify it reads back, then return to 0.
     dev, _ = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
-    if not depth_sensor.supports(rs.option.readout_shaping):
-        pytest.skip("readout shaping not exposed on this device")
 
     r = depth_sensor.get_option_range(rs.option.readout_shaping)
     assert r.min == 0
@@ -25,6 +24,9 @@ def test_readout_shaping_set_get(test_device_wrapped):
 
     pipe = rs.pipeline()
     cfg = rs.config()
+    # The value reads back only while this device streams; without enable_device the
+    # pipeline picks the first connected device.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     def apply(value):
         # Set the value, stream a few frames so the FW applies it at a frame boundary, read it back.
@@ -45,8 +47,6 @@ def test_readout_shaping_rejects_out_of_range(test_device_wrapped):
     # Values above the 0-100 range are rejected (no streaming needed).
     dev, _ = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
-    if not depth_sensor.supports(rs.option.readout_shaping):
-        pytest.skip("readout shaping not exposed on this device")
 
     for bad in (101, 200, 255):
         with pytest.raises(Exception):

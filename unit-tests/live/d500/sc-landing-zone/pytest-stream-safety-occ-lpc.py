@@ -15,13 +15,15 @@ FRAMES_TO_COLLECT = 3
 
 @pytest.mark.parametrize("stream", [rs.stream.safety, rs.stream.occupancy, rs.stream.labeled_point_cloud],
                          ids=lambda s: repr(s))
-def test_sc_streaming(test_context, stream):
+def test_sc_streaming(test_device, stream):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     if stream == rs.stream.labeled_point_cloud:
         cfg.enable_stream(stream, 2880, 1040, rs.format.y8, 30)
     else:
         cfg.enable_stream(stream)
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     try:
         for _ in range(FRAMES_TO_COLLECT):
