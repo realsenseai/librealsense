@@ -91,7 +91,7 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
     max_delay = max_delay_for(dev)
     os_name = platform.system()
 
-    if any(model in product_name for model in ['D421', 'D405', 'D430', 'D401']):
+    if any(model in product_name for model in ['D421', 'D430']):
         pytest.skip(f"Device {product_name} has no color sensor")
 
     log.info(f"Testing pipeline first color frame delay on {product_name} device - {os_name} OS")
