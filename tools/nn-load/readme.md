@@ -15,7 +15,7 @@ Run `rs-nn-load -l` to list the connected cameras that accept NN models and whet
 
 ```
 Connected NN loader devices:
-1) RealSense D585 s/n 541522320235, firmware version: 7.60.0.0, upload supported
+1) RealSense D585 s/n 541522320235, firmware version: 7.61.47203.18002, upload supported
 ```
 
 Then upload a package with `rs-nn-load -f <package>`, adding `-s <serial_number>` when more than one such camera is connected:

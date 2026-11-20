@@ -15,14 +15,13 @@ log = logging.getLogger(__name__)
 
 
 pytestmark = [
-    pytest.mark.skip( reason="no D585 FW with NN upload yet: enable with the real NN_UPLOAD_MIN_FW" ),
     pytest.mark.device_each( "D555", "D535", "D585" ),
     pytest.mark.device_exclude( "D585S" ),       # the safety SKU has no perception sensor
     pytest.mark.device_type_exclude( "GMSL" ),   # uploads go over the USB HW monitor only
     pytest.mark.device_type_exclude( "DDS" ),
 ]
 
-NN_UPLOAD_MIN_FW = rsutils.version( 7, 60, 0, 0 )   # placeholder, as in d500-nn-loader.cpp
+NN_UPLOAD_MIN_FW = rsutils.version( 7, 61, 0, 0 )   # as in d500-nn-loader.cpp
 NN_UPLOAD_PIDS = { "0C04", "0C05", "0C06", "0C07", "0C08" }   # D585 only, as nn_upload_pids in d500-private.h
 MAX_FILE_SIZE = ( 1 << 16 ) * 1000 - 16
 GARBAGE = bytes( range( 256 ) ) * 16                 # not a package: no package magic
@@ -150,6 +149,6 @@ def test_bad_package_rejected( unlocked_loader ):
     assert all( 0 <= p < 1 for p in progress )   # never reports completion
     assert progress == sorted( progress )
 
-    # The device is ready for the next upload. Whether the stored model survives depends on where the device rejects the
-    # package (before or during the commit), so detections are not checked here.
+    # The device is ready for the next upload. GARBAGE has no package magic, so the FW rejects it before the commit: the
+    # stored model survives (checked on a D585, FW 7.61.47203: its detections on a DDT-injected scene unchanged after).
     assert unlocked_loader.is_upload_supported() == ( True, "" )
