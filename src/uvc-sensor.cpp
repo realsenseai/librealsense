@@ -70,7 +70,7 @@ struct pin_stream
     std::shared_ptr< stream_profile_base > base;
     unsigned long long last_frame_number = 0;
     rs2_time_t last_timestamp = 0;
-    unsigned long long color_fn = 0;  // see per_stream_color_fn
+    unsigned long long color_fn = 0;  // see update_per_stream_color_fn()
 };
 
 // Requests grouped by backend pin; a multiplexed pin holds several streams and is opened once for all of them
@@ -227,32 +227,56 @@ uvc_sensor::frame_stream_resolver uvc_sensor::multiplexed_pin_resolver( const st
 void uvc_sensor::open( const stream_profiles & requests )
 {
     std::lock_guard< std::mutex > lock( _configure_lock );
-    if( _is_streaming )
+    // An incremental sensor adds the requests to the streams already open; their pins keep streaming
+    bool const adding = _is_opened && _incremental_streams;
+    if( _is_streaming && ! adding )
         throw wrong_api_call_sequence_exception( "open(...) failed. UVC device is streaming!" );
-    else if( _is_opened )
+    else if( _is_opened && ! adding )
         throw wrong_api_call_sequence_exception( "open(...) failed. UVC device is already opened!" );
 
-    auto on = std::unique_ptr< power >( new power( std::dynamic_pointer_cast< uvc_sensor >( shared_from_this() ) ) );
-
-    _source.init( _metadata_parsers );
-    _source.set_sensor( _source_owner->shared_from_this() );
+    std::unique_ptr< power > on;
+    auto all_requests = get_active_streams();
+    if( adding )
+    {
+        // Checked here, not at opt-in: the pins are known only once the device is powered
+        if( ! std::static_pointer_cast< platform::multi_pins_uvc_device >( _device )->has_pin_per_device() )
+            throw not_implemented_exception( "Adding streams one by one needs a device with a pin per stream" );
+        for( auto && req : requests )
+            for( auto && cfg : _internal_config )
+                if( std::dynamic_pointer_cast< stream_profile_base >( req )->get_backend_profile().pin_index == cfg.pin_index )
+                    throw wrong_api_call_sequence_exception( rsutils::string::from()
+                                                             << req << " shares a hardware endpoint that is already open" );
+    }
+    else
+    {
+        on.reset( new power( std::dynamic_pointer_cast< uvc_sensor >( shared_from_this() ) ) );
+        _source.init( _metadata_parsers );
+        _source.set_sensor( _source_owner->shared_from_this() );
+        _zc_inflight.clear();  // drained/read in close(); repopulated per stream below
+    }
+    all_requests.insert( all_requests.end(), requests.begin(), requests.end() );
 
     std::vector< platform::stream_profile > commited;
 
-    verify_supported_requests( requests );
+    verify_supported_requests( all_requests );
+    update_per_stream_color_fn( all_requests );
 
-    _zc_inflight.clear();  // drained/read in close(); repopulated per stream below
-
-    // On devices that opt in (enable_software_color_frame_numbers), the color pins share a single
-    // hardware frame counter, so each stream's frame number jumps by the number of color streams per
-    // interval - which makes the reported (hardware) FPS read 2x. Give each color stream its own
-    // software frame counter, mirroring the accel/gyro override below.
-    int color_stream_count = 0;
-    if( _sw_color_frame_numbers )
-        for( auto && rp : requests )
-            if( rp->get_stream_type() == RS2_STREAM_COLOR )
-                ++color_stream_count;
-    const bool per_stream_color_fn = ( color_stream_count > 1 );
+    // Closes the pins committed so far, after a failure
+    auto const undo_commits = [&]()
+    {
+        for( auto && profile : commited )
+        {
+            try
+            {
+                _device->close( profile );
+            }
+            catch( ... )
+            {
+            }
+            _zc_inflight.erase( profile.pin_index );
+        }
+        update_per_stream_color_fn( get_active_streams() );
+    };
 
     for( auto && streams : group_by_pin( requests ) )
     {
@@ -264,10 +288,10 @@ void uvc_sensor::open( const stream_profiles & requests )
             // backend buffers currently pinned by in-flight zero-copy frames. shared_ptr so
             // it outlives the lambda if a frame is released later, on another thread.
             auto zc_inflight = std::make_shared< std::atomic< int > >( 0 );
-            _zc_inflight.push_back( zc_inflight );  // close() drains this before buffers are freed
+            _zc_inflight[pin_profile->get_backend_profile().pin_index] = zc_inflight;  // drained before buffers are freed
             _device->probe_and_commit(
                 pin_profile->get_backend_profile(),
-                [this, streams, resolver, zc_inflight, per_stream_color_fn, reported_unnamed = false](
+                [this, streams, resolver, zc_inflight, reported_unnamed = false](
                     platform::stream_profile p,
                     platform::frame_object f,
                     std::function< void() > continuation ) mutable
@@ -335,10 +359,12 @@ void uvc_sensor::open( const stream_profiles & requests )
 
                     // Dual color streams share one hardware frame counter; give each its own
                     // per-stream software counter so the reported (hardware) FPS isn't doubled
-                    // (see per_stream_color_fn). Mirrors the accel/gyro override above.
-                    if( per_stream_color_fn && req_profile_base->get_stream_type() == RS2_STREAM_COLOR )
+                    // (see update_per_stream_color_fn). Mirrors the accel/gyro override above.
+                    if( _per_stream_color_fn && req_profile_base->get_stream_type() == RS2_STREAM_COLOR )
                     {
-                        fr->additional_data.frame_number = ++stream->color_fn;
+                        // continues from the last number, so a stream switching counters never goes back
+                        fr->additional_data.frame_number = stream->color_fn
+                            = std::max( stream->color_fn, stream->last_frame_number ) + 1;
                         frame_counter = fr->additional_data.frame_number;
                     }
 
@@ -408,7 +434,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                                        && ! is_depth_mapping && ! is_perception  // CPU-read payloads; GMSL capture memory is uncached
                                        && ! align64
                                        && expected_size == sizeof( uint8_t ) * f.frame_size
-                                       && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;
+                                       && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT
+                                       && ! _incremental_streams;  // closing one pin doesn't wait for a frame already being captured on it
                     frame_holder fh = _source.alloc_frame(
                         { req_profile_base->get_stream_type(), req_profile_base->get_stream_index(), extension },
                         expected_size,
@@ -521,13 +548,29 @@ void uvc_sensor::open( const stream_profiles & requests )
         }
         catch( ... )
         {
-            for( auto && commited_profile : commited )
-            {
-                _device->close( commited_profile );
-            }
+            _zc_inflight.erase( pin_profile->get_backend_profile().pin_index );
+            undo_commits();
             throw;
         }
         commited.push_back( pin_profile->get_backend_profile() );
+    }
+
+    if( adding )
+    {
+        try
+        {
+            _device->stream_on( [&]( const notification & n ) { _notifications_processor->raise_notification( n ); } );
+            if( _is_streaming )
+                _device->start_callbacks();
+        }
+        catch( ... )
+        {
+            undo_commits();
+            throw;
+        }
+        _internal_config.insert( _internal_config.end(), commited.begin(), commited.end() );
+        set_active_streams( all_requests );
+        return;
     }
 
     _internal_config = commited;
@@ -598,27 +641,7 @@ void uvc_sensor::close()
     else if( ! _is_opened )
         throw wrong_api_call_sequence_exception( "close() failed. UVC device was not opened!" );
 
-    // Zero-copy frames alias the backend V4L2 buffers via a deferred continuation, and those
-    // buffers are unmapped in _device->close() below. Wait (bounded) for any in-flight zero-copy
-    // frames to be released first, so we never free a buffer a frame still points at. No-op when
-    // none are in flight (the common case and every non-zero-copy build).
-    if( ! _zc_inflight.empty() )
-    {
-        auto inflight_total = [this]()
-        {
-            int s = 0;
-            for( auto & c : _zc_inflight )
-                s += c->load( std::memory_order_relaxed );
-            return s;
-        };
-        auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 1 );
-        while( inflight_total() > 0 && std::chrono::steady_clock::now() < deadline )
-            std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-        if( int remaining = inflight_total() )
-            LOG_WARNING( "close(): " << remaining
-                         << " zero-copy frame(s) still held; release frames before close()" );
-        _zc_inflight.clear();
-    }
+    drain_zero_copy_frames( _internal_config );
 
     for( auto && profile : _internal_config )
     {
@@ -638,6 +661,91 @@ void uvc_sensor::close()
     _power.reset();
     _is_opened = false;
     set_active_streams( {} );
+}
+
+void uvc_sensor::enable_incremental_streams()
+{
+    if( ! std::dynamic_pointer_cast< platform::multi_pins_uvc_device >( _device ) )
+        throw not_implemented_exception( "Adding and closing streams one by one needs a multi-pin device" );
+    _incremental_streams = true;
+}
+
+void uvc_sensor::update_per_stream_color_fn( const stream_profiles & streams )
+{
+    // Color pins sharing one hardware frame counter (enable_software_color_frame_numbers) make each stream's
+    // number jump by the color stream count: give each color stream its own counter while there are several
+    _per_stream_color_fn = _sw_color_frame_numbers
+                        && std::count_if( streams.begin(), streams.end(),
+                                          []( const std::shared_ptr< stream_profile_interface > & sp )
+                                          { return sp->get_stream_type() == RS2_STREAM_COLOR; } ) > 1;
+}
+
+void uvc_sensor::close_streams( const stream_profiles & profiles )
+{
+    // Called by the synthetic sensor, which closes the whole sensor instead when no stream would remain
+    std::lock_guard< std::mutex > lock( _configure_lock );
+    auto pin_of = []( const std::shared_ptr< stream_profile_interface > & p )
+    { return std::dynamic_pointer_cast< stream_profile_base >( p )->get_backend_profile().pin_index; };
+    auto remaining = get_active_streams();
+    std::set< uint32_t > pins;
+    for( auto && profile : profiles )
+    {
+        auto it = std::find( remaining.begin(), remaining.end(), profile );
+        if( it == remaining.end() )
+            throw invalid_value_exception( rsutils::string::from() << profile << " is not open" );
+        pins.insert( pin_of( profile ) );
+        remaining.erase( it );
+    }
+    for( auto && profile : remaining )
+        if( pins.count( pin_of( profile ) ) )
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                                                     << profile << " shares a hardware endpoint with the closed streams" );
+
+    std::vector< platform::stream_profile > closing, kept;
+    for( auto && cfg : _internal_config )
+        ( pins.count( cfg.pin_index ) ? closing : kept ).push_back( cfg );
+    // No new frame may borrow a buffer of these pins once the drain has started
+    auto multi_pins = std::static_pointer_cast< platform::multi_pins_uvc_device >( _device );
+    for( auto && profile : closing )
+        multi_pins->stop_callbacks( profile );
+    drain_zero_copy_frames( closing );
+    for( auto && profile : closing )
+    {
+        try  // Handle disconnect event
+        {
+            _device->close( profile );
+        }
+        catch( ... )
+        {
+        }
+    }
+    _internal_config = kept;
+    update_per_stream_color_fn( remaining );
+    set_active_streams( remaining );
+}
+
+// Zero-copy frames alias backend V4L2 buffers that are unmapped when a pin closes: wait (bounded) for the pins'
+// in-flight zero-copy frames to be released first. No-op when none are in flight.
+void uvc_sensor::drain_zero_copy_frames( const std::vector< platform::stream_profile > & pins )
+{
+    auto inflight_total = [&]()
+    {
+        int s = 0;
+        for( auto & pin : pins )
+        {
+            auto it = _zc_inflight.find( pin.pin_index );
+            if( it != _zc_inflight.end() )
+                s += it->second->load( std::memory_order_relaxed );
+        }
+        return s;
+    };
+    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 1 );
+    while( inflight_total() > 0 && std::chrono::steady_clock::now() < deadline )
+        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+    if( int remaining = inflight_total() )
+        LOG_WARNING( "close(): " << remaining << " zero-copy frame(s) still held; release frames before close()" );
+    for( auto & pin : pins )
+        _zc_inflight.erase( pin.pin_index );
 }
 
 
