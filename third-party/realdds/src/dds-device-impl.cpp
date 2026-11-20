@@ -668,10 +668,13 @@ json dds_device::impl::query_embedded_filter(const std::shared_ptr< dds_embedded
 void dds_device::impl::write_control_message( json const & j, json * reply )
 {
     assert( _control_writer != nullptr );
+    std::unique_lock< std::mutex > lock( _replies_mutex, std::defer_lock );
+    // Prevent the notification thread from matching a reply before its entry exists.
+    if( reply )
+        lock.lock();
     auto this_sequence_number = topics::flexible_msg( j ).write_to( *_control_writer );
     if( reply )
     {
-        std::unique_lock< std::mutex > lock( _replies_mutex );
         auto & actual_reply = _replies[this_sequence_number];  // create it; initialized to null json
         if( ! _replies_cv.wait_for( lock,
                                     std::chrono::milliseconds( _reply_timeout_ms ),
@@ -682,6 +685,7 @@ void dds_device::impl::write_control_message( json const & j, json * reply )
                                         return true;
                                     } ) )
         {
+            _replies.erase( this_sequence_number );
             DDS_THROW( runtime_error, "timeout waiting for reply #" << this_sequence_number << ": " << j );
         }
         //LOG_DEBUG( "got reply: " << actual_reply );
