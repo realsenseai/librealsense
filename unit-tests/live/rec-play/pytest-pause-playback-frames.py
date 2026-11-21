@@ -26,7 +26,7 @@ pytestmark = [
 ]
 
 STREAMING_DURATION = 3
-TIMEOUT_BUFFER = 3  # [sec] extra time to the expected playback time for not failing on runtime hiccups..
+TIMEOUT_BUFFER = 6  # [sec] extra time to the expected playback time for not failing on runtime hiccups (D585 GMSL plays back ~2 sec slower than recorded)
 
 
 def record_with_pause( file_name, iterations, pause_delay=0, resume_delay=0, dev=None ):
