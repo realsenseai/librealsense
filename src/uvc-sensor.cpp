@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <map>
 #include <thread>
+#include <utility>
 
 #ifdef RS2_USE_CUDA_ZEROCOPY
 #include "cuda/cuda-frame-memory.h"  // rs_frame_zc_enabled
@@ -406,8 +407,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                         && expected_size == f.frame_size
                         && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT )
                     {
-                        auto release = [continuation = std::move( continuation ), zc_inflight]( const void * ) {
-                            continuation();
+                        auto release = [complete = std::exchange( continuation, {} ), zc_inflight]( const void * ) {
+                            complete();
                             zc_inflight->fetch_sub( 1, std::memory_order_relaxed );
                         };
                         zc_inflight->fetch_add( 1, std::memory_order_relaxed );
@@ -474,7 +475,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // Zero-copy path: the frame now owns the backend buffer and will release it
                     // (via the deferred continuation attached above) when it is destroyed -- do
                     // NOT release it here or the camera would overwrite live frame data.
-                    if( ! borrowed )
+                    if( continuation )
                         continuation();
 
                     if (!fh.frame)
