@@ -250,11 +250,17 @@ namespace librealsense
 #ifdef METADATA_SUPPORT
                             try_read_metadata( sample, metadata_size, &metadata );
 #endif
+                            CComPtr< IMFSample > retained_sample;
+                            if( stream.profile.format == fourcc( 'Y', '8', 'I', ' ' )
+                                || stream.profile.format == fourcc( 'Z', '1', '6', ' ' ) )
+                                retained_sample = sample;
                             frame_object f{ length, metadata_size, pixels.get(), metadata,
-                                            monotonic_to_realtime( llTimestamp * 0.0001 ) };
-                            stream.callback( stream.profile, f, [pixels = std::move( pixels )]() mutable {
-                                pixels.reset();
-                            } );
+                                            monotonic_to_realtime( llTimestamp * 0.0001 ), retained_sample != nullptr };
+                            stream.callback( stream.profile, f,
+                                [pixels = std::move( pixels ), retained_sample = std::move( retained_sample )]() mutable {
+                                    pixels.reset();
+                                    retained_sample.Release();
+                                } );
                         }
                         catch( std::exception const & e )
                         {

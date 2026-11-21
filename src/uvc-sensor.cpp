@@ -38,11 +38,7 @@ void log_callback_end( uint32_t fps,
                        unsigned long long frame_number );
 
 
-// Zero-copy capture: when the build has zero-copy enabled AND we are on an integrated GPU, the
-// captured frame can point directly at the backend (V4L2) buffer instead of memcpy'ing it into a
-// pool frame. The backend buffer is then released only when the frame is destroyed (deferred
-// continuation), so the kernel/CPU can read it in place. Off in every other configuration ->
-// behavior is byte-for-byte unchanged.
+// Integrated GPU capture can also use a backend buffer directly.
 static bool capture_zerocopy_enabled()
 {
 #ifdef RS2_USE_CUDA_ZEROCOPY
@@ -54,10 +50,8 @@ static bool capture_zerocopy_enabled()
 #endif
 }
 
-// Cap on how many backend buffers may be pinned by in-flight zero-copy frames at once.
-// The V4L2 ring is small (default 4); never borrow so many that the camera can starve.
-// When the cap is hit we fall back to the copy path for that frame, so the ring is never
-// drained and the camera never stalls regardless of how long the app holds frames.
+// Limit retained buffers per pin. Further frames use the SDK pool while the application
+// holds the earlier samples. V4L2 rings can be as small as four buffers.
 static constexpr int ZC_MAX_INFLIGHT = 2;
 
 
@@ -254,6 +248,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                 ++color_stream_count;
     const bool per_stream_color_fn = ( color_stream_count > 1 );
 
+    const bool gpu_capture = capture_zerocopy_enabled();
     for( auto && streams : group_by_pin( requests ) )
     {
         auto && pin_profile = streams.front().base;  // a multiplexed pin's streams share one backend profile
@@ -264,10 +259,12 @@ void uvc_sensor::open( const stream_profiles & requests )
             // backend buffers currently pinned by in-flight zero-copy frames. shared_ptr so
             // it outlives the lambda if a frame is released later, on another thread.
             auto zc_inflight = std::make_shared< std::atomic< int > >( 0 );
-            _zc_inflight.push_back( zc_inflight );  // close() drains this before buffers are freed
+            // GPU capture borrows the driver's ring. Retained WMF samples own their memory across close.
+            if( gpu_capture )
+                _zc_inflight.push_back( zc_inflight );
             _device->probe_and_commit(
                 pin_profile->get_backend_profile(),
-                [this, streams, resolver, zc_inflight, per_stream_color_fn, reported_unnamed = false](
+                [this, streams, resolver, zc_inflight, gpu_capture, per_stream_color_fn, reported_unnamed = false](
                     platform::stream_profile p,
                     platform::frame_object f,
                     std::function< void() > continuation ) mutable
@@ -403,50 +400,34 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // Zero-copy capture is taken only on the clean branch where the frame is a
                     // verbatim view of the backend buffer (sizes match exactly, not motion, not
                     // realigned) and we have not already pinned too many ring buffers.
-                    const bool do_zc = capture_zerocopy_enabled()
-                                       && ! msp  // split IMU reports share one buffer, requeued after the last copy (v4l-uvc-device.cpp)
-                                       && ! is_depth_mapping && ! is_perception  // CPU-read payloads; GMSL capture memory is uncached
-                                       && ! align64
-                                       && expected_size == sizeof( uint8_t ) * f.frame_size
-                                       && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;
+                    std::shared_ptr< const void > borrowed;
+                    if( ( gpu_capture || f.can_retain_pixels ) && ! msp
+                        && ! is_depth_mapping && ! is_perception && ! align64
+                        && expected_size == f.frame_size
+                        && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT )
+                    {
+                        auto release = [continuation = std::move( continuation ), zc_inflight]( const void * ) {
+                            continuation();
+                            zc_inflight->fetch_sub( 1, std::memory_order_relaxed );
+                        };
+                        zc_inflight->fetch_add( 1, std::memory_order_relaxed );
+                        borrowed = std::shared_ptr< const void >( f.pixels, std::move( release ) );
+                    }
                     frame_holder fh = _source.alloc_frame(
                         { req_profile_base->get_stream_type(), req_profile_base->get_stream_index(), extension },
                         expected_size,
                         std::move( fr->additional_data ),
-                        ! do_zc );  // requires_memory=false for zero-copy: the frame points at the backend buffer
+                        ! borrowed );
                     auto diff = time_service::get_time() - system_time;
                     if( diff > 10 )
                         LOG_DEBUG( "!! Frame allocation took " << diff << " msec" );
 
-                    bool zc_attached = false;
                     if( fh.frame )
                     {
-                        if( do_zc )
+                        if( borrowed )
                         {
-                            // Point the frame at the backend buffer and defer its release
-                            // (continuation -> VIDIOC_QBUF) until the frame is destroyed. The
-                            // inflight counter is decremented in the same deferred release.
-                            // Attach first and only count the buffer once the continuation is
-                            // installed: constructing/attaching it can throw (std::function copy),
-                            // and incrementing first would leak the in-flight slot on throw. On
-                            // failure zc_attached stays false, so the copy path below returns the
-                            // backend buffer via the trailing continuation() (no double release).
-                            auto inflight = zc_inflight;
-                            try
-                            {
-                                fh.frame->attach_continuation( frame_continuation(
-                                    [continuation, inflight]() {
-                                        continuation();
-                                        inflight->fetch_sub( 1, std::memory_order_relaxed );
-                                    },
-                                    f.pixels ) );
-                                zc_inflight->fetch_add( 1, std::memory_order_relaxed );
-                                zc_attached = true;
-                            }
-                            catch( ... )
-                            {
-                                zc_attached = false;
-                            }
+                            // The final owner releases the backend buffer once, including on allocation failure.
+                            fh.frame->attach_continuation( frame_continuation( [borrowed]() {}, borrowed.get() ) );
                         }
                         // method should be limited to use of MIPI - not for USB
                         // the aim is to grab the data from a bigger buffer, which is aligned to 64 bytes,
@@ -493,7 +474,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // Zero-copy path: the frame now owns the backend buffer and will release it
                     // (via the deferred continuation attached above) when it is destroyed -- do
                     // NOT release it here or the camera would overwrite live frame data.
-                    if( ! zc_attached )
+                    if( ! borrowed )
                         continuation();
 
                     if (!fh.frame)
