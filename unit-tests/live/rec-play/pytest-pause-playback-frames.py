@@ -87,6 +87,7 @@ def calc_playback_timeout( iterations, pause_delay ):
 
 def test_pause_playback_frames(test_device):
     dev, _ = test_device
+    time.sleep( 3 )  # device starts at D0 (Operational); streaming right away fails on D585 GMSL
     # create temporary folder to record to that will be deleted automatically at the end of the script
     # (requires that no files are being held open inside this directory. Important to not keep any handle open to a file
     # in this directory, any handle as such must be set to None)
