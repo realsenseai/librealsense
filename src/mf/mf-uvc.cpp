@@ -959,9 +959,10 @@ namespace librealsense
         {
             CComPtr<IMFAttributes> reader_attrs = nullptr;
 
-            CHECK_HR(MFCreateAttributes(&reader_attrs, 3));
+            CHECK_HR(MFCreateAttributes(&reader_attrs, 4));
             CHECK_HR(reader_attrs->SetUINT32(MF_SOURCE_READER_DISCONNECT_MEDIASOURCE_ON_SHUTDOWN, FALSE));
             CHECK_HR(reader_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE));
+            CHECK_HR(reader_attrs->SetString(MF_READWRITE_MMCSS_CLASS, L"Capture"));
             CHECK_HR(reader_attrs->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK,
                 static_cast<IUnknown*>(new source_reader_callback(shared_from_this()))));
             return reader_attrs;
