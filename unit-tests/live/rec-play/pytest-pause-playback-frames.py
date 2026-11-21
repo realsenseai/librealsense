@@ -29,9 +29,9 @@ STREAMING_DURATION = 3
 TIMEOUT_BUFFER = 6  # [sec] extra time to the expected playback time for not failing on runtime hiccups (D585 GMSL plays back ~2 sec slower than recorded)
 
 
-def record_with_pause( ctx, file_name, iterations, pause_delay=0, resume_delay=0, dev=None ):
+def record_with_pause( file_name, iterations, pause_delay=0, resume_delay=0, dev=None ):
     # creating a pipeline and recording to a file
-    pipeline = rs.pipeline( ctx )
+    pipeline = rs.pipeline()
     cfg = rs.config()
     # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
     # connected device; without enable_device(sn) the pipeline picks the first match.
@@ -86,7 +86,7 @@ def calc_playback_timeout( iterations, pause_delay ):
 
 
 def test_pause_playback_frames(test_device):
-    dev, ctx = test_device
+    dev, _ = test_device
     # create temporary folder to record to that will be deleted automatically at the end of the script
     # (requires that no files are being held open inside this directory. Important to not keep any handle open to a file
     # in this directory, any handle as such must be set to None)
@@ -99,8 +99,8 @@ def test_pause_playback_frames(test_device):
     # probably pause & resume will occur before recording base time is set.
 
     try:
-        timeout = record_with_pause( ctx, file_name, iterations = 1, pause_delay = 0, resume_delay = 0, dev = dev )
-        pipeline = rs.pipeline( ctx )
+        timeout = record_with_pause( file_name, iterations = 1, pause_delay = 0, resume_delay = 0, dev = dev )
+        pipeline = rs.pipeline()
         device_playback = playback( pipeline, file_name )
         psv = PlaybackStatusVerifier( device_playback );
         psv.wait_for_status(timeout, rs.playback_status.stopped)
@@ -117,8 +117,8 @@ def test_pause_playback_frames(test_device):
 
     # Pause time should be lower than recording base time and resume time higher
     try:
-        timeout = record_with_pause( ctx, file_name, iterations = 1, pause_delay = 0, resume_delay = 5, dev = dev )
-        pipeline = rs.pipeline( ctx )
+        timeout = record_with_pause( file_name, iterations = 1, pause_delay = 0, resume_delay = 5, dev = dev )
+        pipeline = rs.pipeline()
         device_playback = playback( pipeline, file_name )
         psv = PlaybackStatusVerifier( device_playback );
         psv.wait_for_status( timeout, rs.playback_status.stopped )
@@ -134,8 +134,8 @@ def test_pause_playback_frames(test_device):
     log.info("delayed pause & delayed resume test")
     # Pause & resume will occur after recording base time is set
     try:
-        timeout = record_with_pause( ctx, file_name, iterations = 1, pause_delay = 3, resume_delay = 2, dev = dev )
-        pipeline = rs.pipeline( ctx )
+        timeout = record_with_pause( file_name, iterations = 1, pause_delay = 3, resume_delay = 2, dev = dev )
+        pipeline = rs.pipeline()
         device_playback = playback( pipeline, file_name )
         psv = PlaybackStatusVerifier( device_playback );
         psv.wait_for_status( timeout, rs.playback_status.stopped )
@@ -152,8 +152,8 @@ def test_pause_playback_frames(test_device):
     # Combination of some of the previous tests, testing accumulated recording capture time
 
     try:
-        timeout = record_with_pause( ctx, file_name, iterations = 2, pause_delay = 0, resume_delay = 2, dev = dev )
-        pipeline = rs.pipeline( ctx )
+        timeout = record_with_pause( file_name, iterations = 2, pause_delay = 0, resume_delay = 2, dev = dev )
+        pipeline = rs.pipeline()
         device_playback = playback( pipeline, file_name )
         psv = PlaybackStatusVerifier( device_playback );
         psv.wait_for_status( timeout, rs.playback_status.stopped )
