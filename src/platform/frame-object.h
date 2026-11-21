@@ -20,6 +20,8 @@ struct frame_object
     const void * pixels;
     const void * metadata;
     rs2_time_t backend_time;
+    // The backend continuation retains the sample and keeps the pixels locked until release.
+    bool can_retain_pixels = false;
 };
 
 
