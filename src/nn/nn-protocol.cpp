@@ -104,9 +104,11 @@ std::string error_message( int32_t code, int slot )
     case -41:
         return "the camera is busy: stop Object Detection streaming and wait for any firmware update or other upload "
                "to finish, then try again";
-    case -65: return "the camera accepts only signed custom network packages, and this package is unsigned";
-    case -66: return "the package signature is not valid";
-    case -67: return "the package is signed with a key this camera does not know";
+    case -65: return "this model package is not signed. Custom NN packages must be signed by RealSense";
+    case -66: return "the model package signature is not valid. Get the package again from the Perception Service";
+    case -67:
+        return "the model package is signed with a key this camera doesn't know. Update the camera firmware or get a "
+               "package for this firmware";
     default: return rsutils::string::from() << "device error " << code;
     }
 }

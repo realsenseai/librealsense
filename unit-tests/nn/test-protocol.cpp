@@ -155,9 +155,10 @@ TEST_CASE( "slot-2 error mapping" )
     CHECK_THAT( thrown_message( -1, 2 ), ContainsSubstring( "Custom NN upload is not supported by this camera's firmware" ) );
     CHECK_THAT( thrown_message( -1, 0 ), ContainsSubstring( "invalid command (-1)" ) );
     // Signature codes
-    CHECK_THAT( thrown_message( -65, 2 ), ContainsSubstring( "unsigned" ) && ContainsSubstring( "(-65)" ) );
+    CHECK_THAT( thrown_message( -65, 2 ), ContainsSubstring( "not signed" ) && ContainsSubstring( "signed by RealSense" )
+                                              && ContainsSubstring( "(-65)" ) );
     CHECK_THAT( thrown_message( -66, 2 ), ContainsSubstring( "signature is not valid" ) && ContainsSubstring( "(-66)" ) );
-    CHECK_THAT( thrown_message( -67, 2 ), ContainsSubstring( "key this camera does not know" ) );
+    CHECK_THAT( thrown_message( -67, 2 ), ContainsSubstring( "key this camera doesn't know" ) );
     for( int32_t code : { -65, -66, -67, -5, -10 } )
     {
         CAPTURE( code );

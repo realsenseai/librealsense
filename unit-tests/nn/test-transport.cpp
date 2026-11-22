@@ -163,7 +163,7 @@ TEST_CASE( "slot 2" )
         fake_transport t;
         t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::error, 8, 0, -65 ) };
         CHECK_THAT( upload( t, 2501, nullptr, nn::slot_param( 2, true ) ),
-                    ContainsSubstring( "unsigned" ) && ContainsSubstring( "(-65)" ) );
+                    ContainsSubstring( "not signed" ) && ContainsSubstring( "(-65)" ) );
 
         fake_transport weights_only;
         weights_only.statuses = { make_status( nn::upload_state::idle, 7 ),
