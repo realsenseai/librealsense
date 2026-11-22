@@ -169,7 +169,7 @@ namespace librealsense
 
             if (_must_enqueue || force)
             {
-                if (!_use_memory_map)
+                if (!_use_memory_map && !_userptr_dma)  // MIPI metadata comes from its own node, not the buffer tail
                 {
                     auto metadata_offset = get_full_length() - MAX_META_DATA_SIZE;
                     memset((uint8_t *)(get_frame_start()) + metadata_offset, 0, MAX_META_DATA_SIZE);

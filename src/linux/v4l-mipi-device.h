@@ -13,7 +13,7 @@ namespace librealsense
         class v4l_mipi_device : public v4l_uvc_meta_device
         {
         public:
-            v4l_mipi_device(const uvc_device_info& info, bool use_memory_map = true);
+            v4l_mipi_device(const uvc_device_info& info, bool use_memory_map = ! use_userptr_capture());
 
             // Zero-copy frames point at the capture buffers, and the driver's MMAP ones are mapped uncached:
             // capture into our own (cached) USERPTR buffers instead.
@@ -35,7 +35,6 @@ namespace librealsense
         protected:
             void streamoff() const override;
             void map_device_descriptor() override;
-            void prepare_capture_buffers() override;
         };
     }  // namespace platform
 }  // namespace librealsense

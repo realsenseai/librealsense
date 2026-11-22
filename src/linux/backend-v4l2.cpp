@@ -34,7 +34,7 @@ namespace librealsense
 
             bool mipi_device = info.is_mipi;
 
-            auto v4l_uvc_dev =        mipi_device ?         std::make_shared<v4l_mipi_device>(info, ! v4l_mipi_device::use_userptr_capture()) :
+            auto v4l_uvc_dev =        mipi_device ?         std::make_shared<v4l_mipi_device>(info) :
                               ((!info.has_metadata_node) ?  std::make_shared<v4l_uvc_device>(info) :
                                                             std::make_shared<v4l_uvc_meta_device>(info));
 

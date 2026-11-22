@@ -42,34 +42,23 @@ namespace librealsense
         void v4l_mipi_device::map_device_descriptor()
         {
             v4l_uvc_meta_device::map_device_descriptor();
+            if( _use_memory_map )
+                return;
             // The USERPTR path supports single-planar capture only; keep MMAP for a multi-planar node.
-            if( ! _use_memory_map && _dev.buf_type != V4L2_BUF_TYPE_VIDEO_CAPTURE )
+            if( _dev.buf_type != V4L2_BUF_TYPE_VIDEO_CAPTURE )
             {
                 LOG_DEBUG( "MIPI " << _name << ": multi-planar capture, using MMAP buffers" );
                 _use_memory_map = true;
+                return;
             }
-        }
-
-        void v4l_mipi_device::prepare_capture_buffers()
-        {
-            try
+            // Ask the driver before any buffer exists: a queue without USERPTR rejects the memory type (EINVAL).
+            v4l2_requestbuffers req = {};
+            req.type = _dev.buf_type;
+            req.memory = V4L2_MEMORY_USERPTR;
+            if( xioctl( _fd, VIDIOC_REQBUFS, &req ) < 0 && errno == EINVAL )
             {
-                v4l_uvc_meta_device::prepare_capture_buffers();
-            }
-            catch( const std::exception & e )
-            {
-                if( _use_memory_map )
-                    throw;
-                // The driver rejected our USERPTR buffers: redo all buffers with its MMAP ones (slower CPU reads)
-                LOG_WARNING( "MIPI " << _name << ": USERPTR capture buffers rejected (" << e.what()
-                                     << "), falling back to MMAP" );
-                const size_t num = _buffers.size();
-                negotiate_kernel_buffers( 0 );  // also drops any buffer already queued
-                allocate_io_buffers( 0 );
+                LOG_WARNING( "MIPI " << _name << ": driver does not support USERPTR capture, using MMAP buffers" );
                 _use_memory_map = true;
-                negotiate_kernel_buffers( num );
-                allocate_io_buffers( num );
-                v4l_uvc_meta_device::prepare_capture_buffers();
             }
         }
 
