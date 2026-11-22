@@ -25,7 +25,6 @@ WARMUP_FRAMESETS = 15
 FPS = 30
 FRAME_PERIOD_MS = 1000.0 / FPS  # with embedded filters the pair must at least arrive within one frame
 COLOR_RES = ( 1280, 720 )
-CAMERA_SYNC_DOMAINS = ( rs.timestamp_domain.hardware_clock, rs.timestamp_domain.global_time )
 
 # name -> ( embedded filter, its 'applied' bit in the depth frame metadata, depth resolution ). None is the baseline.
 # The FW accepts decimated depth only at 640x360 next to 1280x720 color.
@@ -76,11 +75,17 @@ def filter_setup( test_device, request ):
             if t == filter_type:
                 pytest.skip( f"Embedded filter {request.param} not present on this device" )
     initial = { t: toggle.get() for t, toggle in toggles.items() }
+    gt_sensors = [s for s in ( dev.first_depth_sensor(), dev.first_color_sensor() ) if s.supports( rs.option.global_time_enabled )]
+    gt_initial = [s.get_option( rs.option.global_time_enabled ) for s in gt_sensors]
+    for s in gt_sensors:
+        s.set_option( rs.option.global_time_enabled, 0 )  # frame timestamps must be the HW clock
     for t, toggle in toggles.items():
         toggle.set( int( t == filter_type ) )
     yield applied_bit, depth_res
     for t, toggle in toggles.items():
         toggle.set( initial[t] )
+    for s, v in zip( gt_sensors, gt_initial ):
+        s.set_option( rs.option.global_time_enabled, v )
 
 
 @pytest.mark.parametrize( "filter_setup", FILTERS, indirect=True )
@@ -97,6 +102,7 @@ def test_rgb_depth_sync( test_device, filter_setup ):
     framesets = 0
     filtered = 0
     md = rs.frame_metadata_value.embedded_filters
+    hw_md = rs.frame_metadata_value.frame_timestamp
     try:
         for i in range( WARMUP_FRAMESETS + STREAM_SECONDS * FPS ):
             fs = pipe.wait_for_frames()
@@ -107,9 +113,9 @@ def test_rgb_depth_sync( test_device, filter_setup ):
             if not depth or not color:
                 continue
             for f in ( depth, color ):
-                assert f.get_frame_timestamp_domain() in CAMERA_SYNC_DOMAINS, "timestamps are not camera-generated"
-            assert depth.get_frame_timestamp_domain() == color.get_frame_timestamp_domain()
-            deltas.append( abs( depth.get_timestamp() - color.get_timestamp() ) )
+                assert f.get_frame_timestamp_domain() == rs.timestamp_domain.hardware_clock, "timestamp is not the HW clock"
+                assert f.supports_frame_metadata( hw_md ), "frame has no HW timestamp metadata"
+            deltas.append( abs( depth.get_frame_metadata( hw_md ) - color.get_frame_metadata( hw_md ) ) / 1000.0 )  # usec -> ms
             if depth.supports_frame_metadata( md ) and depth.get_frame_metadata( md ) & applied_bit:
                 filtered += 1
     finally:
