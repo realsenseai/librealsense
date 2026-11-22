@@ -25,6 +25,8 @@ WARMUP_FRAMESETS = 15
 FPS = 30
 FRAME_PERIOD_MS = 1000.0 / FPS  # with embedded filters the pair must at least arrive within one frame
 COLOR_RES = ( 1280, 720 )
+# First FW stamping the frame timestamp with its capture time, so the temporal filter latency no longer shifts the depth/color pairing
+TEMPORAL_MIN_FW = { "USB": rsutils.version( "7.59.47005.17570" ), "GMSL": rsutils.version( "7.62.50000.0" ) }  # GMSL: placeholder until FW names the version
 
 # name -> ( embedded filter, its 'applied' bit in the depth frame metadata, depth resolution ). None is the baseline.
 # The FW accepts decimated depth only at 640x360 next to 1280x720 color.
@@ -66,6 +68,9 @@ def filter_setup( test_device, request ):
     dev, _ = test_device
     if dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "temporal DPP and pipeline start/stop on GMSL" )
+    if request.param == "temporal":
+        transport = "GMSL" if dev.get_info( rs.camera_info.connection_type ) == "GMSL" else "USB"
+        require_min_fw_version( dev, TEMPORAL_MIN_FW[transport], f"capture-time frame timestamps with the temporal filter over {transport}" )
     filter_type, applied_bit, depth_res = FILTERS[request.param]
     toggles = {}  # only the filter under test is enabled; the others are off, whatever the FW default is
     for t in COMPOSITE:
