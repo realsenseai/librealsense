@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 namespace librealsense
@@ -34,6 +35,7 @@ namespace librealsense
             uint32_t _timeout;
             int _fildes;
             std::atomic< int > _lock_counter;
+            std::mutex _fd_mtx;  // Guards _lock_counter transitions and _fildes across threads using this instance
         };
     }  // namespace platform
 }  // namespace librealsense
