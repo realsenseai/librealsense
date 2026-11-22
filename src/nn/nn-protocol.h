@@ -89,7 +89,8 @@ inline size_t chunk_count( size_t table_size ) { return ( table_size + CHUNK_SIZ
 // param4 of chunk i out of n: ( n - 1 ) << 16 | i
 inline uint32_t chunk_param( size_t n_chunks, size_t i ) { return static_cast< uint32_t >( ( n_chunks - 1 ) << 16 | i ); }
 
-std::string error_message( int32_t code );
+// Slot 2 has its own wording for -5, -10 and -15
+std::string error_message( int32_t code, int slot = DETECTION_SLOT );
 
 // Throws the library exception matching a device error code. FW without slot 2 refuses a slot-2 upload with -1.
 [[noreturn]] void throw_error( int32_t code, int slot = DETECTION_SLOT );

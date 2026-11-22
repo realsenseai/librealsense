@@ -158,6 +158,19 @@ TEST_CASE( "slot 2" )
         CHECK_THAT( upload( t, 2501, nullptr, nn::slot_param( 2, true ) ),
                     ContainsSubstring( "Custom NN upload is not supported by this camera's firmware" ) );
     }
+    SECTION( "package errors come in the commit, worded for slot 2" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::error, 8, 0, -65 ) };
+        CHECK_THAT( upload( t, 2501, nullptr, nn::slot_param( 2, true ) ),
+                    ContainsSubstring( "unsigned" ) && ContainsSubstring( "(-65)" ) );
+
+        fake_transport weights_only;
+        weights_only.statuses = { make_status( nn::upload_state::idle, 7 ),
+                                  make_status( nn::upload_state::error, 8, 0, -5 ) };
+        CHECK_THAT( upload( weights_only, 2501, nullptr, nn::slot_param( 2, true ) ),
+                    ContainsSubstring( "network library" ) && ContainsSubstring( "(-5)" ) );
+    }
     SECTION( "-1 on slot 0 keeps its message" )
     {
         fake_transport t;

@@ -154,9 +154,29 @@ TEST_CASE( "slot-2 error mapping" )
     CHECK_THROWS_AS( nn::throw_error( -1, 2 ), not_implemented_exception );
     CHECK_THAT( thrown_message( -1, 2 ), ContainsSubstring( "Custom NN upload is not supported by this camera's firmware" ) );
     CHECK_THAT( thrown_message( -1, 0 ), ContainsSubstring( "invalid command (-1)" ) );
-    // The other codes read the same on either slot until HKR assigns the slot-2 ones
+    // Signature codes
+    CHECK_THAT( thrown_message( -65, 2 ), ContainsSubstring( "unsigned" ) && ContainsSubstring( "(-65)" ) );
+    CHECK_THAT( thrown_message( -66, 2 ), ContainsSubstring( "signature is not valid" ) && ContainsSubstring( "(-66)" ) );
+    CHECK_THAT( thrown_message( -67, 2 ), ContainsSubstring( "key this camera does not know" ) );
+    for( int32_t code : { -65, -66, -67, -5, -10 } )
+    {
+        CAPTURE( code );
+        CHECK_THROWS_AS( nn::throw_error( code, 2 ), invalid_value_exception );
+    }
+    // -5 and -10 cover more causes on slot 2, and keep their weights wording on slot 0
+    CHECK_THAT( thrown_message( -5, 2 ), ContainsSubstring( "network library" ) && ContainsSubstring( "s16" )
+                                             && ContainsSubstring( "(-5)" ) );
+    CHECK_THAT( thrown_message( -5, 0 ), ContainsSubstring( "converted for" ) && ! ContainsSubstring( "s16" ) );
+    CHECK_THAT( thrown_message( -10, 2 ), ContainsSubstring( "3 MiB" ) && ContainsSubstring( "scratch" )
+                                              && ContainsSubstring( "flash slot" ) );
+    CHECK_THAT( thrown_message( -10, 0 ), ContainsSubstring( "too large for this camera's model slot" ) );
+    CHECK_THAT( thrown_message( -15, 2 ), ContainsSubstring( "no custom network" ) );
+    CHECK_THAT( thrown_message( -15, 0 ), ContainsSubstring( "no detection model" ) );
+    // Busy: OD streaming, a FW update or another writer
+    CHECK_THAT( nn::error_message( -41 ), ContainsSubstring( "Object Detection" ) && ContainsSubstring( "firmware update" ) );
+    // The rest read the same on either slot
     CHECK( thrown_message( -6, 2 ) == thrown_message( -6, 0 ) );
-    CHECK_THROWS_AS( nn::throw_error( -10, 2 ), invalid_value_exception );
+    CHECK( thrown_message( -41, 2 ) == thrown_message( -41, 0 ) );
     CHECK_THAT( thrown_message( -99, 2 ), ContainsSubstring( "device error -99" ) );
 }
 
