@@ -53,6 +53,19 @@ namespace librealsense
             uint32_t data_type;
         };
 
+        // Texture that lives for a single GL action; freed on scope exit so a throwing GL call doesn't leak it
+        class temp_texture
+        {
+        public:
+            temp_texture() = default;
+            temp_texture( const temp_texture & ) = delete;
+            temp_texture & operator=( const temp_texture & ) = delete;
+            ~temp_texture() { if( _id ) glDeleteTextures( 1, &_id ); }
+            uint32_t create() { glGenTextures( 1, &_id ); return _id; }
+        private:
+            uint32_t _id = 0;
+        };
+
         template<class T, int N = 2>
         class pbo
         {

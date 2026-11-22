@@ -252,6 +252,7 @@ namespace librealsense
 
                 uint32_t depth_texture;
                 uint32_t hist_texture = _cm_texture;
+                temp_texture uploaded_depth, uploaded_hist;
 
                 if (auto input_frame = f.as<rs2::gl::gpu_frame>())
                 {
@@ -260,7 +261,7 @@ namespace librealsense
                 }
                 else
                 {
-                    glGenTextures(1, &depth_texture);
+                    depth_texture = uploaded_depth.create();
                     glBindTexture(GL_TEXTURE_2D, depth_texture);
 
                     if (disparity)
@@ -277,7 +278,7 @@ namespace librealsense
 
                     if (_equalize)
                     {
-                        glGenTextures(1, &hist_texture);
+                        hist_texture = uploaded_hist.create();
                         glBindTexture(GL_TEXTURE_2D, hist_texture);
 
                         if (disparity)
@@ -349,15 +350,6 @@ namespace librealsense
                     _fbo->unbind();
 
                     glBindTexture(GL_TEXTURE_2D, 0);
-
-                    if (!f.is<rs2::gl::gpu_frame>())
-                    {
-                        if (_equalize)
-                        {
-                            glDeleteTextures(1, &hist_texture);
-                        }
-                        glDeleteTextures(1, &depth_texture);
-                    }
                 }
 
             }, 
