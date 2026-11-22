@@ -20,7 +20,7 @@ def test_custom_nn_api_is_exposed():
     for name in ( 'source_frame_id', 'nn_model_generation', 'nn_status', 'nn_model_id' ):
         assert hasattr( rs.frame_metadata_value, name )
     for name in ( 'tensor_count', 'tensor', 'tensors', 'status', 'status_message', 'generation', 'model_id',
-                  'source_frame_id' ):
+                  'source_frame_id', 'description_mismatch' ):
         assert hasattr( rs.custom_nn_frame, name )
     for name in ( 'name', 'dtype', 'shape', 'layout', 'data', 'dequant_scale', 'as_float' ):
         assert hasattr( rs.nn_tensor, name )

@@ -5467,6 +5467,13 @@ int rs2_custom_nn_frame_get_status(const rs2_frame* frame, rs2_error** error) BE
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, frame)
 
+int rs2_custom_nn_frame_get_description_mismatch(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    return VALIDATE_INTERFACE((frame_interface*)frame, librealsense::custom_nn_frame)->get_description_mismatch();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0, frame)
+
 const char* rs2_custom_nn_frame_get_status_message(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(frame);

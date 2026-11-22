@@ -20,6 +20,7 @@
 using rs_fourcc = rsutils::type::fourcc;
 
 #include <map>
+#include <thread>
 #include <vector>
 
 namespace librealsense
@@ -59,20 +60,13 @@ namespace librealsense
             auto on_frame = [this, owner, tf_keeper, global_time]( rs2::frame f, const rs2::frame_source & source )
             {
                 auto nn = dynamic_cast< custom_nn_frame * >( (frame_interface *)f.get() );
-                if( ! nn )
-                    return;
-                auto description = owner->get_custom_nn_description();
-                nn->set_description( description );
-                if( ! nn->is_valid() )
+                if( ! nn || ! nn->is_valid() )
                     return;  // logged by the parser
-                if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
-                    LOG_ERROR( nn->get_status_message() );
                 rs2_metadata_type generation = 0;
                 nn->find_metadata( RS2_FRAME_METADATA_NN_MODEL_GENERATION, &generation );
-                if( description && generation && uint32_t( generation ) != description->generation
-                    && ! _other_model_logged.exchange( true ) )
-                    LOG_WARNING( "The camera runs a Custom NN model other than the installed one; its tensors are not "
-                                 "described until the camera is reset" );
+                nn->set_description( owner->get_custom_nn_description( uint32_t( generation ) ) );
+                if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
+                    LOG_ERROR( nn->get_status_message() );
 
                 // The UVC sensor stamped the frame before its payload was read
                 rs2_metadata_type hw_us = 0;
@@ -99,7 +93,6 @@ namespace librealsense
 
     private:
         std::atomic_bool _load_failed_logged{ false };
-        std::atomic_bool _other_model_logged{ false };
     };
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
@@ -227,14 +220,26 @@ namespace librealsense
         od_ep->register_processing_block( custom_nn_pbf );
     }
 
-    std::shared_ptr< const nn::model_description > d500_object_detection::get_custom_nn_description() const
+    // A frame of a model other than the described one reads NN_INFO again, once per generation, off the frame thread
+    std::shared_ptr< const nn::model_description > d500_object_detection::get_custom_nn_description( uint32_t generation )
     {
         std::lock_guard< std::mutex > lock( _custom_nn_mutex );
+        if( generation && generation != _custom_nn_reread_generation
+            && ( ! _custom_nn_description || _custom_nn_description->generation != generation ) )
+        {
+            _custom_nn_reread_generation = generation;
+            std::weak_ptr< device_interface > device = shared_from_this();
+            std::thread( [this, device, generation]
+                         {
+                             if( auto alive = device.lock() )
+                                 read_custom_nn_description( generation );
+                         } ).detach();
+        }
         return _custom_nn_description;
     }
 
     // NN_INFO describes the stored model, which the camera runs from its next boot; frames of another model stay raw
-    void d500_object_detection::read_custom_nn_description()
+    void d500_object_detection::read_custom_nn_description( uint32_t frame_generation )
     {
         std::shared_ptr< const nn::model_description > description;
         try
@@ -249,6 +254,13 @@ namespace librealsense
         {
             LOG_WARNING( "Custom NN tensors are not described: " << e.what() );
         }
+        if( description )
+            for( auto const & out : description->outputs )
+                if( ! out.dense )
+                    LOG_ERROR( "Custom NN output '" << out.name << "' is not laid out densely; its tensor is exposed raw" );
+        if( frame_generation && ( ! description || description->generation != frame_generation ) )
+            LOG_WARNING( "The camera runs a Custom NN model other than the installed one; its tensors are exposed raw "
+                         "until the camera is reset" );
         std::lock_guard< std::mutex > lock( _custom_nn_mutex );
         _custom_nn_description = std::move( description );
     }

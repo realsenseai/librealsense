@@ -1341,6 +1341,18 @@ namespace rs2
         }
 
         /**
+        * \return true when a tensor is exposed raw (no name, layout or scale): the camera's description of its model is
+        * missing or describes another model, or the tensor doesn't match its output
+        */
+        bool description_mismatch() const
+        {
+            rs2_error* e = nullptr;
+            auto r = rs2_custom_nn_frame_get_description_mismatch(get(), &e);
+            error::handle(e);
+            return r != 0;
+        }
+
+        /**
         * \return what the status means and what to do about it; empty when the status is OK
         */
         std::string status_message() const

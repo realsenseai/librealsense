@@ -22,6 +22,7 @@ struct output_description
     std::vector< int > strides;  // in elements
     uint32_t buffer_size;
     float dequant_scale;  // the raw value divided by it gives the real value
+    bool dense;  // strides lay the sizes out with no gaps; otherwise the SDK can't shape the tensor
 };
 
 struct model_description

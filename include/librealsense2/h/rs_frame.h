@@ -599,6 +599,15 @@ void rs2_custom_nn_frame_get_tensor(const rs2_frame* frame, int index, rs2_nn_te
 int rs2_custom_nn_frame_get_status(const rs2_frame* frame, rs2_error** error);
 
 /**
+* When called on Custom NN frame type, tells whether a tensor is exposed raw (no name, layout or scale): the camera's
+* description of its model is missing or describes another model, or the tensor doesn't match its output
+* \param[in] frame       Custom NN frame
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                Non-zero when a tensor is exposed raw
+*/
+int rs2_custom_nn_frame_get_description_mismatch(const rs2_frame* frame, rs2_error** error);
+
+/**
 * When called on Custom NN frame type, explains its status
 * \param[in] frame       Custom NN frame
 * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
