@@ -408,7 +408,7 @@ void init_frame(py::module &m) {
         .def("status", &rs2::custom_nn_frame::status, "0 when the frame carries tensors, otherwise the camera's error status")
         .def("status_message", &rs2::custom_nn_frame::status_message, "What the status means and what to do about it; empty when OK")
         .def("generation", &rs2::custom_nn_frame::generation, "Generation of the model that made the frame (CRC-32 of its metadata); 0 when none was loaded")
-        .def("source_frame_id", &rs2::custom_nn_frame::source_frame_id, "Sequence number of the camera's RGB frame the network ran on");
+        .def("source_frame_id", &rs2::custom_nn_frame::source_frame_id, "The camera's number of the RGB frame the network ran on, counted from the Custom NN start; not the Color frame counter");
 
     py::class_<rs2::gpu_frame, rs2::frame> gpu_frame(m, "gpu_frame", "Extends the frame class for a GPU-resident (zero-copy) frame on "
         "integrated-GPU CUDA builds. Reach it with frame.as(gpu_frame); the cast is null unless the frame is GPU-resident.");

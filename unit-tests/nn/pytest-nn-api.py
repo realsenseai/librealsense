@@ -25,4 +25,4 @@ def test_custom_nn_api_is_exposed():
         assert hasattr( rs.nn_tensor, name )
     for name in ( 'is_custom_nn_frame', 'as_custom_nn_frame' ):
         assert hasattr( rs.frame, name )
-    assert hasattr( rs.custom_nn_syncer( 4 ), 'match' )
+    assert hasattr( rs.composite_frame, 'get_custom_nn_frame' )

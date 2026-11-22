@@ -1515,7 +1515,7 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_SEGMENTATION_MODE] = "0 - segmentation not applied, otherwise the mode applied";
         descriptions[RS2_FRAME_METADATA_SEGMENTATION_CLASSES] = "Bitmask of the segmentation classes applied";
         descriptions[RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL] = "0 - occlusion removal off, 1 - on";
-        descriptions[RS2_FRAME_METADATA_SOURCE_FRAME_ID] = "Sequence number of the camera's RGB frame the network ran on";
+        descriptions[RS2_FRAME_METADATA_SOURCE_FRAME_ID] = "The camera's number of the RGB frame the network ran on, counted from the Custom NN start";
         descriptions[RS2_FRAME_METADATA_NN_MODEL_GENERATION] = "CRC-32 of the model's metadata; 0 when no model was loaded";
         descriptions[RS2_FRAME_METADATA_NN_STATUS] = "0 - OK, 4 - model load failed, 5 - inference failed";
 

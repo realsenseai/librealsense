@@ -44,20 +44,40 @@ namespace librealsense
     constexpr uint32_t custom_nn_width = 1024;
     constexpr const char * custom_nn_stream_name = "Custom NN";
 
-    // Passes on only the Custom NN frames that parse, so tensors can be trusted downstream
+    // Passes on only the Custom NN frames that parse, so tensors can be trusted downstream. Each is stamped with the
+    // capture time of the Color frame the network ran on, converted as Color's is, so the two match by timestamp.
     class custom_nn_validator : public processing_block
     {
     public:
-        custom_nn_validator()
+        custom_nn_validator( std::weak_ptr< time_diff_keeper > tf_keeper, std::shared_ptr< global_time_option > global_time )
             : processing_block( "Custom NN validator" )
         {
-            auto on_frame = [this]( rs2::frame f, const rs2::frame_source & source )
+            auto on_frame = [this, tf_keeper, global_time]( rs2::frame f, const rs2::frame_source & source )
             {
-                auto nn = dynamic_cast< const custom_nn_frame * >( (frame_interface *)f.get() );
+                auto nn = dynamic_cast< custom_nn_frame * >( (frame_interface *)f.get() );
                 if( ! nn || ! nn->is_valid() )
                     return;  // logged by the parser
                 if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
                     LOG_ERROR( nn->get_status_message() );
+
+                // The UVC sensor stamped the frame before its payload was read
+                rs2_metadata_type hw_us = 0;
+                nn->find_metadata( RS2_FRAME_METADATA_FRAME_TIMESTAMP, &hw_us );
+                double ts = hw_us / 1000.;
+                auto domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
+                auto keeper = tf_keeper.lock();
+                if( keeper && global_time->is_true() )
+                {
+                    bool ready = false;
+                    auto const global = keeper->get_system_hw_time( ts, ready );
+                    if( ready )
+                    {
+                        ts = global;
+                        domain = RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME;
+                    }
+                }
+                nn->set_timestamp( ts );
+                nn->set_timestamp_domain( domain );
                 source.frame_ready( f );
             };
             set_processing_callback( std::make_shared< rs2::frame_processor_callback< decltype( on_frame ) > >( on_frame ) );
@@ -167,7 +187,7 @@ namespace librealsense
         od_ep->register_info( RS2_CAMERA_INFO_PHYSICAL_PORT, physical_port );
 
         register_metadata( raw_od_ep );
-        register_processing_blocks( od_ep );
+        register_processing_blocks( od_ep, enable_global_time_option );
 
         return od_ep;
     }
@@ -178,7 +198,8 @@ namespace librealsense
                                       make_uvc_header_parser( &platform::uvc_header::timestamp ) );
     }
 
-    void d500_object_detection::register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep )
+    void d500_object_detection::register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep,
+                                                            std::shared_ptr< global_time_option > global_time )
     {
         processing_block_factory od_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                             { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
@@ -186,7 +207,8 @@ namespace librealsense
         od_ep->register_processing_block( od_pbf );
         processing_block_factory custom_nn_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
                                                    { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
-                                                   []() { return std::make_shared< custom_nn_validator >(); } };
+                                                   [keeper = std::weak_ptr< time_diff_keeper >( _tf_keeper ), global_time]()
+                                                   { return std::make_shared< custom_nn_validator >( keeper, global_time ); } };
         od_ep->register_processing_block( custom_nn_pbf );
     }
 

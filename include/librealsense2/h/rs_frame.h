@@ -167,7 +167,7 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_SEGMENTATION_MODE                    , /**< OG / LPCL: 0 - segmentation not applied, otherwise the mode applied */
     RS2_FRAME_METADATA_SEGMENTATION_CLASSES                 , /**< OG / LPCL: bitmask of the segmentation classes applied */
     RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL                , /**< Point cloud: 0 - occlusion removal off, 1 - on */
-    RS2_FRAME_METADATA_SOURCE_FRAME_ID                      , /**< Custom NN: sequence number of the camera's RGB frame the network ran on */
+    RS2_FRAME_METADATA_SOURCE_FRAME_ID                      , /**< Custom NN: the camera's number of the RGB frame the network ran on, counted from the Custom NN start; not the Color frame counter */
     RS2_FRAME_METADATA_NN_MODEL_GENERATION                  , /**< Custom NN: generation (CRC-32 of the metadata) of the model that made the frame; 0 when none was loaded */
     RS2_FRAME_METADATA_NN_STATUS                            , /**< Custom NN: inference status, 0 - OK, 4 - model load failed, 5 - inference failed */
     RS2_FRAME_METADATA_COUNT

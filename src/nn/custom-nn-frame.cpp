@@ -92,8 +92,8 @@ bool custom_nn_frame::find_metadata( rs2_frame_metadata_value id, rs2_metadata_t
     case RS2_FRAME_METADATA_SOURCE_FRAME_ID: value = payload.source_frame_id; break;
     case RS2_FRAME_METADATA_NN_MODEL_GENERATION: value = p->layout.header.generation; break;
     case RS2_FRAME_METADATA_NN_STATUS: value = payload.status; break;
-    // Microseconds, as Color's hardware timestamp (RS2_FRAME_METADATA_FRAME_TIMESTAMP) of the frame the network ran on
-    case RS2_FRAME_METADATA_SENSOR_TIMESTAMP: value = rs2_metadata_type( payload.timestamp_ms * 1000 + 0.5 ); break;
+    // The hardware timestamp of the Color frame the network ran on, in microseconds as Color's
+    case RS2_FRAME_METADATA_FRAME_TIMESTAMP: value = rs2_metadata_type( payload.timestamp_ms * 1000 + 0.5 ); break;
     default: return video_frame::find_metadata( id, p_value );
     }
     if( p_value )
