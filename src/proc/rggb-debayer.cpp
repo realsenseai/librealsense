@@ -6,6 +6,7 @@
 #include <cstddef>   // size_t
 #include <cmath>     // std::pow
 #include <cstring>   // std::memcpy
+#include <vector>
 
 namespace librealsense {
 namespace rggb {
@@ -87,20 +88,27 @@ void debayer_rggb8( const uint8_t * bayer, int bayer_stride, int width, int heig
     // full-scale sensor reading maps to 1.0 (matches the reference raw decode).
     const float inv_range = 1.f / ( 255.f - (float)p.black_level );
 
-    // Black-level-subtracted, edge-clamped Bayer sample at (x,y).
-    auto S = [&]( int x, int y ) -> int {
+    // Tone curve and contrast folded into one output LUT (same values as applying them per pixel).
+    uint8_t out_lut[1024];
+    for( int i = 0; i < 1024; ++i )
+        out_lut[i] = to_u8( ( tone[i] - 128.f ) * con + 128.f );
+
+    // Black-level-subtracted Bayer sample at (x,y): edge-clamped for border pixels, direct inside.
+    auto S_edge = [&]( int x, int y ) -> int {
         x = clampi( x, 0, wmax );
         y = clampi( y, 0, hmax );
         int v = static_cast< int >( bayer[ y * bayer_stride + x ] ) - bl;
         return v < 0 ? 0 : v;
     };
+    auto S_inner = [&]( int x, int y ) -> int {
+        int v = static_cast< int >( bayer[ y * bayer_stride + x ] ) - bl;
+        return v < 0 ? 0 : v;
+    };
 
-    for( int y = yb; y < ye; ++y )
+    std::vector< float > fr( width ), fg( width ), fb( width );
+    auto demosaic = [&]( const auto & S, int x, int y )
     {
-        uint8_t * row = dst + static_cast< size_t >( y ) * row_px * 3;
-        const int yodd = y & 1;
-        for( int x = 0; x < width; ++x )
-        {
+            const int yodd = y & 1;
             const int xodd = x & 1;
             float R, G, B;
 
@@ -130,6 +138,28 @@ void debayer_rggb8( const uint8_t * bayer, int bayer_stride, int width, int heig
             }
 
             if( p.swap_rb ) { float t = R; R = B; B = t; }   // RGGB demosaic -> BGGR (real D401 phase)
+            fr[x] = R; fg[x] = G; fb[x] = B;
+    };
+
+    for( int y = yb; y < ye; ++y )
+    {
+        uint8_t * row = dst + static_cast< size_t >( y ) * row_px * 3;
+        if( y == 0 || y == hmax )
+        {
+            for( int x = 0; x < width; ++x )
+                demosaic( S_edge, x, y );
+        }
+        else
+        {
+            demosaic( S_edge, 0, y );
+            for( int x = 1; x < wmax; ++x )
+                demosaic( S_inner, x, y );
+            demosaic( S_edge, wmax, y );
+        }
+        for( int x = 0; x < width; ++x )
+        {
+            uint8_t * px = row + x * 3;
+            const float R = fr[x], G = fg[x], B = fb[x];
 
             // White-balance + digital gain, normalized to [0,1].
             float r = clamp01( R * gr * inv_range );
@@ -144,12 +174,9 @@ void debayer_rggb8( const uint8_t * bayer, int bayer_stride, int width, int heig
             r2 = clamp01( yl + sat * ( r2 - yl ) );
             g2 = clamp01( yl + sat * ( g2 - yl ) );
             b2 = clamp01( yl + sat * ( b2 - yl ) );
-            float rd = tone[ static_cast< int >( r2 * 1023.f ) ];
-            float gd = tone[ static_cast< int >( g2 * 1023.f ) ];
-            float bd = tone[ static_cast< int >( b2 * 1023.f ) ];
-            row[ x * 3 + 0 ] = to_u8( ( rd - 128.f ) * con + 128.f );
-            row[ x * 3 + 1 ] = to_u8( ( gd - 128.f ) * con + 128.f );
-            row[ x * 3 + 2 ] = to_u8( ( bd - 128.f ) * con + 128.f );
+            px[0] = out_lut[ static_cast< int >( r2 * 1023.f ) ];
+            px[1] = out_lut[ static_cast< int >( g2 * 1023.f ) ];
+            px[2] = out_lut[ static_cast< int >( b2 * 1023.f ) ];
         }
         // Zero any padding columns so a narrower image sits cleanly in a wider output frame.
         for( int x = width; x < row_px; ++x )
