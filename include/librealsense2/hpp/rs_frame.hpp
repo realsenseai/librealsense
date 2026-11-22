@@ -1218,6 +1218,150 @@ namespace rs2
         }
     };
 
+    /**
+    * One output tensor of a Custom NN frame; holds the frame, so its data stays valid
+    */
+    class nn_tensor
+    {
+    public:
+        nn_tensor(const frame& f, const rs2_nn_tensor& t) : _frame(f), _tensor(t) {}
+
+        std::string name() const { return _tensor.name; }
+        rs2_nn_dtype dtype() const { return _tensor.dtype; }
+        int output_index() const { return _tensor.output_index; }
+        std::vector<int> shape() const { return std::vector<int>(_tensor.shape, _tensor.shape + _tensor.rank); }
+        std::string layout() const { return _tensor.layout; }
+        const void* data() const { return _tensor.data; }
+        size_t size() const { return _tensor.size; }
+        float dequant_scale() const { return _tensor.dequant_scale; }
+        const rs2_nn_tensor& get() const { return _tensor; }
+
+        /**
+        * The values as float: each raw value divided by dequant_scale (by 1 when the scale is not available)
+        */
+        std::vector<float> as_float() const
+        {
+            float const scale = _tensor.dequant_scale ? _tensor.dequant_scale : 1.f;
+            switch (_tensor.dtype)
+            {
+            case RS2_NN_DTYPE_S16: return convert<int16_t>(scale);
+            case RS2_NN_DTYPE_U16: return convert<uint16_t>(scale);
+            case RS2_NN_DTYPE_S8: return convert<int8_t>(scale);
+            case RS2_NN_DTYPE_U8: return convert<uint8_t>(scale);
+            case RS2_NN_DTYPE_F32: return convert<float>(scale);
+            default: throw error("unsupported tensor dtype");
+            }
+        }
+
+    private:
+        template<class T> std::vector<float> convert(float scale) const
+        {
+            auto values = static_cast<const T*>(_tensor.data);
+            std::vector<float> result(_tensor.size / sizeof(T));
+            for (size_t i = 0; i < result.size(); ++i)
+                result[i] = float(values[i]) / scale;
+            return result;
+        }
+
+        frame _frame;
+        rs2_nn_tensor _tensor;
+    };
+
+    class custom_nn_frame : public video_frame
+    {
+    public:
+        /**
+        * Extends video_frame class with the output tensors of a custom neural network; the raw frame is 1024 x H bytes
+        */
+        custom_nn_frame() : video_frame(frame()) {}
+
+        /**
+        * Extends video_frame class with the output tensors of a custom neural network; the raw frame is 1024 x H bytes
+        * \param[in] frame - existing frame instance
+        */
+        custom_nn_frame(const frame& f)
+            : video_frame(f)
+        {
+            rs2_error* e = nullptr;
+            if (!f || (rs2_is_frame_extendable_to(f.get(), RS2_EXTENSION_CUSTOM_NN_FRAME, &e) == 0 && !e))
+            {
+                reset();
+            }
+            error::handle(e);
+        }
+
+        /**
+        * eturn the number of output tensors; 0 when the frame has an error status
+        */
+        int tensor_count() const
+        {
+            rs2_error* e = nullptr;
+            auto r = rs2_custom_nn_frame_get_tensor_count(get(), &e);
+            error::handle(e);
+            return r;
+        }
+
+        nn_tensor tensor(int index) const
+        {
+            rs2_nn_tensor t;
+            rs2_error* e = nullptr;
+            rs2_custom_nn_frame_get_tensor(get(), index, &t, &e);
+            error::handle(e);
+            return nn_tensor(*this, t);
+        }
+
+        /**
+        * \param[in] name - output name in the model description
+        */
+        nn_tensor tensor(const std::string& name) const
+        {
+            for (auto&& t : tensors())
+                if (t.name() == name)
+                    return t;
+            throw error("no tensor named " + name);
+        }
+
+        std::vector<nn_tensor> tensors() const
+        {
+            std::vector<nn_tensor> result;
+            for (int i = 0, n = tensor_count(); i < n; ++i)
+                result.push_back(tensor(i));
+            return result;
+        }
+
+        /**
+        * eturn 0 when the frame carries tensors, otherwise the camera's error status
+        */
+        int status() const
+        {
+            rs2_error* e = nullptr;
+            auto r = rs2_custom_nn_frame_get_status(get(), &e);
+            error::handle(e);
+            return r;
+        }
+
+        /**
+        * eturn what the status means and what to do about it; empty when the status is OK
+        */
+        std::string status_message() const
+        {
+            rs2_error* e = nullptr;
+            auto r = rs2_custom_nn_frame_get_status_message(get(), &e);
+            error::handle(e);
+            return r;
+        }
+
+        /**
+        * eturn generation of the model that made the frame (CRC-32 of its metadata), 0 when none was loaded
+        */
+        uint32_t generation() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_NN_MODEL_GENERATION)); }
+
+        /**
+        * eturn sequence number of the camera's RGB frame the network ran on
+        */
+        uint32_t source_frame_id() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_SOURCE_FRAME_ID)); }
+    };
+
     class frameset : public frame
     {
     public:
@@ -1407,6 +1551,15 @@ namespace rs2
                 });
             }
             return f.as<object_detection_frame>();
+        }
+
+        /**
+        * Retrieve the Custom NN frame
+        * eturn custom_nn_frame - the output tensors of the custom network
+        */
+        custom_nn_frame get_custom_nn_frame() const
+        {
+            return first_or_default(RS2_STREAM_CUSTOM_NN).as<custom_nn_frame>();
         }
 
         /**

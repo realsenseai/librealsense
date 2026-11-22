@@ -200,7 +200,7 @@ std::vector< stream_interface * > matcher_factory::separate_perception( std::vec
 {
     std::vector< stream_interface * > perception;
     for( auto & profile : profiles )
-        if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
+        if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION || profile->get_stream_type() == RS2_STREAM_CUSTOM_NN )
             perception.push_back( profile );
         else
             rest.push_back( profile );

@@ -135,6 +135,32 @@ typedef struct rs2_object_detection
     int center_of_mass_valid;     /**< Nonzero when world_position, center_of_mass_x and center_of_mass_y are valid */
 } rs2_object_detection;
 
+/** \brief Element type of a neural-network output tensor */
+typedef enum rs2_nn_dtype
+{
+    RS2_NN_DTYPE_S16,   /**< Signed 16-bit integer */
+    RS2_NN_DTYPE_U16,   /**< Unsigned 16-bit integer */
+    RS2_NN_DTYPE_S8,    /**< Signed 8-bit integer */
+    RS2_NN_DTYPE_U8,    /**< Unsigned 8-bit integer */
+    RS2_NN_DTYPE_F32,   /**< 32-bit float */
+    RS2_NN_DTYPE_COUNT  /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
+} rs2_nn_dtype;
+const char* rs2_nn_dtype_to_string(rs2_nn_dtype dtype);
+
+/** \brief One output tensor of a Custom NN frame. Pointers stay valid while the frame is held. */
+typedef struct rs2_nn_tensor
+{
+    const char* name;       /**< Output name from the model description; empty when the description is not available */
+    rs2_nn_dtype dtype;     /**< Element type */
+    int output_index;       /**< Index of the output in the model description */
+    int rank;               /**< Number of dimensions in shape */
+    const int* shape;       /**< Dimensions; the element count when the description is not available */
+    const char* layout;     /**< Order of the dimensions after a leading N (e.g. "NHWC"); empty when not available */
+    const void* data;       /**< Raw tensor data, dense in row-major order */
+    unsigned int size;      /**< Size of data in bytes, without padding */
+    float dequant_scale;    /**< The raw value divided by it gives the real value; 0 when not available */
+} rs2_nn_tensor;
+
 /** \brief Severity of the librealsense logger. */
 typedef enum rs2_log_severity {
     RS2_LOG_SEVERITY_DEBUG, /**< Detailed information about ordinary operations */
@@ -223,6 +249,7 @@ typedef enum rs2_extension
     RS2_EXTENSION_PERCEPTION_PROFILE,
     RS2_EXTENSION_GPU_FRAME,
     RS2_EXTENSION_NN_LOADER,
+    RS2_EXTENSION_CUSTOM_NN_FRAME,
     RS2_EXTENSION_COUNT
 } rs2_extension;
 const char* rs2_extension_type_to_string(rs2_extension type);

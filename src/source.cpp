@@ -66,7 +66,8 @@ namespace librealsense
                                   RS2_EXTENSION_POSE_FRAME,
                                   RS2_EXTENSION_LABELED_POINTS,
                                   RS2_EXTENSION_PERCEPTION_FRAME,
-                                  RS2_EXTENSION_OBJECT_DETECTION_FRAME };
+                                  RS2_EXTENSION_OBJECT_DETECTION_FRAME,
+                                  RS2_EXTENSION_CUSTOM_NN_FRAME };
 
         _metadata_parsers = metadata_parsers;
     }
@@ -221,6 +222,8 @@ namespace librealsense
 
         case RS2_STREAM_OBJECT_DETECTION:
             return RS2_EXTENSION_OBJECT_DETECTION_FRAME;
+        case RS2_STREAM_CUSTOM_NN:
+            return RS2_EXTENSION_CUSTOM_NN_FRAME;
 
         case RS2_STREAM_COLOR:
         case RS2_STREAM_INFRARED:

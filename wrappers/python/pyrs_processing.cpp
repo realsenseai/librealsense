@@ -161,6 +161,12 @@ void init_processing(py::module &m) {
               py::call_guard< py::gil_scoped_release >() );
       /*.def("__call__", &rs2::syncer::operator(), "frame"_a)*/
 
+    py::class_<rs2::custom_nn_syncer> custom_nn_syncer(m, "custom_nn_syncer", "Pairs each Custom NN frame with the Color frame the network ran on, "
+        "by their equal capture time. Feed it the Color frames (or framesets holding them), then match each Custom NN frame.");
+    custom_nn_syncer.def(py::init<size_t>(), "capacity"_a = 8)
+        .def("__call__", &rs2::custom_nn_syncer::operator(), "frame"_a, "Hold a Color frame (the last capacity are kept)")
+        .def("match", &rs2::custom_nn_syncer::match, "frame"_a, "The held Color frame the network ran on, or an empty frame when it isn't held");
+
     py::class_<rs2::align, rs2::filter> align(m, "align", "Performs alignment between depth image and another image.");
     align.def(py::init<rs2_stream>(), "To perform alignment of a depth image to the other, set the align_to parameter with the other stream type.\n"
               "To perform alignment of a non depth image to a depth image, set the align_to parameter to RS2_STREAM_DEPTH.\n"

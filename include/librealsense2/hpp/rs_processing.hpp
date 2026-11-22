@@ -7,6 +7,9 @@
 #include "rs_frame.hpp"
 #include "rs_options.hpp"
 
+#include <deque>
+#include <mutex>
+
 namespace rs2
 {
     /**
@@ -823,6 +826,47 @@ namespace rs2
     private:
         asynchronous_syncer _sync;
         frame_queue _results;
+    };
+
+    /**
+    * Pairs each Custom NN frame with the Color frame the network ran on: their capture times are equal (the Custom NN
+    * RS2_FRAME_METADATA_SENSOR_TIMESTAMP and the Color RS2_FRAME_METADATA_FRAME_TIMESTAMP). Feed it the Color frames
+    * (or framesets holding them), then match each Custom NN frame. Held frames count against the stream's frame queue.
+    */
+    class custom_nn_syncer
+    {
+    public:
+        explicit custom_nn_syncer(size_t capacity = 8) : _capacity(capacity) {}
+
+        void operator()(frame f)
+        {
+            if (auto fs = f.as<frameset>())
+                f = fs.first_or_default(RS2_STREAM_COLOR);
+            if (!f || f.get_profile().stream_type() != RS2_STREAM_COLOR || !f.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+                return;
+            std::lock_guard<std::mutex> lock(_mutex);
+            _colors.push_back(f);
+            if (_colors.size() > _capacity)
+                _colors.pop_front();
+        }
+
+        /**
+        * eturn the held Color frame the network ran on, or an empty frame when it isn't held (not received yet, or too old)
+        */
+        video_frame match(const custom_nn_frame& nn) const
+        {
+            auto const ts = nn.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP);
+            std::lock_guard<std::mutex> lock(_mutex);
+            for (auto it = _colors.rbegin(); it != _colors.rend(); ++it)
+                if (it->get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP) == ts)
+                    return *it;
+            return frame();
+        }
+
+    private:
+        size_t _capacity;
+        std::deque<frame> _colors;
+        mutable std::mutex _mutex;
     };
 
     /**

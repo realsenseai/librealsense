@@ -368,7 +368,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                         bpp = 4;
 
                     auto extension = frame_source::stream_to_frame_types( req_profile_base->get_stream_type() );
-                    const bool is_perception = ( extension == RS2_EXTENSION_OBJECT_DETECTION_FRAME );
+                    const bool is_perception
+                        = ( extension == RS2_EXTENSION_OBJECT_DETECTION_FRAME || extension == RS2_EXTENSION_CUSTOM_NN_FRAME );
                     // The depth-mapping streams are the same case: the profile describes the
                     // occupancy canvas / point-cloud geometry, while the wire carries a framed
                     // payload with its own headers, so width*height*bpp is not its length.

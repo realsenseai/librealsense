@@ -91,5 +91,77 @@ std::string error_message( int32_t code );
 // Throws the library exception matching a device error code
 [[noreturn]] void throw_error( int32_t code );
 
+
+// Custom NN frame, version 2: frame and payload headers in the first 64 bytes, then per tensor a header padded to 64
+// bytes and its data padded to 64 bytes. The CRC covers payload_size bytes after the frame header; zeros follow.
+constexpr uint32_t CUSTOM_NN_MAGIC = 0x4E4E5543;  // "CUNN"
+constexpr uint16_t CUSTOM_NN_VERSION = 0x0200;
+constexpr size_t CUSTOM_NN_ALIGNMENT = 64;
+constexpr uint8_t CUSTOM_NN_ERROR_FLAG = 0x01;
+
+enum class custom_nn_status : uint8_t
+{
+    ok,
+    no_metadata,
+    too_large,
+    tensor_invalid,
+    load_failed,
+    dsp_error,
+};
+
+#pragma pack( push, 1 )
+struct custom_nn_frame_header
+{
+    uint32_t magic;
+    uint16_t version;
+    uint8_t flags;
+    uint32_t payload_size;
+    uint32_t generation;  // CRC-32 of the model's metadata, 0 when none was loaded
+    uint32_t crc32;
+};
+
+struct custom_nn_payload_header
+{
+    double timestamp_ms;       // capture time of the RGB frame the network ran on
+    uint64_t frame_id;
+    uint32_t source_frame_id;  // sequence number of that RGB frame
+    uint8_t tensor_count;
+    uint8_t status;            // custom_nn_status
+};
+
+struct custom_nn_tensor_header
+{
+    uint8_t output_index;  // index in the model description's outputs
+    uint8_t dtype;         // rs2_nn_dtype
+    uint32_t byte_size;
+};
+#pragma pack( pop )
+static_assert( sizeof( custom_nn_frame_header ) == 19, "unexpected Custom NN frame header size" );
+static_assert( sizeof( custom_nn_payload_header ) == 22, "unexpected Custom NN payload header size" );
+static_assert( sizeof( custom_nn_tensor_header ) == 6, "unexpected Custom NN tensor header size" );
+
+struct custom_nn_tensor
+{
+    uint8_t output_index;
+    rs2_nn_dtype dtype;
+    size_t offset;  // of the data, from the start of the frame
+    uint32_t size;
+};
+
+struct custom_nn_frame_layout
+{
+    custom_nn_frame_header header;
+    custom_nn_payload_header payload;
+    std::vector< custom_nn_tensor > tensors;  // empty when the frame has an error status
+};
+
+size_t dtype_size( rs2_nn_dtype dtype );
+
+// Checks and locates the tensors of a Custom NN frame; throws invalid_value_exception saying what is wrong
+custom_nn_frame_layout parse_custom_nn_frame( const uint8_t * data, size_t size );
+
+// What a frame status means and what to do about it; empty for OK
+const char * custom_nn_status_message( uint8_t status, uint32_t generation );
+
 }  // namespace nn
 }  // namespace librealsense

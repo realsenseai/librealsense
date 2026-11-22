@@ -91,5 +91,81 @@ void throw_error( int32_t code )
     throw invalid_value_exception( msg );
 }
 
+
+size_t dtype_size( rs2_nn_dtype dtype )
+{
+    switch( dtype )
+    {
+    case RS2_NN_DTYPE_S8:
+    case RS2_NN_DTYPE_U8: return 1;
+    case RS2_NN_DTYPE_S16:
+    case RS2_NN_DTYPE_U16: return 2;
+    case RS2_NN_DTYPE_F32: return 4;
+    default: return 0;
+    }
+}
+
+
+static size_t round_up( size_t size ) { return ( size + CUSTOM_NN_ALIGNMENT - 1 ) / CUSTOM_NN_ALIGNMENT * CUSTOM_NN_ALIGNMENT; }
+
+
+custom_nn_frame_layout parse_custom_nn_frame( const uint8_t * data, size_t size )
+{
+    auto fail = []( std::string const & why ) { throw invalid_value_exception( "Invalid Custom NN frame: " + why ); };
+    if( size < CUSTOM_NN_ALIGNMENT )
+        fail( rsutils::string::from() << size << " bytes" );
+
+    custom_nn_frame_layout layout;
+    std::memcpy( &layout.header, data, sizeof( layout.header ) );
+    std::memcpy( &layout.payload, data + sizeof( layout.header ), sizeof( layout.payload ) );
+    auto const & header = layout.header;
+    if( header.magic != CUSTOM_NN_MAGIC )
+        fail( rsutils::string::from() << "magic 0x" << std::hex << header.magic );
+    if( header.version != CUSTOM_NN_VERSION )
+        fail( rsutils::string::from() << "unsupported version 0x" << std::hex << header.version );
+
+    size_t const end = sizeof( header ) + size_t( header.payload_size );
+    if( end < CUSTOM_NN_ALIGNMENT || end > size )
+        fail( rsutils::string::from() << "payload size " << header.payload_size << " in a frame of " << size << " bytes" );
+    auto const crc = rsutils::number::calc_crc32( data + sizeof( header ), header.payload_size );
+    if( crc != header.crc32 )
+        fail( rsutils::string::from() << "CRC 0x" << std::hex << crc << ", expected 0x" << header.crc32 );
+
+    if( ( header.flags & CUSTOM_NN_ERROR_FLAG ) || layout.payload.status != uint8_t( custom_nn_status::ok ) )
+        return layout;
+
+    size_t offset = CUSTOM_NN_ALIGNMENT;
+    for( int i = 0; i < layout.payload.tensor_count; ++i )
+    {
+        if( offset + CUSTOM_NN_ALIGNMENT > end )
+            fail( rsutils::string::from() << "tensor " << i << " header past the payload" );
+        custom_nn_tensor_header th;
+        std::memcpy( &th, data + offset, sizeof( th ) );
+        custom_nn_tensor t{ th.output_index, rs2_nn_dtype( th.dtype ), offset + CUSTOM_NN_ALIGNMENT, th.byte_size };
+        size_t const element = th.dtype < RS2_NN_DTYPE_COUNT ? dtype_size( t.dtype ) : 0;
+        if( ! element || t.size % element )
+            fail( rsutils::string::from() << "tensor " << i << " dtype " << int( th.dtype ) << " with " << t.size << " bytes" );
+        if( t.offset + t.size > end )
+            fail( rsutils::string::from() << "tensor " << i << " of " << t.size << " bytes past the payload" );
+        layout.tensors.push_back( t );
+        offset = t.offset + round_up( t.size );
+    }
+    return layout;
+}
+
+
+const char * custom_nn_status_message( uint8_t status, uint32_t generation )
+{
+    switch( custom_nn_status( status ) )
+    {
+    case custom_nn_status::ok: return "";
+    case custom_nn_status::load_failed:
+        return generation ? "The Custom NN model didn't load. Upload it again."
+                          : "A new Custom NN model is installed; reset the camera to use it.";
+    case custom_nn_status::dsp_error: return "Inference failed on this frame.";
+    default: return "The camera couldn't run the Custom NN model on this frame.";
+    }
+}
+
 }  // namespace nn
 }  // namespace librealsense

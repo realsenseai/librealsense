@@ -33,6 +33,7 @@ namespace librealsense
 
     protected:
         std::shared_ptr< stream_interface > _object_detection_stream;
+        std::shared_ptr< stream_interface > _custom_nn_stream;
         uint8_t _object_detection_device_idx = 0;
     };
 

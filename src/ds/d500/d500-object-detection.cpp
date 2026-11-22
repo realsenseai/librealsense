@@ -13,6 +13,7 @@
 #include "stream.h"
 #include "platform/platform-utils.h"
 #include <src/platform/uvc-option.h>
+#include <src/nn/custom-nn-frame.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -39,10 +40,38 @@ namespace librealsense
             { uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), 83, false },
             { 2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ), 2347, true } };
 
+    // A custom network's output shares the OD pin as GREY 1024 x H, H from the installed model
+    constexpr uint32_t custom_nn_width = 1024;
+    constexpr const char * custom_nn_stream_name = "Custom NN";
+
+    // Passes on only the Custom NN frames that parse, so tensors can be trusted downstream
+    class custom_nn_validator : public processing_block
+    {
+    public:
+        custom_nn_validator()
+            : processing_block( "Custom NN validator" )
+        {
+            auto on_frame = [this]( rs2::frame f, const rs2::frame_source & source )
+            {
+                auto nn = dynamic_cast< const custom_nn_frame * >( (frame_interface *)f.get() );
+                if( ! nn || ! nn->is_valid() )
+                    return;  // logged by the parser
+                if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
+                    LOG_ERROR( nn->get_status_message() );
+                source.frame_ready( f );
+            };
+            set_processing_callback( std::make_shared< rs2::frame_processor_callback< decltype( on_frame ) > >( on_frame ) );
+        }
+
+    private:
+        std::atomic_bool _load_failed_logged{ false };
+    };
+
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
+        , _custom_nn_stream( new stream( RS2_STREAM_CUSTOM_NN ) )
     {
         // Over GMSL the stream is multiplexed on the depth sensor's IR node, and the camera takes it by rate alone;
         // over USB it has its own interface. Sensors outlive the device's HW monitor, so a close at teardown skips
@@ -111,6 +140,12 @@ namespace librealsense
 
         if( ! xu_host )
             xu_host = raw_od_ep;
+        raw_od_ep->set_stream_id_resolver(
+            []( const std::vector< platform::stream_profile > &, const platform::stream_profile & p, rs2_stream & type, std::vector< int > & )
+            {
+                if( p.width == custom_nn_width )
+                    type = RS2_STREAM_CUSTOM_NN;
+            } );
         xu_host->register_xu( ds::inference_xu ); // ensure the XU is initialized every time we power the camera
 
         auto od_ep = std::make_shared< d500_object_detection_sensor >( this,
@@ -149,6 +184,10 @@ namespace librealsense
                                             { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                             []() { return std::make_shared< identity_processing_block >(); } };
         od_ep->register_processing_block( od_pbf );
+        processing_block_factory custom_nn_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
+                                                   { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
+                                                   []() { return std::make_shared< custom_nn_validator >(); } };
+        od_ep->register_processing_block( custom_nn_pbf );
     }
 
     void d500_object_detection_sensor::open( const stream_profiles & requests )
@@ -157,6 +196,12 @@ namespace librealsense
         if( depth_sensor.supports_option( RS2_OPTION_DUAL_RGB_RECTIFICATION )
             && depth_sensor.get_option( RS2_OPTION_DUAL_RGB_RECTIFICATION ).query() != 0.f )
             throw wrong_api_call_sequence_exception( "Object detection is not supported while dual RGB rectification is on" );
+
+        // Both are frame sizes of one pin
+        auto is = [&]( rs2_stream s )
+        { return std::any_of( requests.begin(), requests.end(), [s]( std::shared_ptr< stream_profile_interface > const & p ) { return p->get_stream_type() == s; } ); };
+        if( is( RS2_STREAM_CUSTOM_NN ) && is( RS2_STREAM_OBJECT_DETECTION ) )
+            throw wrong_api_call_sequence_exception( "Custom NN and Object Detection can't stream together" );
 
         synthetic_sensor::open( requests );
     }
@@ -182,6 +227,11 @@ namespace librealsense
             {
                 assign_stream( _owner->_object_detection_stream, p );
                 p->set_name( perception_sensor::STREAM_NAME );
+            }
+            else if( p->get_stream_type() == RS2_STREAM_CUSTOM_NN )
+            {
+                assign_stream( _owner->_custom_nn_stream, p );
+                p->set_name( custom_nn_stream_name );
             }
         }
         return results;

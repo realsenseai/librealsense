@@ -68,6 +68,7 @@ RS2_ENUM_HELPERS( rs2_l500_visual_preset, L500_VISUAL_PRESET )
 RS2_ENUM_HELPERS( rs2_calibration_type, CALIBRATION_TYPE )
 RS2_ENUM_HELPERS( rs2_eth_link_priority, LINK_PRIORITY )
 RS2_ENUM_HELPERS( rs2_nn_target, NN_TARGET )
+RS2_ENUM_HELPERS( rs2_nn_dtype, NN_DTYPE )
 RS2_ENUM_HELPERS_CUSTOMIZED( rs2_calibration_status,
                              RS2_CALIBRATION_STATUS_FIRST,
                              RS2_CALIBRATION_STATUS_LAST,

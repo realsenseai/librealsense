@@ -11,3 +11,18 @@ def test_nn_api_is_exposed():
         assert hasattr( rs.nn_loader, name )
     for name in ( 'is_nn_loader', 'as_nn_loader' ):
         assert hasattr( rs.device, name )
+
+
+def test_custom_nn_api_is_exposed():
+    assert rs.stream.custom_nn
+    assert rs.extension.custom_nn_frame
+    assert rs.nn_dtype.s16 and rs.nn_dtype.f32
+    for name in ( 'source_frame_id', 'nn_model_generation', 'nn_status' ):
+        assert hasattr( rs.frame_metadata_value, name )
+    for name in ( 'tensor_count', 'tensor', 'tensors', 'status', 'status_message', 'generation', 'source_frame_id' ):
+        assert hasattr( rs.custom_nn_frame, name )
+    for name in ( 'name', 'dtype', 'shape', 'layout', 'data', 'dequant_scale', 'as_float' ):
+        assert hasattr( rs.nn_tensor, name )
+    for name in ( 'is_custom_nn_frame', 'as_custom_nn_frame' ):
+        assert hasattr( rs.frame, name )
+    assert hasattr( rs.custom_nn_syncer( 4 ), 'match' )

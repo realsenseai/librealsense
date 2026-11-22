@@ -97,6 +97,10 @@ EXPORTS
     rs2_extract_target_dimensions
     rs2_get_frame_object_detection_count
     rs2_get_frame_object_detection
+    rs2_custom_nn_frame_get_tensor_count
+    rs2_custom_nn_frame_get_tensor
+    rs2_custom_nn_frame_get_status
+    rs2_custom_nn_frame_get_status_message
 
     rs2_get_option
     rs2_get_option_value
@@ -525,6 +529,7 @@ EXPORTS
     rs2_restore_default_eth_config
 
     rs2_nn_target_to_string
+    rs2_nn_dtype_to_string
     rs2_nn_upload
     rs2_nn_upload_cpp
     rs2_nn_is_upload_supported
