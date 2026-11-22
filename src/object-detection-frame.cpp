@@ -35,10 +35,13 @@ bool object_detection_frame::validate() const
 
 bool object_detection_frame::validate_payload() const
 {
-    if( data.size() < MIN_FRAME_SIZE )
+    // Not `data`: it is empty when the pixels live in an external (zero-copy) buffer
+    size_t const size = get_frame_data_size();
+    auto const * bytes = get_frame_data();
+    if( size < MIN_FRAME_SIZE )
         return false;
 
-    auto const * header = reinterpret_cast< const object_detection_frame_header * >( data.data() );
+    auto const * header = reinterpret_cast< const object_detection_frame_header * >( bytes );
 
     // The firmware ABI excludes the fixed frame header from CRC coverage. Validate its fields
     // independently; header.size never determines a memory-access or CRC bound.
@@ -59,7 +62,7 @@ bool object_detection_frame::validate_payload() const
     }
 
     auto const * payload
-        = reinterpret_cast< const object_detection_payload_header * >( data.data() + FRAME_HEADER_SIZE );
+        = reinterpret_cast< const object_detection_payload_header * >( bytes + FRAME_HEADER_SIZE );
 
     uint16_t const n = payload->number_of_detections;
     if( n > MAX_DETECTIONS )
@@ -72,16 +75,16 @@ bool object_detection_frame::validate_payload() const
     size_t const expected_size_field = PAYLOAD_HEADER_SIZE + detections_size;
     size_t const expected_data_size_with_detections = FRAME_HEADER_SIZE + expected_size_field;
 
-    // data.size() may exceed the logical payload if the transport adds trailing padding. The header
+    // size may exceed the logical payload if the transport adds trailing padding. The header
     // declares the valid length, and the bounded detection count keeps every read within the buffer.
-    if( data.size() < expected_data_size_with_detections || header->size != expected_size_field )
+    if( size < expected_data_size_with_detections || header->size != expected_size_field )
     {
-        LOG_WARNING( "Object Detection frame size mismatch: got " << data.size() << ", expected at least " << expected_data_size_with_detections <<
+        LOG_WARNING( "Object Detection frame size mismatch: got " << size << ", expected at least " << expected_data_size_with_detections <<
                      ", header size field: " << header->size << ", expected size field: " << expected_size_field );
         return false;
     }
 
-    auto const payload_data = data.data() + FRAME_HEADER_SIZE;
+    auto const payload_data = bytes + FRAME_HEADER_SIZE;
     auto const computed_crc32 = rsutils::number::calc_crc32( payload_data, expected_size_field );
     if( header->crc32 != computed_crc32 )
     {
@@ -108,8 +111,7 @@ object_detection_frame::decoded_object_detection object_detection_frame::get_det
         throw std::out_of_range(
             rsutils::string::from() << "Detection index " << index << " is out of range (count=" << count << ")" );
 
-    auto const * header = reinterpret_cast< const object_detection_frame_header * >( data.data() );
-    auto const * entries = data.data() + FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE;
+    auto const * entries = get_frame_data() + FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE;
 
     decoded_object_detection result;
     auto const & wire = reinterpret_cast< const object_detection_payload_entry * >( entries )[index];
@@ -131,16 +133,16 @@ object_detection_frame::decoded_object_detection object_detection_frame::get_det
 
 object_detection_frame::object_detection_payload_header object_detection_frame::get_payload_header() const
 {
-    if( data.size() < FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE )
+    if( size_t( get_frame_data_size() ) < FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE )
         throw invalid_value_exception( "Object Detection frame is too small" );
-    return *reinterpret_cast< const object_detection_payload_header * >( data.data() + FRAME_HEADER_SIZE );
+    return *reinterpret_cast< const object_detection_payload_header * >( get_frame_data() + FRAME_HEADER_SIZE );
 }
 
 uint16_t object_detection_frame::get_version() const
 {
-    if( data.size() < FRAME_HEADER_SIZE )
+    if( size_t( get_frame_data_size() ) < FRAME_HEADER_SIZE )
         return 0;
-    return reinterpret_cast< const object_detection_frame_header * >( data.data() )->version;
+    return reinterpret_cast< const object_detection_frame_header * >( get_frame_data() )->version;
 }
 
 size_t object_detection_frame::entry_size() const

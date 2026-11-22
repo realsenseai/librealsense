@@ -1,5 +1,4 @@
-/// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'node:url'
@@ -32,12 +31,9 @@ export default defineConfig({
         '**/types.ts',
         'dist/',
       ],
-      all: true,
+      include: ['src/**'],
       // Target 60% coverage as agreed
-      lines: 60,
-      functions: 60,
-      branches: 50,
-      statements: 60,
+      thresholds: { lines: 60, functions: 60, branches: 50, statements: 60 },
     },
   },
 })

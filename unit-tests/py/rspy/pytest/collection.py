@@ -5,6 +5,8 @@
 
 import pytest
 
+from rspy.pytest.device_helpers import REQUIRES_FLAGS, check_fw_requirement
+
 
 # Module-scoped fixtures that are intentionally device-independent (not re-created per camera).
 _PER_CAMERA_FIXTURE_ALLOWLIST = {
@@ -80,6 +82,20 @@ def assert_module_fixtures_are_per_camera(session, items):
             "Depend on test_device (or _test_device_serial) for per-camera lifecycle, or add the "
             "fixture to _PER_CAMERA_FIXTURE_ALLOWLIST if it is genuinely device-independent."
         )
+
+
+def assert_requires_markers_valid(items):
+    """``requires`` is checked by module_device_setup, which sees only module markers: fail collection on one that
+    isn't in the module's pytestmark, takes other than fw= / option= / sensor=, or has a bad fw= (check_fw_requirement)."""
+    for item in items:
+        for marker in item.iter_markers("requires"):
+            try:
+                if marker not in item.getparent(pytest.Module).own_markers or marker.args \
+                        or set(marker.kwargs) - set(REQUIRES_FLAGS):
+                    raise ValueError("use pytestmark = [pytest.mark.requires(fw=..., option=..., sensor=...)]")
+                check_fw_requirement(marker.kwargs.get("fw"))
+            except ValueError as e:
+                raise pytest.UsageError(f"{item.nodeid}: bad requires marker: {e}")
 
 
 def filter_and_sort_items(config, items):

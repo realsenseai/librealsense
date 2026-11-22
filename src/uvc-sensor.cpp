@@ -405,6 +405,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // realigned) and we have not already pinned too many ring buffers.
                     const bool do_zc = capture_zerocopy_enabled()
                                        && ! msp  // split IMU reports share one buffer, requeued after the last copy (v4l-uvc-device.cpp)
+                                       && ! is_depth_mapping && ! is_perception  // CPU-read payloads; GMSL capture memory is uncached
                                        && ! align64
                                        && expected_size == sizeof( uint8_t ) * f.frame_size
                                        && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;

@@ -13,6 +13,7 @@ pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D585S"),  # no accel range control on the safety SKU
     pytest.mark.device_type_exclude("DDS"),  # USB/GMSL-focused: DDS advertises the option through a separate transport
+    pytest.mark.requires(option=rs.option.accel_sensitivity),
 ]
 
 GRAVITY = 9.80665  # m/s^2, ~1000 mg
@@ -25,7 +26,7 @@ FRAMES_TO_CHECK = 20
 def restore_fw_sensitivity(test_device):
     dev, ctx = test_device
     ms = dev.first_motion_sensor()
-    original = {rs.option.accel_sensitivity: ms.get_option(rs.option.accel_sensitivity)} if ms.supports(rs.option.accel_sensitivity) else {}
+    original = {rs.option.accel_sensitivity: ms.get_option(rs.option.accel_sensitivity)}
     yield
     restore_sensitivity(dev, ctx, original)
 
@@ -33,8 +34,6 @@ def restore_fw_sensitivity(test_device):
 def test_accel_sensitivity_all_levels(test_device):
     dev, ctx = test_device
     motion_sensor = dev.first_motion_sensor()
-    if not motion_sensor.supports(rs.option.accel_sensitivity):
-        pytest.skip("Accel Sensitivity option not supported on this device/FW/driver")
 
     for value in range(len(rs.accel_sensitivity.__members__)):
         expected = float(value)

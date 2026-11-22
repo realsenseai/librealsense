@@ -4,8 +4,6 @@
 import pytest
 import platform
 import pyrealsense2 as rs
-import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -17,6 +15,7 @@ pytestmark = [
     pytest.mark.device_each("D455", "D500*"),
     pytest.mark.device_type_exclude("DDS", "GMSL"),
     pytest.mark.skipif(platform.machine() == "aarch64", reason="D455 not available on CI Jetson"),
+    pytest.mark.requires(option=rs.option.gyro_sensitivity, fw={"D585S": None, "D585": "7.61.47150.17821"}),  # older D585 FW has another default
 ]
 
 # product name fragment -> expected RS2_OPTION_GYRO_SENSITIVITY value (the first test of a file runs on a recycled
@@ -26,22 +25,14 @@ EXPECTED_DEFAULT = {
     "D455": 1.0,  # 1000 dps
     "D585": 1.0,  # 1000 dps
 }
-# Older FW has another default (7.58.46322 reports 125 dps), the table holds for FW from the oldest one it was verified on
-MIN_FW = {
-    "D585": rsutils.version(7, 61, 47150, 17821),
-}
 
 
 def test_gyro_sensitivity_default(test_device):
     dev, _ = test_device
     ms = dev.first_motion_sensor()
-    if not ms.supports(rs.option.gyro_sensitivity):
-        pytest.skip("gyro sensitivity not supported on this device/FW")
     name = dev.get_info(rs.camera_info.name)
     key = next((k for k in EXPECTED_DEFAULT if k in name), None)
     if key is None:
         pytest.skip(f"no expected default gyro sensitivity for '{name}', add it to EXPECTED_DEFAULT")
-    if key in MIN_FW:
-        require_min_fw_version(dev, MIN_FW[key], "default gyro sensitivity")
 
     assert ms.get_option(rs.option.gyro_sensitivity) == EXPECTED_DEFAULT[key]

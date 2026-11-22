@@ -11,6 +11,7 @@ pytestmark = [
     pytest.mark.device_exclude("D585 Prototype"), # Exclude D585 temporarily until test is fixed.
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
+    pytest.mark.requires(sensor="Motion Module"),
 ]
 
 
@@ -19,9 +20,6 @@ def test_depth_imu_extrinsics(test_device):
     device_name = device.get_info( rs.camera_info.name )
 
     sensors = {sensor.get_info( rs.camera_info.name ) : sensor for sensor in device.query_sensors()}
-
-    if 'Motion Module' not in sensors:
-        pytest.skip("device has no Motion Module")
 
     depth_profile = rs.stream_profile()
     imu_profile = rs.stream_profile()

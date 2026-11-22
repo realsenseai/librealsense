@@ -464,11 +464,18 @@ namespace librealsense
             (_device_capabilities & ds::ds_caps::CAP_BMI_088) != ds::ds_caps::CAP_UNDEFINED)
         {
                accel_fps_rates = { odr::IMU_FPS_100, odr::IMU_FPS_200 };
-            if( _owner->supports_info( RS2_CAMERA_INFO_PRODUCT_LINE )
-                && _owner->get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) == "D400" )
+            bool const is_d5x5 = ds::d5x5_family_pids.count( _owner->get_pid() ) > 0
+                              && _fw_version >= firmware_version( "7.62.0.0" );
+            if( is_d5x5 || ( _owner->supports_info( RS2_CAMERA_INFO_PRODUCT_LINE )
+                && _owner->get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) == "D400" ) )
             {
-                // D400 new BMI's also support rate of 400 for the accelerometer
+                // D400 new BMI's and D5x5 also support rate of 400 for the accelerometer
                 accel_fps_rates.push_back( odr::IMU_FPS_400 );
+            }
+            if( is_d5x5 )  // D5x5 also supports gyro at 100 Hz
+            {
+                _sensor_name_and_hid_profiles.push_back( { gyro_sensor_name, { RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_GYRO, 0, 1, 1, int( odr::IMU_FPS_100 ) } } );
+                _fps_and_sampling_frequency_per_rs2_stream[RS2_STREAM_GYRO].emplace( unsigned( odr::IMU_FPS_100 ), hid_fps_translation.at( odr::IMU_FPS_100 ) );
             }
         }
         else // Applies to BMI_055 and unrecognized sensors
