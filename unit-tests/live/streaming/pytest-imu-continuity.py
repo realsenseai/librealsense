@@ -25,6 +25,7 @@ pytestmark = [
     pytest.mark.device_exclude("D401"),
     pytest.mark.device_exclude("D405"),
     pytest.mark.device_each("D585"),  # matches D585 and D585S (substring match)
+    pytest.mark.requires(sensor="Motion Module"),  # cameras without an IMU skip before power-on
     pytest.mark.context("nightly"),
 ]
 
@@ -112,13 +113,6 @@ def _find_profile(sensor, stream, fps):
                  and p.format() == rs.format.motion_xyz32f), None)
 
 
-def _first_motion_sensor(dev):
-    try:
-        return dev.first_motion_sensor()
-    except RuntimeError:
-        pytest.skip("Device has no motion sensor")
-
-
 def _pair_supported(dev, motion, accel_fps, gyro_fps):
     # GMSL motion is UVC (D457, D585): the SDK needs equal accel and gyro fps there
     gmsl = dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "GMSL"
@@ -142,13 +136,13 @@ def _video_profiles(dev):
 
 
 def _stream_and_record(dev, motion, accel_fps, gyro_fps, with_video, duration_s):
-    """Stream for duration_s and return {'accel': StreamRecord, 'gyro': StreamRecord}."""
+    """Stream for duration_s; return ({accel/gyro: StreamRecord}, {video stream: frame count})."""
     accel_profile = _find_profile(motion, rs.stream.accel, accel_fps)
     gyro_profile = _find_profile(motion, rs.stream.gyro, gyro_fps)
     video = _video_profiles(dev) if with_video else []
 
     records = {rs.stream.accel: StreamRecord(), rs.stream.gyro: StreamRecord()}
-    video_frames = [0]
+    video_frames = {p.stream_type(): 0 for _, p in video}
 
     def motion_callback(frame):
         rec = records.get(frame.get_profile().stream_type())
@@ -156,7 +150,7 @@ def _stream_and_record(dev, motion, accel_fps, gyro_fps, with_video, duration_s)
             rec.add(frame)
 
     def video_callback(frame):
-        video_frames[0] += 1
+        video_frames[frame.get_profile().stream_type()] += 1
 
     # Raw device timestamps rather than the host-mapped global time
     restore_global_time = None
@@ -190,15 +184,16 @@ def _stream_and_record(dev, motion, accel_fps, gyro_fps, with_video, duration_s)
             sensor.close()
 
     if with_video:
-        log.info("Video frames received during the run: %d", video_frames[0])
-        assert video_frames[0] > 0, "Video streams delivered no frames, IMU was not measured under video load"
-    return records
+        log.info("Video frames received during the run: %s", video_frames)
+    return records, video_frames
 
 
 def _run_continuity(dev, motion, accel_fps, gyro_fps, with_video, duration_s):
-    records = _stream_and_record(dev, motion, accel_fps, gyro_fps, with_video, duration_s)
+    records, video_frames = _stream_and_record(dev, motion, accel_fps, gyro_fps, with_video, duration_s)
+    # A stalled video stream is one more problem, so IMU loss in the same run is still reported
     problems = (evaluate_stream("accel", records[rs.stream.accel], accel_fps) +
-                evaluate_stream("gyro", records[rs.stream.gyro], gyro_fps))
+                evaluate_stream("gyro", records[rs.stream.gyro], gyro_fps) +
+                [f"{s}: no frames during the video run" for s, n in video_frames.items() if n == 0])
     if problems:
         pytest.fail("IMU continuity failed:\n  " + "\n  ".join(problems))
 
@@ -210,7 +205,7 @@ def _pair_id(pair):
 @pytest.mark.parametrize("accel_fps,gyro_fps", IMU_RATE_PAIRS, ids=[_pair_id(p) for p in IMU_RATE_PAIRS])
 def test_imu_continuity_standalone(test_device, accel_fps, gyro_fps):
     dev, _ = test_device
-    motion = _first_motion_sensor(dev)
+    motion = dev.first_motion_sensor()
     if not _pair_supported(dev, motion, accel_fps, gyro_fps):
         pytest.skip(f"accel {accel_fps} / gyro {gyro_fps} not supported on this device")
     _run_continuity(dev, motion, accel_fps, gyro_fps, with_video=False, duration_s=STANDALONE_DURATION_S)
@@ -218,7 +213,7 @@ def test_imu_continuity_standalone(test_device, accel_fps, gyro_fps):
 
 def test_imu_continuity_with_video(test_device):
     dev, _ = test_device
-    motion = _first_motion_sensor(dev)
+    motion = dev.first_motion_sensor()
     pair = next((p for p in VIDEO_RATE_PAIRS if _pair_supported(dev, motion, *p)), None)
     if pair is None:
         pytest.skip("No pair from VIDEO_RATE_PAIRS is supported on this device")
