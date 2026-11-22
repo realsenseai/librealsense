@@ -171,10 +171,13 @@ void rs2::post_processing_filters::map_id_frame_to_frame(rs2::frame first, rs2::
         auto first_uid = first.get_profile().unique_id();
         auto second_uid = second.get_profile().unique_id();
 
-        // An unfiltered frame maps to itself, unless it is already mapped elsewhere (decoded H.264 maps to its source)
+        // An unfiltered frame maps to itself, unless it maps to a shown stream (decoded H.264 to its source)
         if( first_uid == second_uid )
         {
-            viewer.streams_origin.emplace( first_uid, first_uid );
+            std::lock_guard< std::mutex > lock( viewer.streams_mutex );
+            auto it = viewer.streams_origin.find( first_uid );
+            if( it == viewer.streams_origin.end() || ! viewer.streams.count( it->second ) )
+                viewer.streams_origin[first_uid] = first_uid;
             return;
         }
         viewer.streams_origin[first_uid] = second_uid;

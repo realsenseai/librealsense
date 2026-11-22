@@ -2438,9 +2438,8 @@ namespace rs2
             on_frame();
         };
 
-        // H.264 can be rendered only once decoded, and the decoder needs every access unit in order, so decode here,
-        // ahead of the queues that drop frames. Decoded frames come on a profile of their own, mapped to the stream shown;
-        // the device cannot match that profile, so they bypass the syncer.
+        // The decoder needs every access unit in order, so decode ahead of the queues that drop frames. Decoded frames
+        // bypass the syncer: the device cannot match their profile.
         auto h264 = std::make_shared< std::map< int, rs2::h264_decoder > >();
         if( rs2::h264_decoder::is_supported() )
             for( auto & p : profiles )
