@@ -1291,7 +1291,7 @@ namespace rs2
         }
 
         /**
-        * eturn the number of output tensors; 0 when the frame has an error status
+        * \return the number of output tensors; 0 when the frame has an error status
         */
         int tensor_count() const
         {
@@ -1330,7 +1330,7 @@ namespace rs2
         }
 
         /**
-        * eturn 0 when the frame carries tensors, otherwise the camera's error status
+        * \return 0 when the frame carries tensors, otherwise the camera's error status
         */
         int status() const
         {
@@ -1341,7 +1341,7 @@ namespace rs2
         }
 
         /**
-        * eturn what the status means and what to do about it; empty when the status is OK
+        * \return what the status means and what to do about it; empty when the status is OK
         */
         std::string status_message() const
         {
@@ -1352,12 +1352,12 @@ namespace rs2
         }
 
         /**
-        * eturn generation of the model that made the frame (CRC-32 of its metadata), 0 when none was loaded
+        * \return generation of the model that made the frame (CRC-32 of its metadata), 0 when none was loaded
         */
         uint32_t generation() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_NN_MODEL_GENERATION)); }
 
         /**
-        * eturn sequence number of the camera's RGB frame the network ran on
+        * \return sequence number of the camera's RGB frame the network ran on
         */
         uint32_t source_frame_id() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_SOURCE_FRAME_ID)); }
     };
@@ -1555,7 +1555,7 @@ namespace rs2
 
         /**
         * Retrieve the Custom NN frame
-        * eturn custom_nn_frame - the output tensors of the custom network
+        * \return custom_nn_frame - the output tensors of the custom network
         */
         custom_nn_frame get_custom_nn_frame() const
         {

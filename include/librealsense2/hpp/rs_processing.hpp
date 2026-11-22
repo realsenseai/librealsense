@@ -851,7 +851,7 @@ namespace rs2
         }
 
         /**
-        * eturn the held Color frame the network ran on, or an empty frame when it isn't held (not received yet, or too old)
+        * \return the held Color frame the network ran on, or an empty frame when it isn't held (not received yet, or too old)
         */
         video_frame match(const custom_nn_frame& nn) const
         {
