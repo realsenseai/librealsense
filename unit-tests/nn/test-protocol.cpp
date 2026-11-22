@@ -166,6 +166,7 @@ TEST_CASE( "slot-2 error mapping" )
     }
     // -5 and -10 cover more causes on slot 2, and keep their weights wording on slot 0
     CHECK_THAT( thrown_message( -5, 2 ), ContainsSubstring( "network library" ) && ContainsSubstring( "s16" )
+                                             && ContainsSubstring( "416 x 416" ) && ContainsSubstring( "unzipped" )
                                              && ContainsSubstring( "(-5)" ) );
     CHECK_THAT( thrown_message( -5, 0 ), ContainsSubstring( "converted for" ) && ! ContainsSubstring( "s16" ) );
     CHECK_THAT( thrown_message( -10, 2 ), ContainsSubstring( "3 MiB" ) && ContainsSubstring( "scratch" )

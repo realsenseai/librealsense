@@ -60,8 +60,8 @@ static const char * custom_slot_message( int32_t code )
     {
     case -5:
         return "the package is not a valid custom network for this camera. Check that it holds the network library as "
-               "well as the weights, that it was converted for this camera's firmware, and that every output is s16 "
-               "and fits its buffer";
+               "well as the weights, unzipped, that it was converted for this camera's firmware, that its input is at "
+               "most 416 x 416, and that every output is s16 and fits its buffer";
     case -10:
         return "the custom network exceeds this camera's limits: an output frame over 3 MiB, scratch memory over its "
                "budget, or a part larger than its flash slot";
