@@ -14,6 +14,7 @@ pytestmark = [
     pytest.mark.device_each("D585"),
     pytest.mark.device_exclude("D585S"),
     pytest.mark.device_type("USB"),
+    pytest.mark.requires(fw="7.62.47425.18412"),   # MS7 FW, where compressed color is published on 2C and 3C
 ]
 
 W, H, FPS = 1280, 720, 30
@@ -24,10 +25,9 @@ FRAMES = 30
 def test_compressed_color_passthrough(test_device, fmt):
     dev, ctx = test_device
     index = 1 if "Dual RGB" in dev.get_info(rs.camera_info.name) else 0   # 2C names its colors Color 1 / Color 2
-    if not any(p.stream_type() == rs.stream.color and p.stream_index() == index and p.format() == fmt and p.fps() == FPS
+    assert any(p.stream_type() == rs.stream.color and p.stream_index() == index and p.format() == fmt and p.fps() == FPS
                and p.as_video_stream_profile().width() == W and p.as_video_stream_profile().height() == H
-               for s in dev.query_sensors() for p in s.get_stream_profiles()):
-        pytest.skip(f"FW publishes no {fmt} color {W}x{H}@{FPS}")
+               for s in dev.query_sensors() for p in s.get_stream_profiles()), f"FW publishes no {fmt} color {W}x{H}@{FPS}"
 
     pipe = rs.pipeline(ctx)
     cfg = rs.config()
@@ -51,4 +51,5 @@ def test_compressed_color_passthrough(test_device, fmt):
 
     log.debug(f"{fmt} frame sizes: {min(sizes)}..{max(sizes)}")
     assert 0 < max(sizes) < W * H, f"{fmt} frames are not compressed: {max(sizes)} bytes"
-    assert len(set(sizes)) > 1, f"{fmt} frame sizes should vary, all were {sizes[0]}"
+    if fmt == rs.format.h264:   # IDR and P frames differ in size; a JPEG of a static scene can repeat its size
+        assert len(set(sizes)) > 1, f"{fmt} frame sizes should vary, all were {sizes[0]}"

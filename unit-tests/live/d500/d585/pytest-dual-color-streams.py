@@ -88,9 +88,10 @@ def test_both_colors_enumerated(depth_sensor):
 
 
 def check_compressed(sizes, name, fmt):
-    """Compressed frames arrive at their encoded size: under width*height and varying, not padded."""
+    """Compressed frames arrive at their encoded size, under width*height; H.264 sizes also vary (IDR vs P frames)."""
     if fmt in (rs.format.mjpeg, rs.format.h264):
         assert 0 < max( sizes[name] ) < W * H, f"{name} {fmt} frames are not compressed: {max( sizes[name] )} bytes"
+    if fmt == rs.format.h264:
         assert len( sizes[name] ) > 1, f"{name} {fmt} frame sizes should vary, all were {sizes[name]}"
 
 
