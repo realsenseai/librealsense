@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each( "D585" ),
-    pytest.mark.device_exclude( "D585S" ),
+    pytest.mark.device_exclude( "D585S" ),  # the safety SKU has no decimation/temporal embedded filters
     pytest.mark.context( "nightly" ),
 ]
 
