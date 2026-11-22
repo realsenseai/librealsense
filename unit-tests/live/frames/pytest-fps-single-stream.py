@@ -46,9 +46,10 @@ def set_exposure_half_frame_time(sensor, requested_fps):
 
 def check_fps_ladder(sensor, exposure, label, matches, tolerance_at_5fps=0.05):
     """Stream each TESTED_FPS rate the sensor offers; return (rates tested, failures)."""
-    # Set explicitly: a manual run before this one leaves auto exposure off
-    if sensor.supports(rs.option.enable_auto_exposure):
-        sensor.set_option(rs.option.enable_auto_exposure, int(exposure == "auto"))
+    # A manual run before this one leaves auto exposure off; write only on change, D585S rejects any write in run mode
+    auto = int(exposure == "auto")
+    if sensor.supports(rs.option.enable_auto_exposure) and sensor.get_option(rs.option.enable_auto_exposure) != auto:
+        sensor.set_option(rs.option.enable_auto_exposure, auto)
     if sensor.supports(rs.option.auto_exposure_priority):
         sensor.set_option(rs.option.auto_exposure_priority, 0)
 
