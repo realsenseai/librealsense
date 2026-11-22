@@ -43,7 +43,7 @@ namespace librealsense
                     // Attempt to obtain a buffer of the appropriate size from the freelist
                     for (auto it = begin(freelist); it != end(freelist); ++it)
                     {
-                        if (it->data.size() == size)
+                        if (it->storage_size() == size)
                         {
                             backbuffer = std::move(*it);
                             freelist.erase(it);
@@ -62,7 +62,7 @@ namespace librealsense
 
             if (requires_memory)
             {
-                backbuffer.data.resize(size, 0); // TODO: Allow users to provide a custom allocator for frame buffers
+                backbuffer.resize_storage( size );
             }
             // Record the logical size even when we don't allocate `data` (requires_memory==false,
             // e.g. zero-copy capture where the pixels live in an external continuation buffer), so

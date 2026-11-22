@@ -29,6 +29,8 @@ public:
     // pinned+mapped memory (see frame-data-allocator.h); otherwise it is identical to
     // a plain std::vector<uint8_t>. The pointer is always CPU-readable.
     std::vector< uint8_t, frame_data_allocator > data;
+    size_t storage_size() const { return data.size(); }
+    void resize_storage( size_t bytes ) { data.resize( bytes ); }
     frame_additional_data additional_data;
     std::shared_ptr< metadata_parser_map > metadata_parsers = nullptr;
     
