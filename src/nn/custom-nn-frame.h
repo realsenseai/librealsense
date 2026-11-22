@@ -2,7 +2,7 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 #pragma once
 
-#include "nn-protocol.h"
+#include "nn-info.h"
 #include <src/core/video-frame.h>
 
 #include <memory>
@@ -18,6 +18,9 @@ public:
     custom_nn_frame( custom_nn_frame && other );
     custom_nn_frame & operator=( custom_nn_frame && other );
 
+    // Describes the tensors when its generation is the frame's; set before the first access
+    void set_description( std::shared_ptr< const nn::model_description > description ) { _description = std::move( description ); }
+
     // False when the frame can't be parsed (logged once per frame)
     bool is_valid() const { return layout() != nullptr; }
     size_t get_tensor_count() const;
@@ -32,12 +35,14 @@ private:
     {
         nn::custom_nn_frame_layout layout;
         std::vector< std::vector< int > > shapes;
+        std::vector< const nn::output_description * > outputs;  // null for a tensor exposed raw
     };
     parsed const * layout() const;
 
     mutable std::mutex _parse_mutex;
     mutable bool _parse_done = false;
     mutable std::unique_ptr< parsed > _parsed;
+    std::shared_ptr< const nn::model_description > _description;
 };
 
 MAP_EXTENSION( RS2_EXTENSION_CUSTOM_NN_FRAME, librealsense::custom_nn_frame );

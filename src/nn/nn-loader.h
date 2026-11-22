@@ -25,6 +25,9 @@ public:
 
     // Whether the device supports an upload (product, firmware, not locked); otherwise fills the reason
     virtual bool is_upload_supported( std::string & reason ) = 0;
+
+    // The model stored in a slot (NN_INFO) as JSON
+    virtual std::string get_model_info( int slot ) = 0;
 };
 
 MAP_EXTENSION( RS2_EXTENSION_NN_LOADER, nn_loader_interface );

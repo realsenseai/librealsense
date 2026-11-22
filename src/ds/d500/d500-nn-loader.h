@@ -22,6 +22,7 @@ namespace librealsense
         void nn_upload( const uint8_t * file, size_t size, rs2_nn_target target, int slot, bool activate,
                         rs2_update_progress_callback_sptr callback ) override;
         bool is_upload_supported( std::string & reason ) override;
+        std::string get_model_info( int slot ) override;
 
         // The device refuses a FW update during an install, and queues calibration writes behind it
         void enter_update_state() const override;

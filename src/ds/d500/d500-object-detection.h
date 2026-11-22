@@ -6,6 +6,9 @@
 #include "d500-device.h"
 #include <src/perception-sensor.h>
 #include "core/video.h"
+#include <src/nn/nn-info.h>
+
+#include <mutex>
 
 namespace librealsense
 {
@@ -25,8 +28,13 @@ namespace librealsense
                                                                             const std::string & physical_port,
                                                                             std::shared_ptr< uvc_sensor > xu_host );
 
+        // The stored Custom NN model's description, read when the stream opens; null when not available
+        std::shared_ptr< const nn::model_description > get_custom_nn_description() const;
+
     private:
         friend class d500_object_detection_sensor;
+
+        void read_custom_nn_description();
 
         void register_metadata( std::shared_ptr< uvc_sensor > raw_od_ep );
         void register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep,
@@ -35,6 +43,8 @@ namespace librealsense
     protected:
         std::shared_ptr< stream_interface > _object_detection_stream;
         std::shared_ptr< stream_interface > _custom_nn_stream;
+        mutable std::mutex _custom_nn_mutex;
+        std::shared_ptr< const nn::model_description > _custom_nn_description;
         uint8_t _object_detection_device_idx = 0;
     };
 

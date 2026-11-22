@@ -39,4 +39,18 @@ int32_t nn_transport_hwm::read_status( nn::status & status )
     return 0;
 }
 
+
+int32_t nn_transport_hwm::read_chunk( uint16_t table_id, uint32_t param1, uint32_t param3, uint32_t param4,
+                                      std::vector< uint8_t > & table )
+{
+    // The base send: the extended-buffers override would chunk again, without checking each chunk's response
+    command cmd( ds::GET_HKR_CONFIG_TABLE, param1, table_id, param3, param4 );
+    hwmon_response_type response;
+    auto reply = _hwm->hw_monitor::send( cmd, &response );
+    if( response != ds::d500_hwmon_response::SUCCESS )
+        return response;
+    table.insert( table.end(), reply.begin(), reply.end() );
+    return 0;
+}
+
 }  // namespace librealsense
