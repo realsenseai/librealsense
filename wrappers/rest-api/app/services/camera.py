@@ -39,7 +39,7 @@ class Camera:
         # One colorizer, so depth-visualization options (color scheme, min/max distance, histogram eq)
         # set on it affect the streamed depth image
         self.colorizer = rs.colorizer()
-        self.sensors = [Sensor(s, i, f"{self.id}-sensor-{i}") for i, s in enumerate(dev.sensors)]
+        self.sensors = [Sensor(s, i) for i, s in enumerate(dev.sensors)]
 
     def is_metadata_enabled(self) -> bool:
         """False only where Windows keeps its frame metadata off until it is enabled (the SDK says True elsewhere);
@@ -92,8 +92,8 @@ class Camera:
 
     def _streaming_changed(self) -> None:
         """Tell every client what each of its sensors streams now, as a start or stop by any client changed it."""
-        self._events.emit("streaming_changed", {"device_id": self.id, "sensors": {
-            s.id: [r.model_dump() for r in s.active_streams()] for s in self.sensors}})
+        self._events.emit("streaming_changed", {"device_id": self.id, "sensors": [
+            [r.model_dump() for r in s.active_streams()] for s in self.sensors]})
 
     def _stopped(self, profiles: List[rs.stream_profile]) -> None:
         """Close the sockets of the streams a stop ended, and tell every client"""

@@ -6,7 +6,7 @@
 Each message is one JSON text message, {"event": name, ...its fields}:
 
     devices_changed          added, removed: device ids
-    streaming_changed        device_id, sensors: {sensor_id: [stream profile]}, what each sensor streams now
+    streaming_changed        device_id, sensors: [[stream profile] per sensor, by index], what each streams now
     firmware_progress        device_id, progress: 0 to 1, phase: "downloading" or "installing"
     firmware_update_success  device_id, firmware_version
     firmware_update_failed   device_id, error
@@ -17,6 +17,8 @@ Nothing is replayed: a client reads the current state through the REST API once 
 import asyncio
 from typing import Any, Dict, Optional
 
+from fastapi import WebSocket
+
 # A client that doesn't read fast enough would make its queue grow without end. To keep our memory bounded,
 # a client 100 events behind has its socket closed with this code; it reconnects and reads the state again.
 QUEUE_SIZE = 100
@@ -25,10 +27,11 @@ TOO_SLOW = 4003
 
 class Events:
     def __init__(self) -> None:
-        self._queues: Dict[asyncio.Queue, Any] = {}  # one per client, in the order the events happened: its socket
+        # One queue per client, in the order the events happened: its socket
+        self._queues: Dict[asyncio.Queue, WebSocket] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
-    async def serve(self, websocket: Any) -> None:
+    async def serve(self, websocket: WebSocket) -> None:
         """Send the events to an accepted WebSocket until the client disconnects."""
         self._loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue(QUEUE_SIZE)

@@ -33,7 +33,7 @@ export function connectEvents(): void {
     for (const { device } of store.getActiveDevices()) {
       apiClient.getSensors(device.device_id)
         .then(sensors => store.applyStreaming(device.device_id,
-          Object.fromEntries(sensors.map(s => [s.sensor_id, s.active_profiles]))))
+          Object.fromEntries(sensors.map(s => [s.sensor_index, s.active_streams]))))
         .catch(() => {}) // the device left; fetchDevices drops it
     }
   }
@@ -52,5 +52,5 @@ export function connectEvents(): void {
 onEvent('devices_changed', () => useAppStore.getState().fetchDevices(true))
 
 // Any client's start or stop, through either API: every page shows what streams
-onEvent<{ device_id: string; sensors: Record<string, SupportedStreamProfile[]> }>('streaming_changed',
+onEvent<{ device_id: string; sensors: SupportedStreamProfile[][] }>('streaming_changed', // by sensor_index
   m => useAppStore.getState().applyStreaming(m.device_id, m.sensors))

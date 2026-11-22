@@ -28,11 +28,9 @@ export function StreamViewer() {
     const streams: DeviceStream[] = []
     
     Object.values(deviceStates).forEach((ds: DeviceState) => {
-      if (!ds.isActive) return
-      
-      ds.streamConfigs.filter(c => c.enable).forEach(config => {
+ds.streamConfigs.filter(c => c.enable).forEach(config => {
         // The profile this stream runs with on its sensor, if it runs
-        const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_id]
+        const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_index]
         const profile = sensorStatus?.is_streaming ? sensorStatus.profiles?.find(p => streamKey(p) === config.stream_type) : undefined
         if (!profile) return
 
@@ -49,7 +47,7 @@ export function StreamViewer() {
     return streams
   }, [deviceStates])
 
-  const activeDeviceCount = Object.values(deviceStates).filter(ds => ds.isActive).length
+  const activeDeviceCount = Object.keys(deviceStates).length
 
   return (
     <div className="h-full">
@@ -87,7 +85,7 @@ export function StreamViewer() {
             if (isMotionStream) {
               return (
                 <IMUStreamTile
-                  key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                  key={`${stream.deviceId}-${stream.config.sensor_index}-${stream.config.stream_type}`}
                   deviceId={stream.deviceId}
                   streamType={stream.config.stream_type}
                   profile={stream.profile}
@@ -100,7 +98,7 @@ export function StreamViewer() {
             
             return (
               <StreamTile
-                key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                key={`${stream.deviceId}-${stream.config.sensor_index}-${stream.config.stream_type}`}
                 deviceId={stream.deviceId}
                 deviceName={stream.deviceName}
                 serialNumber={stream.serialNumber}

@@ -26,7 +26,7 @@ vi.mock('@/api/frames', () => ({
 
 function motionConfig(streamType: 'accel' | 'gyro'): StreamConfig {
   return {
-    sensor_id: 'motion-sensor',
+    sensor_index: 2,
     stream_type: streamType,
     format: 'motion_xyz32f',
     resolution: { width: 0, height: 0 },
@@ -41,11 +41,9 @@ function streamingDevice(deviceId: string, serial: string, accel?: Sample, gyro?
   if (gyro) samples.set(`${deviceId}/gyro`, gyro)
   const device = createMockDevice({ device_id: deviceId, serial_number: serial })
   return createMockDeviceState(device, {
-    isActive: true,
-    isStreaming: true,
     // A stream is shown only when its sensor reports it running; pipeline mode is gone.
     sensorStreamingStatus: {
-      'motion-sensor': { is_streaming: true, profiles: startedProfiles('accel', 'gyro') },
+      2: { is_streaming: true, profiles: startedProfiles('accel', 'gyro') },
     },
     streamConfigs: [motionConfig('accel'), motionConfig('gyro')],
   })

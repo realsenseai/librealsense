@@ -1,13 +1,13 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-import type { SensorConfig, StreamConfig, SupportedStreamProfile } from '../api/types'
+import type { StreamConfig, SupportedStreamProfile } from '../api/types'
 import { streamKey } from '../api/types'
 
-/** What one sensor is set to; changes snap like the C++ viewer's subdevice_model::get_supported_profiles. */
-export type Selection = SensorConfig & { streams: StreamConfig[] }
-
 type Res = { width: number; height: number }
+
+/** What one sensor is set to; changes snap like the C++ viewer's subdevice_model::get_supported_profiles. */
+export type Selection = { resolution: Res; framerate: number; streams: StreamConfig[] }
 type Profile = SupportedStreamProfile
 
 const sameRes = (a: Res, b: Res) => a.width === b.width && a.height === b.height

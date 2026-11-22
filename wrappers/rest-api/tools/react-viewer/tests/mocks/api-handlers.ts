@@ -4,17 +4,17 @@ import { mockSensors, mockDepthOptions, mockColorOptions, mockMotionOptions, moc
 
 const API_BASE = '/api/v1'
 
-// Map of sensor options by sensor_id suffix
+// Sensor options by sensor_index
 const sensorOptionsMap: Record<string, any[]> = {
-  'sensor-0': mockDepthOptions,
-  'sensor-1': mockColorOptions,
-  'sensor-2': mockMotionOptions,
+  0: mockDepthOptions,
+  1: mockColorOptions,
+  2: mockMotionOptions,
 }
 
 export const handlers = [
   // Health check
   http.get(`${API_BASE}/health`, () => {
-    return HttpResponse.json({ status: 'ok', service: 'realsense-api' })
+    return HttpResponse.json({ sdk_version: '2.58.0', warnings: [] })
   }),
 
   // Get devices list
@@ -42,28 +42,24 @@ export const handlers = [
   }),
 
   // Get sensor options
-  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorId/options/`, ({ params }) => {
-    const sensorId = params.sensorId as string
-    const sensorSuffix = sensorId.split('-').slice(-2).join('-') // e.g., 'sensor-0'
-    const options = sensorOptionsMap[sensorSuffix] || []
-    return HttpResponse.json(options)
+  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/options/`, ({ params }) => {
+    return HttpResponse.json(sensorOptionsMap[params.sensorIndex as string] || [])
   }),
 
   // Set sensor option; answers it as the device now holds it, as every control write does
-  http.put(`${API_BASE}/devices/:deviceId/sensors/:sensorId/options/:optionId`, async ({ params, request }) => {
+  http.put(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/options/:optionId`, async ({ params, request }) => {
     const body = await request.json() as { value: number }
     return HttpResponse.json({ option_id: params.optionId, current_value: body.value, read_only: false })
   }),
 
   // Post-processing filters, keyed by name; only the depth sensor has any
-  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorId/filters/`, ({ params }) => {
-    const sensorId = params.sensorId as string
-    return HttpResponse.json(sensorId.endsWith('sensor-0') ? mockFilters : {})
+  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/filters/`, ({ params }) => {
+    return HttpResponse.json(params.sensorIndex === '0' ? mockFilters : {})
   }),
 
   // Bypass or apply one filter; answers the state it now holds
   http.put(
-    `${API_BASE}/devices/:deviceId/sensors/:sensorId/filters/:filterName/enabled/`,
+    `${API_BASE}/devices/:deviceId/sensors/:sensorIndex/filters/:filterName/enabled/`,
     async ({ params, request }) => {
       const body = await request.json() as { value: boolean }
       return HttpResponse.json({ name: params.filterName, enabled: body.value })
@@ -91,10 +87,9 @@ export const handlers = [
     }
   ),
 
-  // Per-sensor streaming: start / stop return no body
-  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/start`, () => HttpResponse.json(null)),
+  // Per-sensor streaming: open / start / stop / close return no body
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/:step`, () => HttpResponse.json(null)),
   http.get(`${API_BASE}/devices/:deviceId/extrinsics`, () => HttpResponse.json([])),
-  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/stop`, () => HttpResponse.json(null)),
 
   // Recommended firmware (none, unless a test says otherwise)
   http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),

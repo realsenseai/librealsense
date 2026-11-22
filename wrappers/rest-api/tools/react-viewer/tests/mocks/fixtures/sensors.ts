@@ -33,30 +33,24 @@ export const mockMotionSensorProfiles: SupportedStreamProfile[] = profiles([
 ], (p) => (p.stream_type === 'accel' && p.fps === 100) || (p.stream_type === 'gyro' && p.fps === 200))
 
 export const mockDepthSensor: SensorInfo = {
-  sensor_id: '123456789-sensor-0',
+  sensor_index: 0,
   name: 'Stereo Module',
-  type: 'depth',
-  supported_stream_profiles: mockDepthSensorProfiles,
-  active_profiles: [],
-  options: [],
+  stream_profiles: mockDepthSensorProfiles,
+  active_streams: [],
 }
 
 export const mockColorSensor: SensorInfo = {
-  sensor_id: '123456789-sensor-1',
+  sensor_index: 1,
   name: 'RGB Camera',
-  type: 'color',
-  supported_stream_profiles: mockColorSensorProfiles,
-  active_profiles: [],
-  options: [],
+  stream_profiles: mockColorSensorProfiles,
+  active_streams: [],
 }
 
 export const mockMotionSensor: SensorInfo = {
-  sensor_id: '123456789-sensor-2',
+  sensor_index: 2,
   name: 'Motion Module',
-  type: 'motion',
-  supported_stream_profiles: mockMotionSensorProfiles,
-  active_profiles: [],
-  options: [],
+  stream_profiles: mockMotionSensorProfiles,
+  active_streams: [],
 }
 
 export const mockSensors: SensorInfo[] = [

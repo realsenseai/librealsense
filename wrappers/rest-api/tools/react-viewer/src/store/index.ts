@@ -10,17 +10,12 @@ import type {
   ControlGroup,
   SensorFilters,
   FirmwareState,
-  SensorConfig,
-  SensorStreamStatus,
+SensorStreamStatus,
   SupportedStreamProfile,
 } from '../api/types'
 
 // Tracks the in-flight legacy-chatbot request so `stopChatMessage` can abort it.
 let currentChatAbortController: AbortController | null = null
-
-// Map to track pending stop operations by "deviceId:sensorId" key
-// Used to await completion before allowing a new start
-const pendingStopPromises = new Map<string, Promise<void>>()
 
 // Enumerations are unordered across connections; only the newest response may be applied.
 let _fetchSeq = 0
@@ -53,7 +48,7 @@ const resolutionOf = (p: SupportedStreamProfile) => ({ width: p.width, height: p
  * the resolution/fps of the sensor's default, else its first.
  */
 function startupProfiles(sensor: SensorInfo): SupportedStreamProfile[] {
-  const profiles = sensor.supported_stream_profiles
+  const profiles = sensor.stream_profiles
   const anchor = profiles.find(p => p.default) ?? profiles[0]
   return [...new Set(profiles.map(streamKey))].map(key => {
     const ofType = profiles.filter(p => streamKey(p) === key)
@@ -70,7 +65,7 @@ function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
       streamTypeLower === 'depth' || streamTypeLower === 'color' ||
       streamTypeLower === 'gyro' || streamTypeLower === 'accel'
     return {
-      sensor_id: sensor.sensor_id,
+      sensor_index: sensor.sensor_index,
       stream_type: streamKey(profile),
       format: profile.format,
       resolution: resolutionOf(profile),
@@ -86,50 +81,36 @@ function visibleProfiles(profiles: SupportedStreamProfile[]) {
 }
 
 /**
- * The device with each sensor's streaming as the server reports it, by sensor_id, whichever client started
+ * The device with each sensor's streaming as the server reports it, by sensor_index, whichever client started
  * it: a streaming sensor shows its streams selected as they run. Kept from before: a stop this page has in
  * flight, a start error, whether this page started it, and the profiles while they stay the same (a tile
  * reopens its socket when its profile object changes).
  */
-function withStreaming(ds: DeviceState, active: Record<string, SupportedStreamProfile[]>): Partial<DeviceState> {
+function withStreaming(ds: DeviceState, active: Record<number, SupportedStreamProfile[]>): Partial<DeviceState> {
   const sensorStreamingStatus = { ...ds.sensorStreamingStatus }
-  let { streamConfigs, sensorConfigs } = ds
-  for (const [sensorId, listed] of Object.entries(active)) {
-    const was = sensorStreamingStatus[sensorId]
+  let { streamConfigs } = ds
+for (const [key, listed] of Object.entries(active)) {
+    const sensorIndex = Number(key)
+    const was = sensorStreamingStatus[sensorIndex]
     const visible = visibleProfiles(listed)
     const profiles = JSON.stringify(visible) === JSON.stringify(was?.profiles) ? was!.profiles! : visible
     const streaming = profiles.length > 0
-    sensorStreamingStatus[sensorId] = {
-      ...was, sensor_id: sensorId, profiles,
+    sensorStreamingStatus[sensorIndex] = {
+      ...was, sensor_index: sensorIndex, profiles,
       is_streaming: streaming && was?.pendingOp !== 'stopping', // shown stopped from the click on
       startedHere: streaming && !!was?.startedHere, pendingOp: streaming ? was?.pendingOp : null,
     }
     if (!streaming) continue
     streamConfigs = streamConfigs.map(c => {
-      if (c.sensor_id !== sensorId) return c
+      if (c.sensor_index !== sensorIndex) return c
       const p = profiles.find(p => streamKey(p) === c.stream_type)
       return p ? { ...c, format: p.format, resolution: resolutionOf(p), framerate: p.fps, enable: true } : { ...c, enable: false }
     })
-    sensorConfigs = { ...sensorConfigs, [sensorId]: { resolution: resolutionOf(profiles[0]), framerate: profiles[0].fps } }
   }
-  return {
-    sensorStreamingStatus, streamConfigs, sensorConfigs,
-    isStreaming: Object.values(sensorStreamingStatus).some(s => s.is_streaming),
-  }
-}
-
-function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig> {
-  const sensorConfigs: Record<string, SensorConfig> = {}
-  for (const sensor of sensors) {
-    const anchor = sensor.supported_stream_profiles.find(p => p.default) ?? sensor.supported_stream_profiles[0]
-    if (!anchor) continue
-    sensorConfigs[sensor.sensor_id] = { resolution: resolutionOf(anchor), framerate: anchor.fps }
-  }
-  return sensorConfigs
+  return { sensorStreamingStatus, streamConfigs }
 }
 import { apiClient } from '../api/client'
-import { optionLabel, profilesAt, streamKey } from '../api/types'
-import { sharedFps } from '../utils/streamSelection'
+import { isStreaming, optionLabel, profilesAt, streamKey } from '../api/types'
 import {
   checkChatAvailability,
   sendChatMessage as sendChatMessageApi,
@@ -160,7 +141,7 @@ interface AppState {
   fetchDeviceControls: (deviceId: string) => Promise<void>
   setControl: (deviceId: string, key: string, optionId: string, value: number | boolean | string) => Promise<void>
   setControlEnabled: (deviceId: string, key: string, enabled: boolean) => Promise<void>
-  setPostProcessing: (deviceId: string, sensorId: string, enabled: boolean) => Promise<void>
+  setPostProcessing: (deviceId: string, sensorIndex: number, enabled: boolean) => Promise<void>
 
   // Device activation (multi-select support)
   toggleDeviceActive: (device: DeviceInfo) => Promise<void>
@@ -171,16 +152,15 @@ interface AppState {
 
   // Per-device sensors fetch
   fetchSensors: (deviceId: string) => Promise<void>
-  /** What each sensor of the device streams now, by sensor_id, as the server pushes it on any client's start or stop */
-  applyStreaming: (deviceId: string, active: Record<string, SupportedStreamProfile[]>) => void
+  /** What each sensor of the device streams now, by sensor_index, as the server pushes it on any client's start or stop */
+  applyStreaming: (deviceId: string, active: Record<number, SupportedStreamProfile[]>) => void
 
   // Per-device stream configuration
   updateStreamConfig: (deviceId: string, config: StreamConfig) => void
-  updateSensorConfig: (deviceId: string, sensorId: string, config: Partial<SensorConfig>) => void
 
   // Per-sensor streaming (sensor API)
-  startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
-  stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
+  startSensorStreaming: (deviceId: string, sensorIndex: number) => Promise<void>
+  stopSensorStreaming: (deviceId: string, sensorIndex: number) => Promise<void>
 
   // UI state
   viewMode: ViewMode
@@ -329,29 +309,31 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }
   },
 
-  // The colorizer, the advanced controls and each sensor's filters have their own
-  // endpoints rather than riding a sensor's option list. Rebuilt wholesale so groups that
-  // stopped existing drop out, while a single source failing leaves its section empty.
+  // Rebuilt wholesale so groups that stopped existing drop out, while a single source
+  // failing leaves its section empty.
   fetchDeviceControls: async (deviceId: string) => {
     const sensors = get().deviceStates[deviceId]?.sensors || []
     // The controls exist only while advanced mode is on - the device refuses to read them
     // otherwise - so its state decides whether to ask at all.
     const advancedMode = await apiClient.getAdvancedMode(deviceId).catch(() => undefined)
-    const [colorizer, advanced, ...perSensor] = await Promise.all([
+    const [colorizer, advanced, options, filters] = await Promise.all([
       apiClient.getColorizerOptions(deviceId).catch(() => [] as OptionInfo[]),
       advancedMode?.enabled
         ? apiClient.getAdvancedControls(deviceId).catch(() => ({} as AdvancedControls))
         : ({} as AdvancedControls),
-      ...sensors.map((s) => apiClient.getSensorFilters(deviceId, s.sensor_id).catch(() => ({} as SensorFilters))),
+      Promise.all(sensors.map((s) =>
+        apiClient.getSensorOptions(deviceId, s.sensor_index).catch(() => [] as OptionInfo[]))),
+      Promise.all(sensors.map((s) =>
+        apiClient.getSensorFilters(deviceId, s.sensor_index).catch(() => ({} as SensorFilters)))),
     ])
     // The colorizer and the advanced controls belong to the device rather than to a
     // sensor, but the C++ viewer draws them with the depth sensor's controls, so they are
     // stored against it.
     const depthSensorId = sensors.find(
-      (s) => s.supported_stream_profiles.some((p) => p.stream_type.toLowerCase() === 'depth')
-    )?.sensor_id ?? ''
+      (s) => s.stream_profiles.some((p) => p.stream_type.toLowerCase() === 'depth')
+    )?.sensor_index
     const groups: Record<string, ControlGroup> = {
-      colorizer: { section: 'Depth Visualization', sensorId: depthSensorId, name: '', options: colorizer },
+      colorizer: { section: 'Depth Visualization', sensorIndex: depthSensorId, name: '', options: colorizer },
     }
     // Firmware blocks the AE setpoint on D457 and on the D500 family, so the group is not
     // worth drawing there; the legacy viewer leaves it out for the same reason.
@@ -360,22 +342,23 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     for (const [name, options] of Object.entries(advanced)) {
       if (noAeSetpoint && name === 'ae_control') continue
       groups[`advanced_mode/controls/${name}`] =
-        { section: 'Advanced Controls', sensorId: depthSensorId, name, options }
+        { section: 'Advanced Controls', sensorIndex: depthSensorId, name, options }
     }
     sensors.forEach((s, i) => {
-      groups[`sensors/${s.sensor_id}/options`] =
-        { section: 'Controls', sensorId: s.sensor_id, name: '', options: s.options }
-      const color = s.supported_stream_profiles.some((p) => p.stream_type.toLowerCase() === 'color')
-      const sequenceIds = s.options.some((o) => o.option_id === 'sequence_id')
-      for (const [name, filter] of Object.entries(perSensor[i])) {
+      groups[`sensors/${s.sensor_index}/options`] =
+        { section: 'Controls', sensorIndex: s.sensor_index, name: '', options: options[i] }
+      const color = s.stream_profiles.some((p) => p.stream_type.toLowerCase() === 'color')
+      const sequenceIds = options[i].some((o) => o.option_id === 'sequence_id')
+      for (const [name, filter] of Object.entries(filters[i])) {
         // The legacy viewer leaves HDR Merge out where the sensor has no sequence ids
         if (name === 'HDR Merge' && !sequenceIds) continue
-        groups[`sensors/${s.sensor_id}/filters/${name}`] =
-          { section: 'Post-Processing', sensorId: s.sensor_id, name, ...filter, default_enabled: legacyFilterDefault(name, color) }
+        groups[`sensors/${s.sensor_index}/filters/${name}`] =
+          { section: 'Post-Processing', sensorIndex: s.sensor_index, name, ...filter, default_enabled: legacyFilterDefault(name, color) }
       }
     })
     set((state) => patchDevice(state, deviceId, () => ({ controls: groups, advancedMode })))
   },
+
 
   setControl: async (deviceId, key, optionId, value) => {
     try {
@@ -400,23 +383,23 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
   setControlEnabled: async (deviceId, key, enabled) => {
     const ds = get().deviceStates[deviceId]
     const group = ds?.controls[key]
-    if (!group?.sensorId) return
-    if (ds?.postProcessing?.[group.sensorId] !== false) {
+    if (group?.sensorIndex === undefined) return
+    if (ds?.postProcessing?.[group.sensorIndex] !== false) {
       await apiClient.setFilterEnabled(deviceId, key, enabled)
     }
     set((state) => patchGroup(state, deviceId, key, (g) => ({ ...g, enabled })))
   },
 
-  setPostProcessing: async (deviceId, sensorId, enabled) => {
+  setPostProcessing: async (deviceId, sensorIndex, enabled) => {
     // Choices stay in `controls` untouched, as in the legacy viewer: its master switch and
     // its per-filter flags are separate (processing-block-model.h).
     const filters = Object.entries(get().deviceStates[deviceId]?.controls || {})
-      .filter(([, g]) => g.section === 'Post-Processing' && g.sensorId === sensorId)
+      .filter(([, g]) => g.section === 'Post-Processing' && g.sensorIndex === sensorIndex)
     await Promise.all(
       filters.map(([key, g]) => apiClient.setFilterEnabled(deviceId, key, enabled && !!g.enabled))
     )
     set((state) => patchDevice(state, deviceId, (ds) =>
-      ({ postProcessing: { ...ds.postProcessing, [sensorId]: enabled } })))
+      ({ postProcessing: { ...ds.postProcessing, [sensorIndex]: enabled } })))
   },
 
   // Returns the recommendation too: a device that isn't activated has no state to store it
@@ -440,10 +423,10 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     const state = get()
     const existing = state.deviceStates[device.device_id]
     
-    if (existing?.isActive) {
-      // Deactivate: stop what this page started, then remove; other clients' streams go on
-      for (const [sensorId, status] of Object.entries(existing.sensorStreamingStatus)) {
-        if (status.is_streaming && status.startedHere) await get().stopSensorStreaming(device.device_id, sensorId)
+    if (existing) {
+// Deactivate: stop what this page started, then remove; other clients' streams go on
+      for (const [key, status] of Object.entries(existing.sensorStreamingStatus)) {
+        if (status.is_streaming && status.startedHere) await get().stopSensorStreaming(device.device_id, Number(key))
       }
       set((s) => {
         const newStates = { ...s.deviceStates }
@@ -458,10 +441,7 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
         sensors: [],
         controls: {},
         streamConfigs: [],
-        sensorConfigs: {},
-        isStreaming: false,
-        isActive: true,
-        isLoading: true,
+isLoading: true,
         sensorStreamingStatus: {},
       }
       set((s) => ({
@@ -491,15 +471,9 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }
   },
 
-  getActiveDevices: () => {
-    const state = get()
-    return Object.values(state.deviceStates).filter(ds => ds.isActive)
-  },
+  getActiveDevices: () => Object.values(get().deviceStates),
 
-  isAnyDeviceStreaming: () => {
-    const state = get()
-    return Object.values(state.deviceStates).some(ds => ds.isStreaming)
-  },
+  isAnyDeviceStreaming: () => Object.values(get().deviceStates).some(isStreaming),
 
   resetDevice: async (deviceId) => {
     try {
@@ -526,10 +500,10 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     try {
       const sensors = (await apiClient.getSensors(deviceId)).map(s => ({
         ...s,
-        supported_stream_profiles: visibleProfiles(s.supported_stream_profiles),
+        stream_profiles: visibleProfiles(s.stream_profiles),
       }))
-      const fresh = { sensors, streamConfigs: buildStreamConfigs(sensors), sensorConfigs: buildSensorConfigs(sensors), isLoading: false }
-      const active = Object.fromEntries(sensors.map(s => [s.sensor_id, s.active_profiles]))
+      const fresh = { sensors, streamConfigs: buildStreamConfigs(sensors), isLoading: false }
+      const active = Object.fromEntries(sensors.map(s => [s.sensor_index, s.active_streams]))
 
       set((state) => patchDevice(state, deviceId, (ds) => ({ ...fresh, ...withStreaming({ ...ds, ...fresh }, active) })))
     } catch (error) {
@@ -559,7 +533,7 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
           [deviceId]: {
             ...deviceState,
             streamConfigs: deviceState.streamConfigs.map((c) =>
-              c.sensor_id === config.sensor_id && c.stream_type === config.stream_type ? config : c
+              c.sensor_index === config.sensor_index && c.stream_type === config.stream_type ? config : c
             ),
           },
         },
@@ -567,67 +541,27 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     })
   },
 
-  // Per-sensor configuration (resolution/FPS at sensor level)
-  updateSensorConfig: (deviceId, sensorId, config) => {
-    set((state) => {
-      const deviceState = state.deviceStates[deviceId]
-      if (!deviceState) return state
-      
-      const currentConfig = deviceState.sensorConfigs[sensorId] || { resolution: { width: 0, height: 0 }, framerate: 0 }
-      
-      return {
-        deviceStates: {
-          ...state.deviceStates,
-          [deviceId]: {
-            ...deviceState,
-            sensorConfigs: {
-              ...deviceState.sensorConfigs,
-              [sensorId]: {
-                ...currentConfig,
-                ...config,
-              },
-            },
-          },
-        },
-      }
-    })
-  },
-
-  // Per-sensor streaming (sensor API)
-  startSensorStreaming: async (deviceId, sensorId) => {
-    // Wait for any pending stop operation to complete before starting
-    const pendingKey = `${deviceId}:${sensorId}`
-    const pendingStop = pendingStopPromises.get(pendingKey)
-    if (pendingStop) {
-      await pendingStop
-    }
-
-    const state = get()
+// Per-sensor streaming (sensor API)
+  startSensorStreaming: async (deviceId, sensorIndex) => {
+const state = get()
     const deviceState = state.deviceStates[deviceId]
     if (!deviceState) return
 
     // Find ALL enabled stream configs for this sensor (not just first)
     const enabledStreamConfigs = deviceState.streamConfigs.filter(
-      c => c.sensor_id === sensorId && c.enable
+      c => c.sensor_index === sensorIndex && c.enable
     )
     if (enabledStreamConfigs.length === 0) {
       set({ error: 'Enable at least one stream for this sensor' })
       return
     }
 
-    // Get sensor-level resolution/FPS (shared across all streams from this sensor)
-    const sensorConfig = deviceState.sensorConfigs[sensorId]
-    if (!sensorConfig) {
-      set({ error: 'Sensor configuration not found' })
-      return
-    }
-
-    const sensor = deviceState.sensors.find(s => s.sensor_id === sensorId)!
-    const shared = sharedFps(sensor.supported_stream_profiles)
+    // A sensor with one resolution/fps has it on each of its streams (DevicePanel writes it to all)
+    const sensor = deviceState.sensors.find(s => s.sensor_index === sensorIndex)!
     const profiles: SupportedStreamProfile[] = []
     for (const c of enabledStreamConfigs) {
-      const { resolution, framerate } = shared ? sensorConfig : c
-      const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p => p.format === c.format)
+      const { resolution, framerate } = c
+const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p => p.format === c.format)
       if (!profile) {
         set({ error: `${c.stream_type} has no ${c.format} profile at ${resolution.width}x${resolution.height} ${framerate}fps` })
         return
@@ -636,11 +570,11 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }
 
     try {
-      await apiClient.startSensor(deviceId, sensorId, profiles)
+      await apiClient.startSensor(deviceId, sensorIndex, profiles)
       // As the server's push, which may have come first: the same merge keeps the tiles' profile objects
       set((s) => ({ ...patchDevice(s, deviceId, (ds) => {
-        const started = withStreaming(ds, { [sensorId]: profiles })
-        started.sensorStreamingStatus![sensorId].startedHere = true
+        const started = withStreaming(ds, { [sensorIndex]: profiles })
+        started.sensorStreamingStatus![sensorIndex].startedHere = true
         return started
       }), error: null }))
     } catch (error) {
@@ -663,8 +597,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
             ...s.deviceStates[deviceId],
             sensorStreamingStatus: {
               ...s.deviceStates[deviceId].sensorStreamingStatus,
-              [sensorId]: {
-                sensor_id: sensorId,
+              [sensorIndex]: {
+                sensor_index: sensorIndex,
                 is_streaming: false,
                 error: errorMessage,
               },
@@ -675,85 +609,22 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }
   },
 
-  stopSensorStreaming: async (deviceId, sensorId) => {
-    const pendingKey = `${deviceId}:${sensorId}`
-
-    // Optimistically update UI immediately
-    set((s) => {
-      const deviceState = s.deviceStates[deviceId]
-      if (!deviceState) return s
-
-      const currentSensorStatus = deviceState.sensorStreamingStatus[sensorId] || {
-        sensor_id: sensorId,
-        is_streaming: false,
-      }
-
-      const newSensorStatus = {
-        ...deviceState.sensorStreamingStatus,
-        [sensorId]: {
-          ...currentSensorStatus,
-          is_streaming: false,  // Optimistic: immediately show as stopped
-          pendingOp: 'stopping' as const,  // Track that we're stopping
-        },
-      }
-
-      // Check if any sensors are still streaming (excluding this one)
-      const anyStreaming = Object.entries(newSensorStatus).some(
-        ([id, ss]) => id !== sensorId && ss.is_streaming
-      )
-
-      return {
-        deviceStates: {
-          ...s.deviceStates,
-          [deviceId]: {
-            ...deviceState,
-            isStreaming: anyStreaming,
-            sensorStreamingStatus: newSensorStatus,
-          },
-        },
-      }
-    })
-
-    // Create and store the stop promise so startSensorStreaming can await it
-    const stopPromise = (async () => {
-      try {
-        await apiClient.stopSensor(deviceId, sensorId)
-        get().applyStreaming(deviceId, { [sensorId]: [] })
-      } catch (error) {
-        // Rollback: restore streaming state on error
-        set((s) => {
-          const deviceState = s.deviceStates[deviceId]
-          if (!deviceState) return s
-
-          const currentSensorStatus = deviceState.sensorStreamingStatus[sensorId]
-
-          return {
-            error: `Failed to stop sensor: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            deviceStates: {
-              ...s.deviceStates,
-              [deviceId]: {
-                ...deviceState,
-                isStreaming: true,
-                sensorStreamingStatus: {
-                  ...deviceState.sensorStreamingStatus,
-                  [sensorId]: {
-                    ...currentSensorStatus,
-                    is_streaming: true,  // Rollback: restore streaming state
-                    pendingOp: null,     // Clear pending state
-                  },
-                },
-              },
-            },
-          }
-        })
-      } finally {
-        // Always remove from pending map when done
-        pendingStopPromises.delete(pendingKey)
-      }
-    })()
-
-    pendingStopPromises.set(pendingKey, stopPromise)
-    await stopPromise
+  stopSensorStreaming: async (deviceId, sensorIndex) => {
+    // Shown stopped from the click on; the switch stays off until the stop is done
+    set((s) => patchDevice(s, deviceId, (ds) => ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus,
+      [sensorIndex]: { ...ds.sensorStreamingStatus[sensorIndex], sensor_index: sensorIndex,
+        is_streaming: false, pendingOp: 'stopping' } } })))
+    try {
+      await apiClient.stopSensor(deviceId, sensorIndex)
+      get().applyStreaming(deviceId, { [sensorIndex]: [] })
+    } catch (error) {
+      set({ error: `Failed to stop sensor: ${error instanceof Error ? error.message : 'Unknown error'}` })
+      // Still held, or the device is gone: show what the server has
+      const sensors = await apiClient.getSensors(deviceId).catch(() => [])
+      set((s) => patchDevice(s, deviceId, (ds) => ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus,
+        [sensorIndex]: { ...ds.sensorStreamingStatus[sensorIndex], pendingOp: null } } })))
+      get().applyStreaming(deviceId, { [sensorIndex]: sensors.find(s => s.sensor_index === sensorIndex)?.active_streams ?? [] })
+    }
   },
 
   // UI state
@@ -870,7 +741,7 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
             )
             
             if (proposedConfig) {
-              // Merge proposed config with existing, keeping sensor_id from existing
+              // Merge proposed config with existing, keeping sensor_index from existing
               return {
                 ...existingConfig,
                 format: proposedConfig.format || existingConfig.format,
@@ -897,19 +768,11 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       // Apply option changes
       if (settings.optionChanges) {
         for (const change of settings.optionChanges) {
-          // Map sensor label (e.g., "RGB Camera") to unique sensor_id for this device
-          let uniqueSensorId = change.sensorId
-          if (deviceState.sensors && deviceState.sensors.length > 0) {
-            const match = deviceState.sensors.find(
-              s => s.name === change.sensorId || s.sensor_id === change.sensorId
-            )
-            if (match) {
-              uniqueSensorId = match.sensor_id
-            }
-          }
-          await get().setControl(
-            deviceId, `sensors/${uniqueSensorId}/options`, change.optionId, change.value
-          )
+          // The API takes a sensor's index; its name ("RGB Camera") is only a fallback, as names need not be unique
+          const match = deviceState.sensors?.find(s => s.sensor_index === change.sensorIndex)
+            ?? deviceState.sensors?.find(s => s.name === change.sensorId)
+          if (!match) throw new Error(`No sensor ${change.sensorIndex ?? `named "${change.sensorId}"`}`)
+          await get().setControl(deviceId, `sensors/${match.sensor_index}/options`, change.optionId, change.value)
         }
       }
       
@@ -921,13 +784,13 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
         if (enabledConfigs.length === 0) {
           throw new Error('No streams enabled. Please configure at least one stream before starting.')
         }
-        for (const sensorId of new Set(enabledConfigs.map(c => c.sensor_id))) {
-          await get().startSensorStreaming(deviceId, sensorId)
+        for (const sensorIndex of new Set(enabledConfigs.map(c => c.sensor_index))) {
+          await get().startSensorStreaming(deviceId, sensorIndex)
         }
       } else if (settings.streamAction === 'stop') {
         const status = get().deviceStates[deviceId]?.sensorStreamingStatus || {}
-        for (const [sensorId, ss] of Object.entries(status)) {
-          if (ss.is_streaming) await get().stopSensorStreaming(deviceId, sensorId)
+        for (const [key, ss] of Object.entries(status)) {
+          if (ss.is_streaming) await get().stopSensorStreaming(deviceId, Number(key))
         }
       }
       

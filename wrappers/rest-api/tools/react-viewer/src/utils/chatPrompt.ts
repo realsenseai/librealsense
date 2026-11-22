@@ -1,6 +1,6 @@
 // System prompt builder and response parser for AI camera configuration chat
 
-import { optionLabel, streamKey } from '../api/types'
+import { isStreaming, optionLabel, streamKey } from '../api/types'
 import type { ControlGroup, DeviceState, SensorInfo, StreamConfig } from '../api/types'
 
 /**
@@ -10,6 +10,7 @@ export interface ProposedSettings {
   deviceSerial: string
   streamConfigs?: StreamConfig[]
   optionChanges?: Array<{
+    sensorIndex?: number  // as the REST API addresses a sensor; names need not be unique
     sensorId: string
     optionId: string
     value: number | boolean | string
@@ -56,6 +57,7 @@ When proposing settings changes, include them in a JSON block that can be parsed
   ],
   "optionChanges": [
     {
+      "sensorIndex": 0,
       "sensorId": "sensor_name",
       "optionId": "option_name",
       "value": 50
@@ -103,10 +105,10 @@ function buildDeviceContext(deviceStates: Record<string, DeviceState>): string {
   const deviceDescriptions: string[] = []
   
   for (const [serial, state] of Object.entries(deviceStates)) {
-    const { device, sensors, controls, streamConfigs, isStreaming } = state
+    const { device, sensors, controls, streamConfigs } = state
     
     let desc = `### ${device.name} (Serial: ${serial})
-- Status: ${isStreaming ? 'STREAMING' : 'STOPPED'}
+- Status: ${isStreaming(state) ? 'STREAMING' : 'STOPPED'}
 - Firmware: ${device.firmware_version || 'Unknown'}
 - USB Type: ${device.usb_type || 'Unknown'}
 
@@ -117,7 +119,7 @@ ${formatSensors(sensors)}
 ${formatStreamConfigs(streamConfigs)}
 
 **Available Options:**
-${formatOptions(controls)}
+${formatOptions(controls, sensors)}
 `
     deviceDescriptions.push(desc)
   }
@@ -129,7 +131,7 @@ function formatSensors(sensors: SensorInfo[]): string {
   if (!sensors.length) return '  (none loaded)'
   
   return sensors.map(s => {
-    const profiles = s.supported_stream_profiles || []
+    const profiles = s.stream_profiles || []
     const streamTypes = [...new Set(profiles.map(streamKey))]
 
     // Build available resolutions and FPS for each stream type
@@ -141,7 +143,7 @@ function formatSensors(sensors: SensorInfo[]): string {
       return `${type} (${resolutions} @ ${fps} fps)`
     })
     
-    return `  - ${s.name}:\n      ${streamDetails.join('\n      ') || 'No streams'}`
+    return `  - ${s.name} (sensor ${s.sensor_index}):\n      ${streamDetails.join('\n      ') || 'No streams'}`
   }).join('\n')
 }
 
@@ -154,7 +156,7 @@ function formatStreamConfigs(configs: StreamConfig[]): string {
   ).join('\n')
 }
 
-function formatOptions(controls: Record<string, ControlGroup>): string {
+function formatOptions(controls: Record<string, ControlGroup>, sensors: SensorInfo[]): string {
   const formatted: string[] = []
 
   // A sensor's own controls only: the chatbot sets options by sensor and option name.
@@ -163,7 +165,8 @@ function formatOptions(controls: Record<string, ControlGroup>): string {
     // Only show key options to keep context manageable
     const keyOptions = group.options.filter(o => isKeyOption(optionLabel(o.option_id)))
     if (keyOptions.length) {
-      formatted.push(`  ${group.sensorId}:`)
+      const name = sensors.find(s => s.sensor_index === group.sensorIndex)?.name
+      formatted.push(`  ${name ? `${name} (sensor ${group.sensorIndex})` : `sensor ${group.sensorIndex}`}:`)
       keyOptions.forEach(o => {
         formatted.push(
           `    - ${optionLabel(o.option_id)}: ${o.current_value} [${o.min_value}-${o.max_value}]`

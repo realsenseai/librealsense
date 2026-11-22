@@ -44,16 +44,19 @@ def test_stop_stream(setup_mock_managers):
 def test_sensor_reports_the_profiles_it_streams(setup_mock_managers):
     def depth_sensor():
         return next(s for s in client.get("/api/v1/devices/device1/sensors/").json()
-                    if any(p["stream_type"] == "depth" for p in s["supported_stream_profiles"]))
+                    if any(p["stream_type"] == "depth" for p in s["stream_profiles"]))
 
     sensor = depth_sensor()
-    assert sensor["active_profiles"] == []
-    profile = next(p for p in sensor["supported_stream_profiles"] if p["stream_type"] == "depth")
-    url = f"/api/v1/devices/device1/sensors/{sensor['sensor_id']}"
-    assert client.post(f"{url}/start", json={"profiles": [profile]}).status_code == 200
-    assert depth_sensor()["active_profiles"] == [profile]
+    assert sensor["active_streams"] == []
+    profile = next(p for p in sensor["stream_profiles"] if p["stream_type"] == "depth")
+    url = f"/api/v1/devices/device1/sensors/{sensor['sensor_index']}"
+    opened = {k: v for k, v in profile.items() if k != "default"}  # the SDK's to list, not the client's to send
+    assert client.post(f"{url}/open", json={"profiles": [opened]}).status_code == 200
+    assert client.post(f"{url}/start").status_code == 200
+    assert depth_sensor()["active_streams"] == [profile]
     assert client.post(f"{url}/stop").status_code == 200
-    assert depth_sensor()["active_profiles"] == []
+    assert client.post(f"{url}/close").status_code == 200
+    assert depth_sensor()["active_streams"] == []
 
 
 def test_extrinsics_between_the_device_streams(setup_mock_managers):
@@ -62,27 +65,28 @@ def test_extrinsics_between_the_device_streams(setup_mock_managers):
     assert {(e["stream_type"], e["stream_index"]) for e in response.json()} >= {("depth", 0)}
 
 
-def test_stopping_a_sensor_the_pipeline_runs_is_refused(setup_mock_managers):
+def test_stopping_a_sensor_the_pipeline_runs_stops_it(setup_mock_managers):
     sensor = setup_mock_managers["rs_manager"].cameras["device1"].dev.sensors[0]
     sensor._active = sensor.get_stream_profiles()[:1]  # opened by the pipeline, not the sensor API
-    response = client.post("/api/v1/devices/device1/sensors/device1-sensor-0/stop")
-    assert response.status_code == 409
+    assert client.post("/api/v1/devices/device1/sensors/0/stop").status_code == 200
+    assert client.post("/api/v1/devices/device1/sensors/0/close").status_code == 200
+    assert not sensor.get_active_streams()
 
 
-def test_every_start_and_stop_tells_the_clients(setup_mock_managers):
+def test_every_start_and_close_tells_the_clients(setup_mock_managers):
     sensor = next(s for s in client.get("/api/v1/devices/device1/sensors/").json()
-                  if any(p["stream_type"] == "depth" for p in s["supported_stream_profiles"]))
-    profile = next(p for p in sensor["supported_stream_profiles"] if p["stream_type"] == "depth")
-    url = f"/api/v1/devices/device1/sensors/{sensor['sensor_id']}"
+                  if any(p["stream_type"] == "depth" for p in s["stream_profiles"]))
+    profile = next(p for p in sensor["stream_profiles"] if p["stream_type"] == "depth")
+    url = f"/api/v1/devices/device1/sensors/{sensor['sensor_index']}"
     with client.websocket_connect("/api/v1/events") as events:
-        client.post(f"{url}/start", json={"profiles": [profile]})
-        client.post(f"{url}/stop")
+        for step in ("open", "start", "stop", "close"):
+            client.post(f"{url}/{step}", json={"profiles": [profile]} if step == "open" else None)
         changes = [events.receive_json() for _ in range(2)]
-    assert [(m["event"], m["device_id"], m["sensors"][sensor["sensor_id"]]) for m in changes] == [
+    assert [(m["event"], m["device_id"], m["sensors"][sensor["sensor_index"]]) for m in changes] == [
         ("streaming_changed", "device1", [profile]), ("streaming_changed", "device1", [])]
 
 
-def test_a_refused_start_leaves_the_other_owner_streaming(setup_mock_managers):
+def test_a_refused_open_leaves_the_other_owner_streaming(setup_mock_managers):
     sensor = setup_mock_managers["rs_manager"].cameras["device1"].dev.sensors[0]
     running = sensor.get_stream_profiles()[:1]
     sensor._active = running  # another client holds it
@@ -90,7 +94,7 @@ def test_a_refused_start_leaves_the_other_owner_streaming(setup_mock_managers):
     def refuse(profiles):
         raise RuntimeError("open() failed. UVC device is already opened!")
     sensor.open = refuse
-    row = client.get("/api/v1/devices/device1/sensors/").json()[0]["supported_stream_profiles"][0]
-    response = client.post("/api/v1/devices/device1/sensors/device1-sensor-0/start", json={"profiles": [row]})
-    assert response.status_code == 500
+    row = client.get("/api/v1/devices/device1/sensors/").json()[0]["stream_profiles"][0]
+    response = client.post("/api/v1/devices/device1/sensors/0/open", json={"profiles": [row]})
+    assert response.status_code == 400  # the SDK's error
     assert sensor.get_active_streams() == running
