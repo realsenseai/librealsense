@@ -101,6 +101,7 @@ EXPORTS
     rs2_custom_nn_frame_get_tensor
     rs2_custom_nn_frame_get_status
     rs2_custom_nn_frame_get_status_message
+    rs2_custom_nn_frame_get_description_mismatch
 
     rs2_get_option
     rs2_get_option_value

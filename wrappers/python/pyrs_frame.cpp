@@ -407,6 +407,9 @@ void init_frame(py::module &m) {
         .def("tensor", (rs2::nn_tensor(rs2::custom_nn_frame::*)(const std::string&) const) &rs2::custom_nn_frame::tensor, "name"_a, "Get a tensor by its output name")
         .def("tensors", &rs2::custom_nn_frame::tensors, "All output tensors")
         .def("status", &rs2::custom_nn_frame::status, "0 when the frame carries tensors, otherwise the camera's error status")
+        .def("description_mismatch", &rs2::custom_nn_frame::description_mismatch, "True when a tensor is exposed raw "
+             "(no name, layout or scale): the camera's description of its model is missing or another model's, or the "
+             "tensor doesn't match its output")
         .def("status_message", &rs2::custom_nn_frame::status_message, "What the status means and what to do about it; empty when OK")
         .def("generation", &rs2::custom_nn_frame::generation, "Generation of the model that made the frame (CRC-32 of its metadata); 0 when none was loaded")
         .def("model_id", &rs2::custom_nn_frame::model_id, "Id of the model that made the frame, from its package; 0 when it has none")

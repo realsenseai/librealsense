@@ -22,6 +22,24 @@ static rs2_nn_dtype parse_dtype( const std::string & dtype )
 }
 
 
+// Strides in elements, the last one varying fastest; none given means dense. A size-1 dimension's stride is never used.
+static bool is_dense( const std::vector< int > & sizes, const std::vector< int > & strides )
+{
+    if( strides.empty() )
+        return true;
+    if( strides.size() != sizes.size() )
+        return false;
+    int expected = 1;
+    for( size_t i = sizes.size(); i-- > 0; )
+    {
+        if( sizes[i] != 1 && strides[i] != expected )
+            return false;
+        expected *= sizes[i];
+    }
+    return true;
+}
+
+
 std::shared_ptr< const model_description > parse_model_description( const std::string & metadata, uint32_t generation )
 {
     try
@@ -42,13 +60,15 @@ std::shared_ptr< const model_description > parse_model_description( const std::s
             if( index >= outputs.size() || seen[index] )
                 throw invalid_value_exception( rsutils::string::from() << "output index " << index );
             seen[index] = true;
-            desc->outputs[index] = { o.at( "name" ).get< std::string >(),
-                                     parse_dtype( o.at( "dtype" ).get< std::string >() ),
-                                     o.at( "sizes" ).get< std::vector< int > >(),
-                                     o.value( "format", "" ),
-                                     o.value( "strides", std::vector< int >() ),
-                                     o.at( "buffer_size" ).get< uint32_t >(),
-                                     o.at( "dequant_scale" ).get< float >() };
+            auto & out = desc->outputs[index];
+            out = { o.at( "name" ).get< std::string >(),
+                    parse_dtype( o.at( "dtype" ).get< std::string >() ),
+                    o.at( "sizes" ).get< std::vector< int > >(),
+                    o.value( "format", "" ),
+                    o.value( "strides", std::vector< int >() ),
+                    o.at( "buffer_size" ).get< uint32_t >(),
+                    o.at( "dequant_scale" ).get< float >() };
+            out.dense = is_dense( out.sizes, out.strides );
         }
         return desc;
     }

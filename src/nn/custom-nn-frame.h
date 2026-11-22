@@ -18,13 +18,15 @@ public:
     custom_nn_frame( custom_nn_frame && other );
     custom_nn_frame & operator=( custom_nn_frame && other );
 
-    // Describes the tensors when its generation is the frame's; set before the first access
-    void set_description( std::shared_ptr< const nn::model_description > description ) { _description = std::move( description ); }
+    // Describes the tensors when its generation is the frame's; set before the frame is handed out
+    void set_description( std::shared_ptr< const nn::model_description > description );
 
     // False when the frame can't be parsed (logged once per frame)
     bool is_valid() const { return layout() != nullptr; }
     size_t get_tensor_count() const;
     rs2_nn_tensor get_tensor( size_t index ) const;
+    // True when a tensor is exposed raw: no description of the frame's model, or its output doesn't match the tensor
+    bool get_description_mismatch() const;
     uint8_t get_status() const;
     const char * get_status_message() const;
 
@@ -36,8 +38,10 @@ private:
         nn::custom_nn_frame_layout layout;
         std::vector< std::vector< int > > shapes;
         std::vector< const nn::output_description * > outputs;  // null for a tensor exposed raw
+        bool description_mismatch = false;
     };
     parsed const * layout() const;
+    void describe( parsed & p ) const;
 
     mutable std::mutex _parse_mutex;
     mutable bool _parse_done = false;

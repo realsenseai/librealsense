@@ -302,6 +302,14 @@ TEST_CASE( "model description" )
     CHECK_THAT( description_error( with( "\"dtype\": \"s16\"", "\"dtype\": \"bf16\"" ) ), ContainsSubstring( "bf16" ) );
     CHECK_THAT( description_error( with( "\"name\": \"boxes\", ", "" ) ), ContainsSubstring( "name" ) );
     CHECK_THAT( description_error( "not json" ), ContainsSubstring( "Invalid Custom NN model metadata" ) );
+
+    // Strides: dense (a size-1 dimension's stride is never used), padded, or not given
+    CHECK( scores.dense );
+    CHECK( desc->outputs[1].dense );
+    CHECK( nn::parse_model_description( with( "\"strides\": [80, 80, 1]", "\"strides\": [80, 7, 1]" ), 0 )->outputs[0].dense );
+    CHECK_FALSE( nn::parse_model_description( with( "\"strides\": [80, 80, 1]", "\"strides\": [96, 96, 1]" ), 0 )->outputs[0].dense );
+    CHECK_FALSE( nn::parse_model_description( with( "\"strides\": [80, 80, 1]", "\"strides\": [80, 1]" ), 0 )->outputs[0].dense );
+    CHECK( nn::parse_model_description( with( ", \"strides\": [80, 80, 1]", "" ), 0 )->outputs[0].dense );
 }
 
 
