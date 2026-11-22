@@ -117,6 +117,7 @@ def test_rgb_depth_sync( test_device, filter_setup ):
             for f in ( depth, color ):
                 assert f.get_frame_timestamp_domain() == rs.timestamp_domain.hardware_clock, "timestamp is not the HW clock"
                 assert f.supports_frame_metadata( hw_md ), "frame has no HW timestamp metadata"
+            # The syncer pairs on get_timestamp() (within half a frame), the metadata is independent of it, so this delta can exceed half a frame
             deltas.append( abs( depth.get_frame_metadata( hw_md ) - color.get_frame_metadata( hw_md ) ) / 1000.0 )  # usec -> ms
             if depth.supports_frame_metadata( md ) and depth.get_frame_metadata( md ) & applied_bit:
                 filtered += 1
