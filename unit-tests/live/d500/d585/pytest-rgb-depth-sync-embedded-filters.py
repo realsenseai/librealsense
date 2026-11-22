@@ -75,17 +75,11 @@ def filter_setup( test_device, request ):
             if t == filter_type:
                 pytest.skip( f"Embedded filter {request.param} not present on this device" )
     initial = { t: toggle.get() for t, toggle in toggles.items() }
-    gt_sensors = [s for s in ( dev.first_depth_sensor(), dev.first_color_sensor() ) if s.supports( rs.option.global_time_enabled )]
-    gt_initial = [s.get_option( rs.option.global_time_enabled ) for s in gt_sensors]
-    for s in gt_sensors:
-        s.set_option( rs.option.global_time_enabled, 0 )  # frame timestamps must be the HW clock
     for t, toggle in toggles.items():
         toggle.set( int( t == filter_type ) )
     yield applied_bit, depth_res
     for t, toggle in toggles.items():
         toggle.set( initial[t] )
-    for s, v in zip( gt_sensors, gt_initial ):
-        s.set_option( rs.option.global_time_enabled, v )
 
 
 @pytest.mark.parametrize( "filter_setup", FILTERS, indirect=True )
@@ -97,7 +91,10 @@ def test_rgb_depth_sync( test_device, filter_setup ):
     cfg.enable_stream( rs.stream.depth, *depth_res, rs.format.z16, FPS )
     cfg.enable_stream( rs.stream.color, *COLOR_RES, rs.format.rgb8, FPS )
     pipe = rs.pipeline( ctx )
-    pipe.start( cfg )
+    profile = pipe.start( cfg )
+    for s in profile.get_device().query_sensors():  # pipeline sensors start with global time on; frame timestamps must be the HW clock
+        if s.supports( rs.option.global_time_enabled ):
+            s.set_option( rs.option.global_time_enabled, 0 )
     deltas = []
     framesets = 0
     filtered = 0
