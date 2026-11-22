@@ -4,6 +4,7 @@
 #include "nn-transport.h"
 
 #include <src/librealsense-exception.h>
+#include <src/ds/d500/d500-types/common.h>
 
 #include <rsutils/string/from.h>
 
@@ -49,6 +50,27 @@ void nn_transport::send_table( uint16_t table_id, uint32_t param1, uint32_t para
     wait_for_commit( before.upload_seq, progress );
     if( progress )
         progress( 1.f );
+}
+
+
+nn::stored_model nn_transport::read_info( int slot )
+{
+    // The first chunk's header gives the table size, which says how many chunks follow
+    std::vector< uint8_t > table;
+    int32_t err = read_chunk( nn::INFO_TABLE_ID, nn::STATUS_REGION, uint32_t( slot ), 0, table );
+    if( ! err && table.size() >= sizeof( table_header ) )
+    {
+        size_t const total = sizeof( table_header ) + reinterpret_cast< const table_header * >( table.data() )->get_table_size();
+        size_t const n_chunks = nn::chunk_count( total );
+        for( size_t i = 1; ! err && table.size() < total && i < n_chunks; ++i )
+            err = read_chunk( nn::INFO_TABLE_ID, nn::STATUS_REGION, uint32_t( slot ), nn::chunk_param( n_chunks, i ), table );
+    }
+    if( err == -1 )
+        throw not_implemented_exception( "This camera's firmware doesn't describe Custom NN models" );
+    if( err )
+        throw invalid_value_exception( rsutils::string::from() << "Reading the NN model description failed: "
+                                                               << nn::error_message( err ) << " (" << err << ")" );
+    return nn::parse_info( table );
 }
 
 

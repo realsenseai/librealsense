@@ -82,6 +82,21 @@ namespace rs2
             return supported;
         }
 
+        /**
+         * The NN model stored in a slot, as JSON (see rs2_nn_get_model_info); slot 2 holds a custom network
+         */
+        std::string get_model_info( int slot = 2 ) const
+        {
+            rs2_error * e = nullptr;
+            std::shared_ptr< const rs2_raw_data_buffer > info( rs2_nn_get_model_info( _dev.get(), slot, &e ), rs2_delete_raw_data );
+            error::handle( e );
+            auto data = rs2_get_raw_data( info.get(), &e );
+            error::handle( e );
+            auto size = rs2_get_raw_data_size( info.get(), &e );
+            error::handle( e );
+            return std::string( reinterpret_cast< const char * >( data ), size );
+        }
+
     private:
         // The C API takes an int: anything larger is passed as INT_MAX, so the size check rejects it instead of a
         // truncated size going through

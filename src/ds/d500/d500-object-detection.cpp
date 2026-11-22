@@ -15,6 +15,7 @@
 #include "platform/platform-utils.h"
 #include <src/platform/uvc-option.h>
 #include <src/nn/custom-nn-frame.h>
+#include <src/nn/nn-transport-hwm.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -45,23 +46,35 @@ namespace librealsense
     constexpr uint32_t custom_nn_width = 1024;
     constexpr const char * custom_nn_stream_name = "Custom NN";
 
-    // Passes on only the Custom NN frames that parse, so tensors can be trusted downstream. Each is stamped with the
-    // capture time of the Color frame the network ran on, converted as Color's is, so the two match by timestamp.
+    // Describes the Custom NN frames and passes on only those that parse, so tensors can be trusted downstream. Each
+    // is stamped with the capture time of the Color frame the network ran on, converted as Color's is, so the two match
+    // by timestamp.
     class custom_nn_validator : public processing_block
     {
     public:
-        custom_nn_validator( std::weak_ptr< time_diff_keeper > tf_keeper,
+        custom_nn_validator( d500_object_detection * owner,
+                             std::weak_ptr< time_diff_keeper > tf_keeper,
                              std::shared_ptr< global_time_option > global_time,
                              std::weak_ptr< notifications_processor > notifications )
             : processing_block( "Custom NN validator" )
         {
-            auto on_frame = [this, tf_keeper, global_time, notifications]( rs2::frame f, const rs2::frame_source & source )
+            auto on_frame = [this, owner, tf_keeper, global_time, notifications]( rs2::frame f, const rs2::frame_source & source )
             {
                 auto nn = dynamic_cast< custom_nn_frame * >( (frame_interface *)f.get() );
-                if( ! nn || ! nn->is_valid() )
+                if( ! nn )
+                    return;
+                auto description = owner->get_custom_nn_description();
+                nn->set_description( description );
+                if( ! nn->is_valid() )
                     return;  // logged by the parser
                 if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
                     LOG_ERROR( nn->get_status_message() );
+                rs2_metadata_type generation = 0;
+                nn->find_metadata( RS2_FRAME_METADATA_NN_MODEL_GENERATION, &generation );
+                if( description && generation && uint32_t( generation ) != description->generation
+                    && ! _other_model_logged.exchange( true ) )
+                    LOG_WARNING( "The camera runs a Custom NN model other than the installed one; its tensors are not "
+                                 "described until the camera is reset" );
                 // Every frame after a DSP crash says so; report it once, the application decides to stop
                 if( nn->get_status() == uint8_t( nn::custom_nn_status::dsp_fault ) && ! _dsp_fault_reported.exchange( true ) )
                 {
@@ -96,6 +109,7 @@ namespace librealsense
 
     private:
         std::atomic_bool _load_failed_logged{ false };
+        std::atomic_bool _other_model_logged{ false };
         std::atomic_bool _dsp_fault_reported{ false };
     };
 
@@ -219,10 +233,36 @@ namespace librealsense
         od_ep->register_processing_block( od_pbf );
         processing_block_factory custom_nn_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
                                                    { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
-                                                   [keeper = std::weak_ptr< time_diff_keeper >( _tf_keeper ), global_time,
+                                                   [this, keeper = std::weak_ptr< time_diff_keeper >( _tf_keeper ), global_time,
                                                     notifications = std::weak_ptr< notifications_processor >( od_ep->get_notifications_processor() )]()
-                                                   { return std::make_shared< custom_nn_validator >( keeper, global_time, notifications ); } };
+                                                   { return std::make_shared< custom_nn_validator >( this, keeper, global_time, notifications ); } };
         od_ep->register_processing_block( custom_nn_pbf );
+    }
+
+    std::shared_ptr< const nn::model_description > d500_object_detection::get_custom_nn_description() const
+    {
+        std::lock_guard< std::mutex > lock( _custom_nn_mutex );
+        return _custom_nn_description;
+    }
+
+    // NN_INFO describes the stored model, which the camera runs from its next boot; frames of another model stay raw
+    void d500_object_detection::read_custom_nn_description()
+    {
+        std::shared_ptr< const nn::model_description > description;
+        try
+        {
+            auto stored = nn_transport_hwm( _hw_monitor ).read_info( nn::CUSTOM_SLOT );
+            if( stored.block.present )
+                description = nn::parse_model_description( stored.metadata, stored.block.generation );
+            else
+                LOG_WARNING( "No Custom NN model is installed" );
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "Custom NN tensors are not described: " << e.what() );
+        }
+        std::lock_guard< std::mutex > lock( _custom_nn_mutex );
+        _custom_nn_description = std::move( description );
     }
 
     void d500_object_detection_sensor::open( const stream_profiles & requests )
@@ -237,6 +277,8 @@ namespace librealsense
         { return std::any_of( requests.begin(), requests.end(), [s]( std::shared_ptr< stream_profile_interface > const & p ) { return p->get_stream_type() == s; } ); };
         if( is( RS2_STREAM_CUSTOM_NN ) && is( RS2_STREAM_OBJECT_DETECTION ) )
             throw wrong_api_call_sequence_exception( "Custom NN and Object Detection can't stream together" );
+        if( is( RS2_STREAM_CUSTOM_NN ) )
+            _owner->read_custom_nn_description();
 
         synthetic_sensor::open( requests );
     }

@@ -8,6 +8,7 @@
 #include <src/perception-sensor.h>
 #include <src/uvc-sensor.h>
 #include <src/nn/nn-transport-hwm.h>
+#include <src/nn/nn-info.h>
 
 #include <rsutils/string/from.h>
 
@@ -66,6 +67,15 @@ namespace librealsense
         return rsutils::string::from() << nn::error_message( ds::d500_hwmon_response::UNAUTHORIZED_USER_ACTION ) << ". ("
                                        << get_info( RS2_CAMERA_INFO_NAME ) << ", S/N "
                                        << get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) << ", FW " << _fw_version << ")";
+    }
+
+    std::string d500_nn_loader::get_model_info( int slot )
+    {
+        auto const unsupported = unsupported_reason();
+        if( ! unsupported.empty() )
+            throw not_implemented_exception( unsupported );
+        auto power = get_raw_depth_sensor()->bulk_operation();
+        return nn::to_json( nn_transport_hwm( _hw_monitor ).read_info( slot ) );
     }
 
     void d500_nn_loader::nn_upload( const uint8_t * file, size_t size, rs2_nn_target target, int slot, bool activate,

@@ -3976,6 +3976,14 @@ int rs2_nn_is_upload_supported( const rs2_device * device, char * reason, int re
 }
 HANDLE_EXCEPTIONS_AND_RETURN( 0, device, reason_size )
 
+const rs2_raw_data_buffer * rs2_nn_get_model_info( const rs2_device * device, int slot, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( device );
+    auto info = VALIDATE_INTERFACE( device->device, librealsense::nn_loader_interface )->get_model_info( slot );
+    return new rs2_raw_data_buffer{ std::vector< uint8_t >( info.begin(), info.end() ) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN( nullptr, device, slot )
+
 const rs2_raw_data_buffer* rs2_create_flash_backup_cpp(const rs2_device* device, rs2_update_progress_callback* callback, rs2_error** error) BEGIN_API_CALL
 {
     // Take ownership of the callback ASAP or else memory leaks could result if we throw! (the caller usually does a

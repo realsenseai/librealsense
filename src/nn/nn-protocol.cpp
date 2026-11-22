@@ -27,27 +27,54 @@ std::vector< uint8_t > build_table( uint16_t table_id, const uint8_t * file, siz
 }
 
 
-status parse_status( const std::vector< uint8_t > & reply )
+// The table's payload size, after checking its header and CRC; at least min_size
+static uint32_t check_table( const std::vector< uint8_t > & reply, uint16_t table_id, size_t min_size, const char * what )
 {
-    status result;
-    if( reply.size() < TABLE_HEADER_SIZE + sizeof( result ) )
+    if( reply.size() < TABLE_HEADER_SIZE + min_size )
     {
-        throw invalid_value_exception( rsutils::string::from() << "NN status table too short: " << reply.size() << " bytes" );
+        throw invalid_value_exception( rsutils::string::from() << what << " table too short: " << reply.size() << " bytes" );
     }
-        
+
     auto header = reinterpret_cast< const table_header * >( reply.data() );
     auto const data = reply.data() + TABLE_HEADER_SIZE;
     auto table_size = header->get_table_size();
-    
-    if( header->get_table_type() != STATUS_TABLE_ID 
-        || table_size < sizeof( result )
+
+    if( header->get_table_type() != table_id
+        || table_size < min_size
         || table_size > reply.size() - TABLE_HEADER_SIZE
         || header->get_crc32() != rsutils::number::calc_crc32( data, table_size ) )
     {
-        throw invalid_value_exception( "invalid NN status table" );
+        throw invalid_value_exception( rsutils::string::from() << "invalid " << what << " table" );
     }
-    
-    std::memcpy( &result, data, sizeof( result ) );
+    return table_size;
+}
+
+
+status parse_status( const std::vector< uint8_t > & reply )
+{
+    status result;
+    check_table( reply, STATUS_TABLE_ID, sizeof( result ), "NN status" );
+    std::memcpy( &result, reply.data() + TABLE_HEADER_SIZE, sizeof( result ) );
+    return result;
+}
+
+
+stored_model parse_info( const std::vector< uint8_t > & reply )
+{
+    stored_model result;
+    auto const table_size = check_table( reply, INFO_TABLE_ID, sizeof( result.block ), "NN info" );
+    auto const data = reply.data() + TABLE_HEADER_SIZE;
+    std::memcpy( &result.block, data, sizeof( result.block ) );
+    auto const & block = result.block;
+    // The block may grow in later versions: the metadata follows its own size
+    if( block.size < sizeof( block ) || size_t( block.size ) + block.metadata_size > table_size )
+        throw invalid_value_exception( rsutils::string::from() << "invalid NN info: block " << block.size << " bytes and "
+                                                               << block.metadata_size << " bytes of metadata in "
+                                                               << table_size );
+    auto const metadata = data + block.size;
+    if( block.present && rsutils::number::calc_crc32( metadata, block.metadata_size ) != block.generation )
+        throw invalid_value_exception( "invalid NN info: the metadata doesn't match the model generation" );
+    result.metadata.assign( reinterpret_cast< const char * >( metadata ), block.metadata_size );
     return result;
 }
 

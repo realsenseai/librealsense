@@ -19,6 +19,8 @@ namespace nn {
 // Values below follow the draft FW interface spec and are expected to change until it is frozen.
 constexpr uint16_t PACKAGE_TABLE_ID = 0x0A04;  // NN_MODEL
 constexpr uint16_t STATUS_TABLE_ID = 0x0A07;   // NN_STATUS
+constexpr uint16_t INFO_TABLE_ID = 0x0A06;     // NN_INFO
+constexpr int CUSTOM_SLOT = 2;     // a custom network: code (the NN OEM library) + weights + metadata
 constexpr uint16_t TABLE_VERSION = 0x0100;
 constexpr uint32_t STATUS_REGION = 2;  // RAM
 constexpr std::chrono::milliseconds STATUS_POLL_INTERVAL( 100 );
@@ -69,11 +71,39 @@ struct status
 #pragma pack( pop )
 static_assert( sizeof( status ) == 28, "unexpected NN_STATUS size" );
 
+// NN_INFO block, little-endian, after the table header; the slot's stored metadata (JSON) follows it. Describes the model
+// stored in the slot, which the next boot runs.
+#pragma pack( push, 1 )
+struct info
+{
+    uint16_t version;
+    uint16_t size;
+    uint8_t slot;
+    uint8_t present;
+    uint8_t model_state;
+    uint8_t reserved;
+    uint32_t generation;  // CRC-32 of the metadata
+    uint32_t frame_size;
+    uint32_t frame_height;
+    uint32_t metadata_size;
+};
+#pragma pack( pop )
+static_assert( sizeof( info ) == 24, "unexpected NN_INFO size" );
+
+struct stored_model
+{
+    info block;
+    std::string metadata;
+};
+
 // The 16-byte table header (with CRC-32 of the file) followed by the file, unchanged
 std::vector< uint8_t > build_table( uint16_t table_id, const uint8_t * file, size_t size );
 
 // The status from an NN_STATUS reply: header and CRC are checked
 status parse_status( const std::vector< uint8_t > & reply );
+
+// The stored model from an NN_INFO reply: header, CRC, sizes and the generation are checked
+stored_model parse_info( const std::vector< uint8_t > & reply );
 
 // param1 of a table write: 1 = flash, 2 = DDR
 inline uint32_t target_param( rs2_nn_target target ) { return target == RS2_NN_TARGET_DDR ? 2 : 1; }

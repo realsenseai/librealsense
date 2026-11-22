@@ -20,6 +20,7 @@ custom_nn_frame & custom_nn_frame::operator=( custom_nn_frame && other )
     std::lock_guard< std::mutex > lock( _parse_mutex );
     _parse_done = false;
     _parsed.reset();
+    _description.reset();
     return *this;
 }
 
@@ -32,9 +33,22 @@ custom_nn_frame::parsed const * custom_nn_frame::layout() const
         try
         {
             // Not `data`: it is empty when the bytes live in an external (zero-copy) buffer
-            auto p = std::unique_ptr< parsed >( new parsed{ nn::parse_custom_nn_frame( get_frame_data(), get_frame_data_size() ), {} } );
+            auto p = std::unique_ptr< parsed >( new parsed{ nn::parse_custom_nn_frame( get_frame_data(), get_frame_data_size() ), {}, {} } );
+            bool const same_model = _description && _description->generation == p->layout.header.generation;
             for( auto const & t : p->layout.tensors )
-                p->shapes.push_back( { int( t.size / nn::dtype_size( t.dtype ) ) } );
+            {
+                const nn::output_description * out = same_model && t.output_index < _description->outputs.size()
+                                                       ? &_description->outputs[t.output_index] : nullptr;
+                size_t elements = t.size / nn::dtype_size( t.dtype );
+                size_t described = 1;
+                if( out )
+                    for( int d : out->sizes )
+                        described *= size_t( d );
+                if( out && ( out->dtype != t.dtype || described != elements ) )
+                    out = nullptr;
+                p->outputs.push_back( out );
+                p->shapes.push_back( out ? out->sizes : std::vector< int >{ int( elements ) } );
+            }
             _parsed = std::move( p );
         }
         catch( std::exception const & e )
@@ -60,7 +74,9 @@ rs2_nn_tensor custom_nn_frame::get_tensor( size_t index ) const
     auto p = layout();
     auto const & t = p->layout.tensors[index];
     auto const & shape = p->shapes[index];
-    return { "", t.dtype, t.output_index, int( shape.size() ), shape.data(), "", get_frame_data() + t.offset, t.size, 0.f };
+    auto const out = p->outputs[index];
+    return { out ? out->name.c_str() : "", t.dtype, t.output_index, int( shape.size() ), shape.data(),
+             out ? out->format.c_str() : "", get_frame_data() + t.offset, t.size, out ? out->dequant_scale : 0.f };
 }
 
 uint8_t custom_nn_frame::get_status() const

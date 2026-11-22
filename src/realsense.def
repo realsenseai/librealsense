@@ -533,6 +533,7 @@ EXPORTS
     rs2_nn_upload
     rs2_nn_upload_cpp
     rs2_nn_is_upload_supported
+    rs2_nn_get_model_info
 
     rs2_query_embedded_filters
     rs2_delete_embedded_filter_list

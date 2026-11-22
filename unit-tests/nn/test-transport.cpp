@@ -7,6 +7,7 @@
 #include "../catch.h"
 #include <src/nn/nn-transport.h>
 #include <src/librealsense-exception.h>
+#include <rsutils/number/crc32.h>
 
 #include <cmath>
 #include <deque>
@@ -18,7 +19,8 @@ using Catch::Matchers::ContainsSubstring;
 using std::chrono::milliseconds;
 
 
-// A device scripted per test: chunk replies by index, and a queue of NN_STATUS reads whose last entry repeats
+// A device scripted per test: chunk replies by index, a queue of NN_STATUS reads whose last entry repeats, and a table
+// served in chunks of up to 1000 bytes
 class fake_transport : public nn_transport
 {
 public:
@@ -57,7 +59,23 @@ public:
         return 0;
     }
 
+    int32_t read_chunk( uint16_t table_id, uint32_t, uint32_t param3, uint32_t param4, std::vector< uint8_t > & out ) override
+    {
+        read_params.push_back( param4 );
+        CHECK( table_id == nn::INFO_TABLE_ID );
+        CHECK( param3 == nn::CUSTOM_SLOT );
+        auto it = read_errors.find( read_params.size() - 1 );
+        if( it != read_errors.end() )
+            return it->second;
+        size_t const offset = ( param4 & 0xFFFF ) * nn::CHUNK_SIZE;
+        out.insert( out.end(), table.begin() + offset, table.begin() + std::min( table.size(), offset + nn::CHUNK_SIZE ) );
+        return 0;
+    }
+
     std::vector< chunk > chunks;
+    std::vector< uint8_t > table;
+    std::vector< uint32_t > read_params;
+    std::map< size_t, int32_t > read_errors;
     std::map< size_t, int32_t > chunk_errors;
     size_t lost_at_chunk = SIZE_MAX;
     std::deque< nn::status > statuses;
@@ -285,5 +303,65 @@ TEST_CASE( "long commit and lost device" )
         };
         CHECK_THAT( upload( t ), ContainsSubstring( "did not complete" ) && ContainsSubstring( "allocate resources" ) );
         CHECK( t.status_reads == 2 );
+    }
+}
+
+
+// An NN_INFO table whose metadata is `size` bytes of a JSON string
+static std::vector< uint8_t > make_info_table( size_t size )
+{
+    std::string metadata = "\"" + std::string( size - 2, 'x' ) + "\"";
+    nn::info block = {};
+    block.size = sizeof( block );
+    block.present = 1;
+    block.generation = rsutils::number::calc_crc32( (const uint8_t *)metadata.data(), metadata.size() );
+    block.metadata_size = uint32_t( size );
+    std::vector< uint8_t > payload( (const uint8_t *)&block, (const uint8_t *)&block + sizeof( block ) );
+    payload.insert( payload.end(), metadata.begin(), metadata.end() );
+    return nn::build_table( nn::INFO_TABLE_ID, payload.data(), payload.size() );
+}
+
+
+static std::string read_info_error( fake_transport & t )
+{
+    try
+    {
+        t.read_info( nn::CUSTOM_SLOT );
+    }
+    catch( librealsense_exception const & e )
+    {
+        return e.what();
+    }
+    return {};
+}
+
+
+TEST_CASE( "model info read" )
+{
+    fake_transport t;
+    SECTION( "in one chunk" )
+    {
+        t.table = make_info_table( 900 );
+        CHECK( t.read_info( nn::CUSTOM_SLOT ).metadata.size() == 900 );
+        CHECK( t.read_params == std::vector< uint32_t >{ 0 } );
+    }
+    SECTION( "in chunks" )
+    {
+        // 16 + 24 + 2500 bytes: the first chunk's header gives the size, then chunks 1 and 2 of 3
+        t.table = make_info_table( 2500 );
+        CHECK( t.read_info( nn::CUSTOM_SLOT ).metadata.size() == 2500 );
+        CHECK( t.read_params == std::vector< uint32_t >{ 0, 0x20001, 0x20002 } );
+    }
+    SECTION( "a chunk refused" )
+    {
+        t.table = make_info_table( 2500 );
+        t.read_errors[1] = -21;
+        CHECK_THAT( read_info_error( t ), ContainsSubstring( "description failed" ) && ContainsSubstring( "(-21)" ) );
+        CHECK( t.read_params.size() == 2 );
+    }
+    SECTION( "not supported" )
+    {
+        t.read_errors[0] = -1;
+        CHECK_THAT( read_info_error( t ), ContainsSubstring( "doesn't describe" ) );
     }
 }
