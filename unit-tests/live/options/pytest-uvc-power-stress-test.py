@@ -49,31 +49,27 @@ def test_uvc_power_stress(test_device):
     while GVD commands are issued in parallel. No exceptions should be thrown."""
     dev, ctx = test_device
 
-    # Create a DDS-disabled context to test UVC locking specifically
-    uvc_ctx = rs.context({'dds': {'enabled': False}})
-    devices = uvc_ctx.query_devices()
-    assert len(devices) > 0, "No devices found in DDS-disabled context"
+    # Create a DDS-disabled context to test UVC locking specifically. Use only the device under test:
+    # GMSL devices can't be disabled by the hub, so the context may also see other cameras
+    sn = dev.get_info(rs.camera_info.serial_number)
+    devices = rs.context({'dds': {'enabled': False}}).query_devices()
+    i = next((i for i in range(len(devices)) if devices[i].get_info(rs.camera_info.serial_number) == sn), None)
+    assert i is not None, f"Device {sn} not found in DDS-disabled context"
 
     errors = []
-    threads = []
-    for i in range(len(devices)):
-        # Two threads per device. Calling devices[i] twice creates two different device objects for the same camera
-        t1 = threading.Thread(target=change_presets, args=(devices[i], i * 2, 0.05, errors))
-        t2 = threading.Thread(target=change_presets, args=(devices[i], i * 2 + 1, 0.1, errors))
-        threads.append(t1)
-        threads.append(t2)
+    # Calling devices[i] twice creates two different device objects for the same camera
+    threads = [threading.Thread(target=change_presets, args=(devices[i], 0, 0.05, errors)),
+               threading.Thread(target=change_presets, args=(devices[i], 1, 0.1, errors))]
 
     for t in threads:
         t.start()
 
     # Issue GVD commands while threads are running
-    raw_command = rs.debug_protocol(devices[0]).build_command(0x10)  # 0x10 is GVD opcode
-    for i in range(10):
-        log.debug("Sending GVD commands")
-        for j in range(len(devices)):
-            start = time.perf_counter()
-            rs.debug_protocol(devices[j]).send_and_receive_raw_data(raw_command)
-            log.debug(f"Got device {j} GVD in {time.perf_counter() - start:.3f}s")
+    raw_command = rs.debug_protocol(devices[i]).build_command(0x10)  # 0x10 is GVD opcode
+    for _ in range(10):
+        start = time.perf_counter()
+        rs.debug_protocol(devices[i]).send_and_receive_raw_data(raw_command)
+        log.debug(f"Got GVD in {time.perf_counter() - start:.3f}s")
         time.sleep(0.5)
 
     for t in threads:
