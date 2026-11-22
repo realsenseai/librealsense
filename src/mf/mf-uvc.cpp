@@ -169,6 +169,35 @@ namespace librealsense
         }
 
 
+        // The UVC callback consumes a packed byte span. A read-only 2D lock avoids
+        // Media Foundation copying a YUY2 surface into and back out of a linear buffer.
+        static std::shared_ptr< BYTE > lock_frame_buffer( CComPtr< IMFMediaBuffer > const & buffer,
+                                                          stream_profile const & profile,
+                                                          DWORD & length )
+        {
+            BYTE * pixels = nullptr;
+            if( profile.format == fourcc( 'Y', 'U', 'Y', '2' )
+                || profile.format == fourcc( 'Y', 'U', 'Y', 'V' ) )
+            {
+                CComQIPtr< IMF2DBuffer2 > surface( buffer );
+                BYTE * start = nullptr;
+                LONG pitch = 0;
+                DWORD capacity = 0;
+                if( surface && SUCCEEDED( buffer->GetCurrentLength( &length ) )
+                    && SUCCEEDED( surface->Lock2DSize( MF2DBuffer_LockFlags_Read, &pixels, &pitch, &start, &capacity ) ) )
+                {
+                    if( pixels == start && pitch > 0 && uint64_t( pitch ) == uint64_t( profile.width ) * 2
+                        && uint64_t( pitch ) * profile.height == length && length <= capacity )
+                        return { pixels, [surface]( BYTE * ) { surface->Unlock2D(); } };
+                    surface->Unlock2D();
+                }
+            }
+
+            if( FAILED( buffer->Lock( &pixels, nullptr, &length ) ) )
+                return {};
+            return { pixels, [buffer]( BYTE * ) { buffer->Unlock(); } };
+        }
+
         STDMETHODIMP source_reader_callback::OnReadSample(HRESULT hrStatus,
             DWORD dwStreamIndex,
             DWORD dwStreamFlags,
@@ -205,33 +234,41 @@ namespace librealsense
                     CComPtr<IMFMediaBuffer> buffer = nullptr;
                     if (SUCCEEDED(sample->GetBufferByIndex(0, &buffer)))
                     {
-                        uint8_t * byte_buffer=nullptr;
-                        DWORD max_length{}, current_length{};
-                        if (SUCCEEDED(buffer->Lock(&byte_buffer, &max_length, &current_length)))
+                        try
                         {
+                            std::lock_guard< std::mutex > lock( owner->_streams_mutex );
+                            auto const & stream = owner->_streams[dwStreamIndex];
+                            if( ! stream.callback )
+                                return S_OK;
+
+                            DWORD length = 0;
+                            auto pixels = lock_frame_buffer( buffer, stream.profile, length );
+                            if( ! pixels )
+                                return S_OK;
                             uint8_t * metadata = nullptr;
                             uint8_t metadata_size = 0;
 #ifdef METADATA_SUPPORT
-                            try_read_metadata(sample, metadata_size, &metadata);
+                            try_read_metadata( sample, metadata_size, &metadata );
 #endif
-                            try
-                            {
-                                auto& stream = owner->_streams[dwStreamIndex];
-                                std::lock_guard<std::mutex> lock(owner->_streams_mutex);
-                                auto profile = stream.profile;
-                                frame_object f{ current_length, metadata_size, byte_buffer, metadata, monotonic_to_realtime(llTimestamp * 0.0001) };
-
-                                auto continuation = [buffer, this]()
-                                {
-                                    buffer->Unlock();
-                                };
-
-                                stream.callback(profile, f, continuation);
-                            }
-                            catch (...)
-                            {
-                                // TODO: log
-                            }
+                            CComPtr< IMFSample > retained_sample;
+                            if( stream.profile.format == fourcc( 'Y', '8', 'I', ' ' )
+                                || stream.profile.format == fourcc( 'Z', '1', '6', ' ' ) )
+                                retained_sample = sample;
+                            frame_object f{ length, metadata_size, pixels.get(), metadata,
+                                            monotonic_to_realtime( llTimestamp * 0.0001 ), retained_sample != nullptr };
+                            stream.callback( stream.profile, f,
+                                [pixels = std::move( pixels ), retained_sample = std::move( retained_sample )]() mutable {
+                                    pixels.reset();
+                                    retained_sample.Release();
+                                } );
+                        }
+                        catch( std::exception const & e )
+                        {
+                            LOG_ERROR( "WMF sample on stream " << dwStreamIndex << " failed: " << e.what() );
+                        }
+                        catch( ... )
+                        {
+                            LOG_ERROR( "Unknown exception handling WMF sample on stream " << dwStreamIndex );
                         }
                     }
                 }
@@ -922,9 +959,10 @@ namespace librealsense
         {
             CComPtr<IMFAttributes> reader_attrs = nullptr;
 
-            CHECK_HR(MFCreateAttributes(&reader_attrs, 3));
+            CHECK_HR(MFCreateAttributes(&reader_attrs, 4));
             CHECK_HR(reader_attrs->SetUINT32(MF_SOURCE_READER_DISCONNECT_MEDIASOURCE_ON_SHUTDOWN, FALSE));
             CHECK_HR(reader_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE));
+            CHECK_HR(reader_attrs->SetString(MF_READWRITE_MMCSS_CLASS, L"Capture"));
             CHECK_HR(reader_attrs->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK,
                 static_cast<IUnknown*>(new source_reader_callback(shared_from_this()))));
             return reader_attrs;
