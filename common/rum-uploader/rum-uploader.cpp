@@ -71,7 +71,8 @@ static void reset_saved_report( rsutils::json const & report )
 static bool report_has_usage( rsutils::json const & report )
 {
     return ! report.value( "devices", rsutils::json::object() ).empty()        // devices (streams/options nested)
-        || ! report.value( "notifications", rsutils::json::array() ).empty();  // notifications (top-level)
+        || ! report.value( "notifications", rsutils::json::array() ).empty()   // notifications (top-level)
+        || ! report.value( "apps", rsutils::json::object() ).empty();          // apps (a run with no camera)
 }
 
 

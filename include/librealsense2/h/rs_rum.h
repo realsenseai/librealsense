@@ -11,7 +11,7 @@
 * report file (SDK/system metadata plus whatever has been collected) and the consent get/set
 * always read and write the per-user config file. The ENABLE_STATS build option (default ON)
 * gates only the instrumentation hooks that feed the collector; when it is off the report's
-* collected lists (devices, streams, filters, options, notifications) stay empty, but
+* collected lists (devices, streams, filters, options, notifications, apps) stay empty, but
 * the API itself behaves identically.
 */
 

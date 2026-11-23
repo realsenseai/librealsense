@@ -9,7 +9,7 @@ import pytest
 import pyrealsense2 as rs
 
 
-MAX_APPS = 32   # mirrors max_apps in the SDK collector
+MAX_APPS = 64   # mirrors max_apps in the SDK collector
 
 
 def run_child( code ):

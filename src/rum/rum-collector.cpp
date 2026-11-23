@@ -39,7 +39,7 @@ static constexpr int rum_schema_version = 1;
 static constexpr size_t max_report_bytes = 64 * 1024;
 
 // App names are free text, so cap how many distinct ones a report can hold.
-static constexpr size_t max_apps = 32;
+static constexpr size_t max_apps = 64;
 
 
 // Report file: <app-data>/rum/rum.json. Forward slashes work on Windows and POSIX.
