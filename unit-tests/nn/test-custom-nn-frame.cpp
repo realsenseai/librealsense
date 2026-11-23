@@ -9,6 +9,7 @@
 #include <rsutils/number/crc32.h>
 
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -207,7 +208,10 @@ TEST_CASE( "custom nn error frames" )
     CHECK_THAT( nn::custom_nn_status_message( 4, 0x56ECB061 ), ContainsSubstring( "Upload it again" ) );
     CHECK_THAT( nn::custom_nn_status_message( 5, 1 ), ContainsSubstring( "Inference failed" ) );
     CHECK( std::string( nn::custom_nn_status_message( 0, 1 ) ).empty() );
-    CHECK_FALSE( std::string( nn::custom_nn_status_message( 2, 1 ) ).empty() );
+    CHECK_THAT( nn::custom_nn_status_message( 1, 1 ), ContainsSubstring( "no Custom NN model description" ) );
+    CHECK_THAT( nn::custom_nn_status_message( 2, 1 ), ContainsSubstring( "didn't fit" ) );
+    CHECK_THAT( nn::custom_nn_status_message( 3, 1 ), ContainsSubstring( "invalid" ) );
+    CHECK_THAT( nn::custom_nn_status_message( 9, 1 ), ContainsSubstring( "couldn't run" ) );
 
     // An error frame's tensors are never read, whatever its count says
     auto frame = make_frame( { bytes( 64 ) }, 5 );
@@ -259,4 +263,101 @@ TEST_CASE( "custom nn invalid frames" )
     // An s16 tensor of an odd number of bytes
     frame = make_frame( { bytes( 5 ) }, 0, 1, RS2_NN_DTYPE_S16 );
     CHECK_THAT( error_of( frame ), ContainsSubstring( "dtype" ) );
+}
+
+
+
+// Frames made by the FW's own writer on a host (see custom-nn-v3-frames/README.md), next to this file
+static std::vector< uint8_t > host_frame( std::string const & name )
+{
+    std::string path = __FILE__;
+    path = path.substr( 0, path.find_last_of( "/\\" ) + 1 ) + "custom-nn-v3-frames/" + name;
+    std::ifstream file( path, std::ios::binary );
+    REQUIRE( file );
+    return std::vector< uint8_t >( std::istreambuf_iterator< char >( file ), {} );
+}
+
+// Byte k of output i's data is ( i * 37 + k ) mod 256
+static bool has_pattern( std::vector< uint8_t > const & frame, nn::custom_nn_tensor const & t )
+{
+    for( size_t k = 0; k < t.size; ++k )
+        if( frame[t.offset + k] != uint8_t( t.output_index * 37 + k ) )
+            return false;
+    return true;
+}
+
+
+TEST_CASE( "custom nn host-built frames" )
+{
+    auto const frame = host_frame( "v3_01_ok_model_id_42_1024x313.bin" );
+    REQUIRE( frame.size() == 1024 * 313 );
+    auto layout = parse( frame );
+    CHECK( layout.header.version == nn::CUSTOM_NN_VERSION );
+    CHECK( layout.header.flags == 0 );
+    CHECK( 23 + layout.header.payload_size == 320064 );
+    CHECK( layout.header.model_id == 42 );
+    CHECK( layout.header.generation == 0x1234ABCD );
+    CHECK( layout.payload.timestamp_ms == 123456.789 );
+    CHECK( layout.payload.source_frame_id == 136 + layout.payload.frame_id );
+    std::vector< size_t > const offsets = { 128, 15104, 15552, 75136, 76608, 314624 };
+    std::vector< uint32_t > const sizes = { 14912, 384, 59520, 1408, 237952, 5440 };
+    REQUIRE( layout.tensors.size() == 6 );
+    for( size_t i = 0; i < 6; ++i )
+    {
+        auto const & t = layout.tensors[i];
+        CHECK( t.output_index == i );
+        CHECK( t.dtype == RS2_NN_DTYPE_S16 );
+        CHECK( t.offset == offsets[i] );
+        CHECK( t.size == sizes[i] );
+        CHECK( has_pattern( frame, t ) );
+    }
+
+    CHECK( parse( host_frame( "v3_02_ok_model_id_0_1024x313.bin" ) ).header.model_id == 0 );
+    CHECK( parse( host_frame( "v3_03_ok_model_id_max_1024x313.bin" ) ).header.model_id == 0xFFFFFFFF );
+
+    // Tensors in DSP order, their data not a multiple of 64 bytes
+    auto const small_frame = host_frame( "v3_04_ok_small_unaligned_1024x1.bin" );
+    layout = parse( small_frame );
+    CHECK( layout.header.model_id == 7 );
+    CHECK( 23 + layout.header.payload_size == 576 );
+    REQUIRE( layout.tensors.size() == 3 );
+    std::vector< std::vector< size_t > > const small_tensors = { { 2, 128, 6 }, { 0, 256, 130 }, { 1, 512, 64 } };
+    for( size_t i = 0; i < 3; ++i )
+    {
+        auto const & t = layout.tensors[i];
+        CHECK( t.output_index == small_tensors[i][0] );
+        CHECK( t.offset == small_tensors[i][1] );
+        CHECK( t.size == small_tensors[i][2] );
+        CHECK( has_pattern( small_frame, t ) );
+    }
+
+    // Error frames: 64 bytes, error flag, no tensors
+    std::vector< std::pair< std::string, int > > const errors = { { "v3_05_load_failed_gen0", 4 },
+                                                                  { "v3_06_load_failed_model", 4 },
+                                                                  { "v3_07_dsp_error", 5 },
+                                                                  { "v3_08_no_metadata", 1 },
+                                                                  { "v3_09_too_large", 2 },
+                                                                  { "v3_10_tensor_invalid", 3 } };
+    for( auto const & e : errors )
+    {
+        CAPTURE( e.first );
+        layout = parse( host_frame( e.first + "_1024x313.bin" ) );
+        CHECK( layout.payload.status == e.second );
+        CHECK( layout.header.flags == nn::CUSTOM_NN_ERROR_FLAG );
+        CHECK( layout.header.payload_size == 41 );
+        CHECK( layout.tensors.empty() );
+    }
+    // After an install, before the reset: no model id and no generation, and the reset message
+    layout = parse( host_frame( "v3_05_load_failed_gen0_1024x313.bin" ) );
+    CHECK( layout.header.generation == 0 );
+    CHECK( layout.header.model_id == 0 );
+    CHECK_THAT( nn::custom_nn_status_message( layout.payload.status, layout.header.generation ), ContainsSubstring( "reset the camera" ) );
+    layout = parse( host_frame( "v3_06_load_failed_model_1024x313.bin" ) );
+    CHECK( layout.header.model_id == 42 );
+    CHECK_THAT( nn::custom_nn_status_message( layout.payload.status, layout.header.generation ), ContainsSubstring( "Upload it again" ) );
+
+    CHECK_THAT( error_of( host_frame( "v2_90_refused_ok_1024x313.bin" ) ), ContainsSubstring( "unsupported version 0x200" ) );
+    CHECK_THAT( error_of( host_frame( "v3_91_bad_crc_1024x313.bin" ) ), ContainsSubstring( "CRC" ) );
+    CHECK_THAT( error_of( host_frame( "v3_92_bad_size_1024x313.bin" ) ), ContainsSubstring( "payload size" ) );
+    CHECK_THAT( error_of( host_frame( "v3_93_unknown_version_1024x313.bin" ) ), ContainsSubstring( "unsupported version 0x400" ) );
 }
