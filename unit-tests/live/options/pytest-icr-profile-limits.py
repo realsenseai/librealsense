@@ -24,6 +24,7 @@ ICR = rs.composite_option_id.icr_control
 DECIMATION = rs.composite_option_id.decimation_filter_dpp
 MAX_FPS = 30
 MIN_WIDTH = 128  # the Downscale Secondary must be at least this wide
+ICR_APPLIED_BIT = 1 << 5  # observed in embedded_filters metadata
 
 # mode -> (ICR mode, downscale_ratio, ratio both Depth dimensions must be divisible by)
 MODES = {
@@ -36,9 +37,14 @@ EXCLUDED = {(1600, 1300), (1600, 966), (256, 144)}
 LIVE_ENABLE = {"downscale_x2"}
 
 
-def _supported(mode, w, h, fps):
+def _supported(mode, w, h, fps, decimation_factor=1):
+    if (w, h) in EXCLUDED or fps > MAX_FPS:
+        return False
     _, _, divisor = MODES[mode]
-    return (w, h) not in EXCLUDED and w % divisor == 0 and h % divisor == 0 and w // divisor >= MIN_WIDTH and fps <= MAX_FPS
+    if divisor == 1:  # High Res has no Downscale size constraints
+        return True
+    producer_w, producer_h = w * decimation_factor, h * decimation_factor
+    return producer_w % divisor == 0 and producer_h % divisor == 0 and producer_w // divisor >= MIN_WIDTH
 
 
 def _find_filter(sensor, option_id):
@@ -130,19 +136,22 @@ def filters(test_device):
                 sensor.close()
 
 
-def _profiles_by_support(sensor, mode):
+def _profiles_by_support(sensor, mode, decimation_factor=1):
     supported, unsupported = [], []
     for p in _depth_profiles(sensor):
         v = p.as_video_stream_profile()
-        (supported if _supported(mode, v.width(), v.height(), p.fps()) else unsupported).append(p)
+        (supported if _supported(mode, v.width(), v.height(), p.fps(), decimation_factor) else unsupported).append(p)
     return supported, unsupported
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_unsupported_profiles_rejected(filters, mode):
-    sensor, icr, _ = filters
+@pytest.mark.parametrize("decimation_factor", [1, 2], ids=["decimation-off", "decimation-on"])
+def test_unsupported_profiles_rejected(filters, mode, decimation_factor):
+    sensor, icr, decimation = filters
+    if decimation_factor == 2:
+        _set_decimation(decimation, 1)
     _set_icr(icr, mode, 1)
-    _, unsupported = _profiles_by_support(sensor, mode)
+    _, unsupported = _profiles_by_support(sensor, mode, decimation_factor)
     for profile in unsupported:
         log.info(f"{mode} {_describe(profile)}: expecting rejection")
         with pytest.raises(RuntimeError, match="Improved Close Range Depth .*requires Depth"):
@@ -185,10 +194,13 @@ def test_depth_streams_after_rejection(filters, mode):
 
 @pytest.mark.context("nightly")
 @pytest.mark.parametrize("mode", MODES)
-def test_supported_profiles_accepted(filters, mode):
-    sensor, icr, _ = filters
+@pytest.mark.parametrize("decimation_factor", [1, 2], ids=["decimation-off", "decimation-on"])
+def test_supported_profiles_accepted(filters, mode, decimation_factor):
+    sensor, icr, decimation = filters
+    if decimation_factor == 2:
+        _set_decimation(decimation, 1)
     _set_icr(icr, mode, 1)
-    supported, _ = _profiles_by_support(sensor, mode)
+    supported, _ = _profiles_by_support(sensor, mode, decimation_factor)
     by_resolution = {}  # one profile per resolution, at the highest supported FPS, keeps the run short
     for p in supported:
         v = p.as_video_stream_profile()
@@ -231,7 +243,7 @@ def test_enable_while_streaming(filters, mode):
 
 @pytest.mark.context("nightly")
 def test_downscale_x4_with_decimation_stream_smoke(filters):
-    """Check SDK admission and depth frame delivery with ICR x4 and Decimation configured."""
+    """Check SDK admission, depth frame delivery, and ICR application with Decimation configured."""
     sensor, icr, decimation = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
@@ -250,3 +262,5 @@ def test_downscale_x4_with_decimation_stream_smoke(filters):
             assert frame.get_data_size() == 640 * 360 * 2
             frame_numbers.append(frame.get_frame_number())
         assert all(b > a for a, b in zip(frame_numbers, frame_numbers[1:])), f"frame numbers not increasing: {frame_numbers}"
+        metadata = frame.get_frame_metadata(rs.frame_metadata_value.embedded_filters)
+        assert metadata & ICR_APPLIED_BIT, f"ICR not applied: {metadata:#x}"
