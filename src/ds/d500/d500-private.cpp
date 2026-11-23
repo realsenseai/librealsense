@@ -184,8 +184,11 @@ namespace librealsense
         {
             auto& rgb_coefficients_table = rgb_calib_table.rgb_coefficients_table;
 
-            // checking if the fisheye distortion (2 in calibration table) is needed
-            if( rgb_coefficients_table.distortion_model != d500_calibration_distortion::brown_and_fisheye )
+            // The fisheye correction is for D585S (model brown_and_fisheye), never for D555 (model brown).
+            // The first read rewrites the model to brown and sets reserved[3], which marks a D585S table on later reads.
+            bool already_corrected = rgb_coefficients_table.reserved[3] != 0;
+            if( rgb_coefficients_table.distortion_model != d500_calibration_distortion::brown_and_fisheye
+                && ! already_corrected )
                 return;
 
             // matrix with the intrinsics - after they have been adapted to required resolution
@@ -219,19 +222,15 @@ namespace librealsense
             intrinsics.fx = k_brown.x.x;
             intrinsics.fy = k_brown.y.y;
 
-            // update values in the distortion params of the calibration table
+            if( already_corrected )
+                return;
+
+            // update values in the distortion params of the calibration table, keeping K_trans (coeffs 5..8)
             rgb_coefficients_table.distortion_model = d500_calibration_distortion::brown;
 
             // Since we override the table we need an indication that the table has changed
-            if( rgb_coefficients_table.reserved[3] != 0 )
-                throw invalid_value_exception( "reserved field read from RGB distortion model table is expected to be zero" );
-
             rgb_coefficients_table.reserved[3] = 1;
 
-            rgb_coefficients_table.distortion_coeffs[5] = 0;
-            rgb_coefficients_table.distortion_coeffs[6] = 0;
-            rgb_coefficients_table.distortion_coeffs[7] = 0;
-            rgb_coefficients_table.distortion_coeffs[8] = 0;
             rgb_coefficients_table.distortion_coeffs[9] = 0;
             rgb_coefficients_table.distortion_coeffs[10] = 0;
             rgb_coefficients_table.distortion_coeffs[11] = 0;
