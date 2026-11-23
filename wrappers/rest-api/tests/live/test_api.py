@@ -35,7 +35,7 @@ def first_device_id(client):
 
     devices = response.json()
     assert devices, "/api/v1/devices returned no devices — hub/USB enumeration likely failed"
-    return devices[0]["serial_number"]
+    return devices[0]["firmware_update_id"]
 
 
 class TestRealSenseAPIIntegration:
@@ -56,9 +56,8 @@ class TestRealSenseAPIIntegration:
     def test_get_device_rs(self, real_rs_manager):
         """Test getting device information using real RealSense API"""
         device_id, camera = next(iter(real_rs_manager.cameras.items()))
-        assert camera.id == device_id
         assert camera.info["name"] is not None
-        assert len(camera.sensors) > 0
+        assert camera.info["firmware_update_id"] == device_id
 
     def test_get_sensor_rs(self, real_rs_manager):
         """Test getting sensor information using real RealSense API"""
@@ -336,7 +335,7 @@ class TestRealSenseAPIIntegration:
         if not devices:
             pytest.skip("No RealSense devices connected")
 
-        device_id = devices[0]["serial_number"]
+        device_id = devices[0]["firmware_update_id"]
         log.info("Testing HWM command on device: %s", device_id)
 
         # GVD (Get Version and Date) is opcode 0x10 — safe read-only command

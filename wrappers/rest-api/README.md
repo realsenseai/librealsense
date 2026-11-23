@@ -47,7 +47,7 @@ The API now mirrors the SDK's own objects and calls. Breaking changes:
     *   A route to one option has no trailing slash: `.../options/{option_id}`, `.../filters/{name}/{field}`, `.../advanced_mode/controls/{group}/{field}`.
     *   Advanced-mode controls are `AdvancedControl` (`current_value`, `min_value`, `max_value`, `integer`) by group, instead of `OptionInfo` lists.
 *   **Devices and frames:**
-    *   A device is the SDK's camera info by name (`serial_number`, `firmware_version`, `advanced_mode`, ...) instead of `DeviceInfo`; its ID is its serial number. `force_refresh` and `POST /devices/refresh` are gone.
+    *   A device is the SDK's camera info by name (`serial_number`, `firmware_version`, `advanced_mode`, ...) instead of `DeviceInfo`; its ID is its firmware-update ID, which a camera in recovery mode also has. `force_refresh` and `POST /devices/refresh` are gone.
     *   `GET .../advanced_mode/` is gone: read the camera info `advanced_mode`, YES or NO.
     *   Metadata status is `GET .../is_metadata_enabled`; `POST /system/enable-metadata` is `enable_metadata` and answers nothing.
     *   `extrinsics` takes `from_stream`, `from_index`, `to_stream`, `to_index` and answers one `Extrinsics`.

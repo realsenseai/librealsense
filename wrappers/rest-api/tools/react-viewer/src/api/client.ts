@@ -59,7 +59,7 @@ class ApiClient {
 
   async getDevices(): Promise<DeviceInfo[]> {
     const response = await this.client.get<Record<string, string>[]>('/devices/')
-    return response.data.map((info) => ({ device_id: info.serial_number, info }))
+    return response.data.map((info) => ({ device_id: info.firmware_update_id, info }))
   }
 
   /** False only on Windows until frame metadata is enabled there */

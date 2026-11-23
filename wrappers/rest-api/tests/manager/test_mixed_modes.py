@@ -8,8 +8,8 @@ import pyrealsense2 as rs
 from unittest.mock import MagicMock
 
 from app.models.stream import StreamConfig
-from app.services.rs_manager import RealSenseManager
 from app.services.sensor import profile_row
+from app.services.rs_manager import RealSenseManager
 
 
 def _add_stream(sensor, stream, fmt, bpp, uid):
@@ -26,6 +26,7 @@ def mgr():
     depth = _add_stream(dev.add_sensor("Stereo Module"), rs.stream.depth, rs.format.z16, 2, 0)
     _add_stream(dev.add_sensor("RGB Camera"), rs.stream.color, rs.format.rgb8, 3, 1)
     dev.register_info(rs.camera_info.serial_number, "SW1")
+    dev.register_info(rs.camera_info.firmware_update_id, "SW1")
     dev.create_matcher(rs.matchers.default)
 
     m = RealSenseManager()

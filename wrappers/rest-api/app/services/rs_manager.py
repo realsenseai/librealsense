@@ -51,7 +51,7 @@ class RealSenseManager:
         for dev in devices:
             try:
                 camera = Camera(dev, self.ctx, self.events, self.frame_sender)
-            except RuntimeError as e:  # one without a serial number, or one the SDK can't open now
+            except RuntimeError as e:  # one the SDK can't open now, such as a camera another process flashes
                 logging.info("Skipping a device: %s", e)
                 continue
             if camera.id not in self.cameras:

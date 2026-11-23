@@ -106,6 +106,16 @@ describe('DevicePanel', () => {
       
       expect(screen.getByText(/5\.16\.0\.1/)).toBeInTheDocument()
     })
+
+    it('shows a camera in recovery mode, which has no serial number, as legacy does', () => {
+      const dfu = createMockDevice({ device_id: 'UPD-1', info: { name: 'Intel RealSense D4XX Recovery' } })
+      delete dfu.info.serial_number
+
+      render(<DevicePanel />, { initialStoreState: { devices: [dfu], deviceStates: {} } })
+
+      expect(screen.getByText('Intel RealSense D4XX Recovery')).toBeInTheDocument()
+      expect(screen.getByText('S/N: Unknown')).toBeInTheDocument()
+    })
   })
 
   describe('Error Handling', () => {

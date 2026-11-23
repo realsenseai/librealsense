@@ -30,9 +30,10 @@ class Camera:
                     self.info[name] = dev.get_info(key)
             except RuntimeError:
                 pass
-        # Its serial number. A device without one, such as one in recovery (DFU) mode, raises, and is not listed
-        self.id: str = dev.get_info(rs.camera_info.serial_number)
-        self.pipeline = rs.pipeline(ctx)
+        # Its firmware-update ID: the one ID it has in every state, recovery (DFU) mode included, where it has no
+        # serial number. A device without one raises, and is not listed
+        self.id: str = dev.get_info(rs.camera_info.firmware_update_id)
+        self.pipeline = rs.pipeline(ctx)  # one in recovery mode fails to start, in the SDK
         self.pipeline.set_device(dev)  # skips re-creating the device on start
         self._events = events
         self._frame_sender = frame_sender
@@ -51,8 +52,11 @@ class Camera:
 
     def is_metadata_enabled(self) -> bool:
         """False only where Windows keeps its frame metadata off until it is enabled (the SDK says True elsewhere);
-        read from the registry each call"""
+        read from the registry each call. In recovery mode, with no sensors, the SDK refuses the question"""
         return self.dev.is_metadata_enabled()
+
+    def is_update_device(self) -> bool:
+        return self.dev.is_update_device()
 
     def hardware_reset(self) -> None:
         """The devices-changed callback reports it leaving and coming back, as in the legacy viewer"""

@@ -42,6 +42,16 @@ def is_metadata_enabled(
     return camera.is_metadata_enabled()
 
 
+@router.get("/{device_id}/is_update_device", response_model=bool)
+def get_is_update_device(
+    camera: Camera = Depends(get_camera),
+):
+    """
+    Whether the device is in recovery mode, as the SDK's update_device: a firmware update takes it there and back.
+    """
+    return camera.is_update_device()
+
+
 @router.get("/{device_id}/extrinsics", response_model=Extrinsics)
 def get_extrinsics(
     from_stream: StreamName,
