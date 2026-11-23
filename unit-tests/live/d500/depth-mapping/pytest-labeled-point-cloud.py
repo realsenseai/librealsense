@@ -13,10 +13,8 @@ import time
 import numpy as np
 import pyrealsense2 as rs
 from pytest_check import check
-from rspy.pytest.device_helpers import skip_d585_on_gmsl
 import logging
 log = logging.getLogger(__name__)
-REASON = "D585 over GMSL on rs-ci-orin-04 returns empty point-cloud payloads; passes on rs-sdk-nano-2/3; re-enable once the orin-04 hardware issue is resolved"
 
 
 pytestmark = [
@@ -87,7 +85,6 @@ def collect( sensor, profile, count ):
 
 def test_lpcl_streams_well_formed_frames( lpcl ):
     dev, sensor, profile = lpcl
-    skip_d585_on_gmsl( dev, REASON )
     vsp = profile.as_video_stream_profile()
     frames, errors = collect( sensor, profile, FRAMES_TO_CHECK )
 

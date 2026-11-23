@@ -13,10 +13,9 @@ import pyrealsense2 as rs
 import struct
 import time
 import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version, skip_d585_on_gmsl
+from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
-REASON = "D585 over GMSL on rs-ci-orin-04 returns empty point-cloud payloads; passes on rs-sdk-nano-2/3; re-enable once the orin-04 hardware issue is resolved"
 
 
 pytestmark = [
@@ -197,7 +196,6 @@ def test_lpcl_refused_on_a_smaller_capture(device):
 def test_pd_refused_with_lpcl(device):
     """PD + LPCL is not a supported MUX combination: the camera refuses PD joining a running LPCL, which keeps streaming.
     PD started first is refused before the camera (test_lpcl_refused_on_a_smaller_capture)."""
-    skip_d585_on_gmsl( device, REASON )
     require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "PD + LPCL refusal" )   # older FW lets PD join
     pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
     frames = Collector()
