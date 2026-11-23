@@ -58,6 +58,11 @@ namespace librealsense
 
             std::shared_ptr<watchdog> _watchdog;
             uint32_t _read_buff_length;
+            uint32_t _transfer_buffer_size;
+            bool _split_transfers = false;
+            backend_frame_ptr _partial_frame{ nullptr, nullptr };
+            size_t _partial_size = 0;
+            bool _discard_payload = false;
             bool _allow_variable_length_payload = false;
             backend_frames_queue _queue;
             rs_usb_endpoint _read_endpoint;
@@ -67,6 +72,7 @@ namespace librealsense
             std::shared_ptr<platform::usb_request_callback> _request_callback;
 
             void init();
+            void consume_transfer( const uint8_t * data, size_t size );
             void flush();
         };
     }

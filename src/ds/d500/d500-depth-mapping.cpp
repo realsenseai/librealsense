@@ -1113,16 +1113,23 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
     void d500_depth_mapping_sensor::close()
     {
         std::lock_guard< std::mutex > lock( _owner->_mapping_session_mutex );
-        synthetic_sensor::close();
-        if( _owner->_mapping_selectors )
-            _owner->_raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
-            {
-                std::lock_guard< platform::uvc_device > device_lock( dev );
-                const uint8_t automatic = 0;
-                if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 ) ||
-                    ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) )
-                    throw io_exception( "Cannot restore automatic USB Mapping selection after close" );
-            } );
+        if( !_owner->_mapping_selectors )
+        {
+            synthetic_sensor::close();
+            return;
+        }
+        // Keep the USB interfaces claimed through close and selector restore.
+        // Releasing power between them lets the kernel re-probe the Mapping
+        // interface while the previous firmware graph is still retiring.
+        _owner->_raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
+        {
+            synthetic_sensor::close();
+            std::lock_guard< platform::uvc_device > device_lock( dev );
+            const uint8_t automatic = 0;
+            if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 ) ||
+                ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) )
+                throw io_exception( "Cannot restore automatic USB Mapping selection after close" );
+        } );
     }
 
     rs2_intrinsics d500_depth_mapping_sensor::get_intrinsics(const stream_profile& profile) const

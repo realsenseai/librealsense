@@ -100,11 +100,19 @@ def test_mapping_shared_endpoint_switch_and_reopen(mapping):
         (rs.stream.point_cloud, rs.format.xyzrgb32f, 1280, 720, 15),
         (rs.stream.point_cloud, rs.format.xyz32f, 1280, 720, 15),
     ]
-    for _ in range(3):
+    for cycle in range(3):
         for request in requests:
+            print("Mapping switch", cycle, request, flush=True)
             frames = capture(mapping, select(mapping, *request), count=6)
             assert all(frame.get_profile().format() == request[1] for frame in frames)
             assert all(frame.get_profile().stream_type() == request[0] for frame in frames)
+            stride = (16 if request[1] == rs.format.xyzrgb32f else
+                      12 if request[0] == rs.stream.point_cloud else
+                      13 if request[0] == rs.stream.labeled_point_cloud else 1)
+            expected_size = request[2] * request[3] * stride
+            assert all(frame.get_data_size() == expected_size for frame in frames)
+            for frame in frames:
+                assert frame.get_frame_metadata(rs.frame_metadata_value.crc) == zlib.crc32(bytes(frame.get_data()))
     first = select(mapping, *requests[0])
     second = select(mapping, *requests[1])
     with pytest.raises(RuntimeError):
