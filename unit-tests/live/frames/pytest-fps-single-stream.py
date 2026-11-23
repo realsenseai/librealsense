@@ -3,7 +3,7 @@
 
 """
 Test FPS accuracy for single depth and color streams at various frame rates.
-Verify that actual fps is within 10% of requested, as in the other fps tests, with manual exposure (half the frame time)
+Verify that actual fps is within 10% of requested, with manual exposure (half the frame time)
 on every build and auto exposure added on nightly.
 """
 
