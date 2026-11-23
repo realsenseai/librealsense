@@ -27,6 +27,7 @@ pytestmark = [
 
 MAX_DELAY = 1.0  # [sec]
 MAX_DELAY_D585_GMSL = 2.0  # [sec] first stream after a reset takes 1.1-1.6 s on D585 over GMSL
+MAX_DELAY_COLOR_FROM_DEPTH = 2.0  # [sec] D401/D405 color powers up the RGB ISP on start: ~0.4 s more than depth, 1.2-1.4 s on Jetson GMSL
 
 
 def max_delay_for(dev):
@@ -91,7 +92,7 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
 def test_pipeline_first_color_frame_delay(pipeline_device):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = max_delay_for(dev)
+    max_delay = MAX_DELAY_COLOR_FROM_DEPTH if any(m in product_name for m in ('D401', 'D405')) else max_delay_for(dev)
     os_name = platform.system()
 
     log.info(f"Testing pipeline first color frame delay on {product_name} device - {os_name} OS")

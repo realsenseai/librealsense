@@ -124,12 +124,13 @@ def test_first_color_frame_delay(sensor_device):
     if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "first color frame delay" )
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    color_from_depth = any(m in product_name for m in ('D401', 'D405'))
+    max_delay = 2 if color_from_depth else 1  # D401/D405 color powers up the RGB ISP on start
     os_name = platform.system()
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
 
-    cs = dev.first_depth_sensor() if any(m in product_name for m in ('D401', 'D405')) else dev.first_color_sensor()
+    cs = dev.first_depth_sensor() if color_from_depth else dev.first_color_sensor()
     cp = next(p for p in cs.profiles
               if p.fps() == 30
               and p.stream_type() == rs.stream.color
