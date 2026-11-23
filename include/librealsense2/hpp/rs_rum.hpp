@@ -49,7 +49,7 @@ namespace rs2
             return enabled != 0;
         }
 
-        // Name the application in the RUM report; call once at startup.
+        // Name the application in the RUM report; the last name set wins.
         inline void set_app_name(const std::string& name)
         {
             rs2_error* e = nullptr;

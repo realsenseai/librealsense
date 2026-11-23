@@ -240,14 +240,7 @@ void rum_collector::record_notification( std::string const & category )
 void rum_collector::record_app( std::string const & name )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    if( ! _apps_this_session.insert( name ).second )
-        return;
-    if( ! _app_counts.count( name ) && _app_counts.size() >= max_apps )
-    {
-        LOG_WARNING( "RUM report already holds " << max_apps << " app names; not recording '" << name << "'" );
-        return;
-    }
-    ++_app_counts[name];
+    _app_name = name;
 }
 
 
@@ -330,6 +323,9 @@ json rum_collector::build_report() const
     report["apps"] = json::object();
     for( auto const & entry : _app_counts )
         report["apps"][entry.first] = entry.second;
+    // This run counts once, under the last name set - a layer above (e.g. REST over pyrealsense2) overrides
+    if( ! _app_name.empty() && ( _app_counts.count( _app_name ) || _app_counts.size() < max_apps ) )
+        report["apps"][_app_name] = report["apps"].value( _app_name, 0 ) + 1;
     return report;
 }
 
@@ -430,9 +426,6 @@ void rum_collector::merge_saved_report()
     auto apps = j.value( "apps", json::object() );
     for( auto ait = apps.begin(); ait != apps.end(); ++ait )
         _app_counts[ ait.key() ] += ait.value().get< int >();
-    // Saved names keep their place; names first seen this run go if that puts the report over the cap
-    for( auto it = _app_counts.begin(); _app_counts.size() > max_apps && it != _app_counts.end(); )
-        it = apps.find( it->first ) == apps.end() ? _app_counts.erase( it ) : std::next( it );
 }
 
 

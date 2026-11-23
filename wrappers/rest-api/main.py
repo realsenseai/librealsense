@@ -96,6 +96,12 @@ _static_dir = Path(__file__).parent / "static"
 if (_static_dir / "index.html").exists():
     app.router.default = StaticFiles(directory=_static_dir, html=True)
 
+# Name this app in the RUM report over pyrealsense2's default; older wheels lack the call
+import pyrealsense2 as rs
+_set_app_name = getattr(getattr(rs, "rum", None), "set_app_name", None)
+if _set_app_name:
+    _set_app_name("realsense-react-viewer" if (_static_dir / "index.html").exists() else "rest-api")
+
 
 @app.on_event("startup")
 async def startup_event():
