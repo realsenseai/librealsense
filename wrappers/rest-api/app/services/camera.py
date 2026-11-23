@@ -127,15 +127,15 @@ class Camera:
             for f in frames.as_frameset() if frames.is_frameset() else [frames]:
                 if not sender.watched(device_id, f):
                     continue
-                if f.get_profile().stream_type() == rs.stream.depth:  # the filters process depth only
-                    for flt, on in filters[rs.sensor.from_frame(f).get_info(rs.camera_info.name)].items():
-                        if on:
-                            try:
-                                f = flt.process(f)
-                            except RuntimeError as e:  # a failing filter is skipped, not the whole frame
-                                if flt not in failed:  # logged once, not on every frame
-                                    failed.add(flt)
-                                    logging.warning("Filter %s failed, skipped: %s", flt.get_info(rs.camera_info.name), e)
+                for flt, on in filters[rs.sensor.from_frame(f).get_info(rs.camera_info.name)].items():
+                    if not on:
+                        continue
+                    try:
+                        f = flt.process(f)
+                    except RuntimeError as e:  # a failing filter is skipped, not the whole frame
+                        if flt not in failed:  # logged once, not on every frame
+                            failed.add(flt)
+                            logging.warning("Filter %s failed, skipped: %s", flt.get_info(rs.camera_info.name), e)
                 sender.send(device_id, f, colorizer)
         return send
 
