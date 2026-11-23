@@ -4,7 +4,7 @@
 """
 Test time-to-first-frame for sensor API. Measures startup time from
 sensor.open()/start() to first frame via callback for depth and color streams,
-on a cold start and again on a restart right after stop.
+on a cold start and on a restart right after stop.
 
 Note: Using Windows Media Foundation to handle power management between USB actions
 can add ~27ms to the startup time.
@@ -25,8 +25,6 @@ pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
 ]
-
-MAX_DELAY = 1  # [sec]
 
 
 @pytest.fixture(scope="module")
@@ -92,10 +90,11 @@ def test_device_creation_time(module_device_setup):
         f"Device creation time {creation_time:.3f}s exceeds maximum {max_time:.1f}s"
 
 
-def test_first_depth_frame_delay(sensor_device):
+@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
+def test_first_depth_frame_delay(sensor_device, restart):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1.5 if is_d585_on_gmsl(dev) else MAX_DELAY  # slow first start after reset on D585 GMSL, not on restart
+    max_delay = 1.5 if is_d585_on_gmsl(dev) and not restart else 1  # slow first start after reset on D585 GMSL
     os_name = platform.system()
 
     log.info(f"Testing first depth frame delay on {product_name} device - {os_name} OS")
@@ -107,27 +106,34 @@ def test_first_depth_frame_delay(sensor_device):
               and p.format() == rs.format.z16
               and p.is_default())
 
-    for run, limit in (("start", max_delay), ("restart after stop", MAX_DELAY)):
-        delay = time_to_first_frame(ds, dp, limit)
-        assert delay != -1, f"Depth frames did not arrive for {limit + 1} second(s) on {run}"
-        log.info(f"Time until first depth frame on {run} is: {delay:.3f} [sec] max allowed is: {limit:.1f} [sec]")
-        assert delay < limit, \
-            f"Depth frame delay on {run} {delay:.3f}s exceeds maximum {limit:.1f}s"
-        # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
+    if restart:  # unmeasured start/stop, then measure the restart right after it
+        time_to_first_frame(ds, dp, max_delay)
         if is_dds_dev(dev):
-            time.sleep(1)
+            time.sleep(1)  # stream stops when DDS reader closure is detected by device
+
+    delay = time_to_first_frame(ds, dp, max_delay)
+
+    assert delay != -1, f"Depth frames did not arrive for {max_delay + 1} second(s)"
+    log.info(f"Time until first depth frame is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
+    assert delay < max_delay, \
+        f"Depth frame delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+
+    # Allow some time to close the depth pipe completely, stream stops when DDS reader closure is detected by device
+    if is_dds_dev(dev):
+        time.sleep(1)
 
 
 # D421/D430 have no color; D401/D405 stream color from the depth sensor.
 @pytest.mark.device_exclude("D421")
 @pytest.mark.device_exclude("D430")
-def test_first_color_frame_delay(sensor_device):
+@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
+def test_first_color_frame_delay(sensor_device, restart):
     dev, ctx = sensor_device
     if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "first color frame delay" )
     product_name = dev.get_info(rs.camera_info.name)
     color_from_depth = any(m in product_name for m in ('D401', 'D405'))
-    max_delay = 2 if color_from_depth else MAX_DELAY  # D401/D405 color powers up the RGB ISP on start
+    max_delay = 2 if color_from_depth else 1  # D401/D405 color powers up the RGB ISP on start
     os_name = platform.system()
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
@@ -139,11 +145,14 @@ def test_first_color_frame_delay(sensor_device):
               and p.format() == rs.format.rgb8
               and p.is_default())
 
-    for run in ("start", "restart after stop"):
-        delay = time_to_first_frame(cs, cp, max_delay)
-        assert delay != -1, f"Color frames did not arrive for {max_delay + 1} second(s) on {run}"
-        log.info(f"Time until first color frame on {run} is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
-        assert delay < max_delay, \
-            f"Color frame delay on {run} {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+    if restart:  # unmeasured start/stop, then measure the restart right after it
+        time_to_first_frame(cs, cp, max_delay)
         if is_dds_dev(dev):
-            time.sleep(1)  # let the DDS stream close before the restart
+            time.sleep(1)  # stream stops when DDS reader closure is detected by device
+
+    delay = time_to_first_frame(cs, cp, max_delay)
+
+    assert delay != -1, f"Color frames did not arrive for {max_delay + 1} second(s)"
+    log.info(f"Time until first color frame is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
+    assert delay < max_delay, \
+        f"Color frame delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
