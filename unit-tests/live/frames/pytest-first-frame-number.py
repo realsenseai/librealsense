@@ -5,11 +5,13 @@ import pytest
 import pyrealsense2 as rs
 from pytest_check import check
 import threading
+import platform
 import logging
 log = logging.getLogger(__name__)
 
+# This test checks that every stream's first frame number after each stream start is the expected one for the platform
+
 pytestmark = [
-    pytest.mark.context("nightly"),
     pytest.mark.device_each("D400*"),  # D500 excluded: FW counter starts at 2+, RSDEV-7649
     pytest.mark.device_type_exclude("GMSL"),  # GMSL excluded: FW counter starts at 2+, RSDSO-21070
 ]
@@ -18,8 +20,7 @@ CYCLES = 3
 
 
 def test_first_frame_number_on_stream_start(test_device):
-    """Every stream's first frame is numbered 0 or 1 after each start. Sensor callbacks are used
-    because the pipeline drops frames until it has a full frameset."""
+    """Sensor callbacks are used because the pipeline drops frames until it has a full frameset."""
     dev, ctx = test_device
     cfg = rs.config()
     cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
@@ -37,7 +38,7 @@ def test_first_frame_number_on_stream_start(test_device):
 
         def on_frame(f):
             with lock:
-                first.setdefault(f.get_profile().stream_name(), f.get_frame_number())
+                first.setdefault(f.get_profile().stream_name(), (f.get_frame_number(), f.is_motion_frame()))
                 if len(first) == len(resolved):
                     all_arrived.set()
 
@@ -57,5 +58,7 @@ def test_first_frame_number_on_stream_start(test_device):
 
         log.info(f"cycle {cycle}: first frame numbers {first}")
         check.equal(len(first), len(resolved), f"cycle {cycle}: not all streams delivered a frame: {first}")
-        for stream, number in first.items():
-            check.less_equal(number, 1, f"cycle {cycle}: {stream} first frame number is {number}")
+        for stream, (number, is_motion) in first.items():
+            # The SDK counts IMU frames from 1; on Windows the FW counter's frame 0 never reaches the host
+            expected = 1 if is_motion or platform.system() == "Windows" else 0
+            check.equal(number, expected, f"cycle {cycle}: {stream} first frame number is {number}")
