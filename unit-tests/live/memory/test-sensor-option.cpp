@@ -24,7 +24,9 @@ TEST_CASE( "sensor get_option memory leak", "[live]" )
         }
         float option_value( depth_sens.get_option( RS2_OPTION_ENABLE_AUTO_EXPOSURE ) );
 
-        REQUIRE( (option_value) ); // Using the value of option_value, if memory error exist, causes valgrind to output: "Conditional jump or move depends on uninitialised value(s)"
+        // Branching on the value makes valgrind report "Conditional jump or move depends on uninitialised value(s)" if there is a memory error.
+        // Auto-exposure can legitimately be on or off, so only verify the value is boolean.
+        CHECK( ( option_value == 0.f || option_value == 1.f ) );
     }
 }
 
