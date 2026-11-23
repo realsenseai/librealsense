@@ -6,19 +6,7 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-class RealSenseError(Exception):
-    def __init__(self, status_code: int, detail: str):
-        self.status_code = status_code
-        self.detail = detail
-
 def setup_exception_handlers(app: FastAPI):
-    @app.exception_handler(RealSenseError)
-    async def realsense_exception_handler(request: Request, exc: RealSenseError):
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"detail": exc.detail},
-        )
-
     # A name, ID or index the path gives that is not there: a device, a sensor, an option, a filter
     @app.exception_handler(LookupError)
     async def not_found_handler(request: Request, exc: LookupError):

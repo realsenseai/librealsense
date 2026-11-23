@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { apiClient } from '../api/client'
+import { onEvent } from '../api/events'
 import type { DeviceInfo, FirmwareState } from '../api/types'
 
 interface FirmwareProgressModalProps {
@@ -8,9 +8,7 @@ interface FirmwareProgressModalProps {
   firmware: FirmwareState
   fileName?: string
   onClose: () => void
-  onProgressUpdate: (progress: number, phase?: 'downloading' | 'installing') => void
-  onSuccess: (firmwareVersion: string | null) => void
-  onError: (error: string) => void
+  onProgressUpdate: (progress: number) => void
 }
 
 export function FirmwareProgressModal({
@@ -20,36 +18,19 @@ export function FirmwareProgressModal({
   fileName,
   onClose,
   onProgressUpdate,
-  onSuccess,
-  onError,
 }: FirmwareProgressModalProps) {
   useEffect(() => {
     if (!isOpen) return
 
-    const unsubscribeProgress = apiClient.onFirmwareProgress(device.device_id, onProgressUpdate)
-
-    const unsubscribeSuccess = apiClient.onFirmwareSuccess(device.device_id, (fwVersion: string | null) => {
-      onSuccess(fwVersion)
-    })
-
-    const unsubscribeError = apiClient.onFirmwareError(device.device_id, (error: string) => {
-      onError(error)
-    })
-
-    return () => {
-      unsubscribeProgress()
-      unsubscribeSuccess()
-      unsubscribeError()
-    }
-  }, [isOpen, device.device_id, onProgressUpdate, onSuccess, onError])
+    return onEvent<{ device_id: string; progress: number }>('firmware_progress',
+      (m) => m.device_id === device.device_id && onProgressUpdate(m.progress))
+  }, [isOpen, device.device_id, onProgressUpdate])
 
   if (!isOpen) return null
 
-  // Download and install each report 0..1; give them one shared 0-20/20-100 scale so the
-  // bar never rewinds between the two phases.
-  const fraction = firmware.progress || 0
-  const progress = Math.round((firmware.phase === 'downloading' ? fraction * 0.2 : 0.2 + fraction * 0.8) * 100)
-  // Only a terminal event means done: the SDK hits 100% long before the camera is back.
+  // Each phase fills the bar once; its label says which one it is
+  const progress = Math.round((firmware.progress || 0) * 100)
+  // Only the update's outcome means done: the SDK hits 100% long before the camera is back.
   const done = firmware.is_updating === false && !firmware.last_error
 
   return (

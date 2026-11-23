@@ -74,9 +74,6 @@ export const mockDeviceState: DeviceState = {
   device: mockDevice,
   firmware: {
     recommended: '5.16.0.1',
-    is_updating: false,
-    progress: undefined,
-    last_error: null,
   },
   sensors: mockSensors,
   options: {},

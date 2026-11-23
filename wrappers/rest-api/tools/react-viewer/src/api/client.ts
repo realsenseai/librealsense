@@ -1,5 +1,4 @@
 import axios, { AxiosInstance } from 'axios'
-import { onEvent } from './events'
 import { BACKEND_ORIGIN } from './backend'
 import { visibleOptions } from './types'
 import type {
@@ -16,10 +15,6 @@ import type {
 
 const API_BASE = `${BACKEND_ORIGIN}/api/v1`
 
-type FirmwareProgressCallback = (progress: number, phase?: 'downloading' | 'installing') => void
-type FirmwareErrorCallback = (error: string) => void
-type FirmwareSuccessCallback = (firmwareVersion: string | null) => void
-
 class ApiClient {
   private client: AxiosInstance
 
@@ -30,23 +25,6 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
     })
-  }
-
-  // ============ Firmware events (api/events.ts) ============
-
-  onFirmwareProgress(deviceId: string, callback: FirmwareProgressCallback): () => void {
-    return onEvent<{ device_id: string; progress: number; phase?: 'downloading' | 'installing' }>('firmware_progress',
-      m => m.device_id === deviceId && callback(m.progress, m.phase))
-  }
-
-  onFirmwareError(deviceId: string, callback: FirmwareErrorCallback): () => void {
-    return onEvent<{ device_id: string; error: string }>('firmware_update_failed',
-      m => m.device_id === deviceId && callback(m.error))
-  }
-
-  onFirmwareSuccess(deviceId: string, callback: FirmwareSuccessCallback): () => void {
-    return onEvent<{ device_id: string; firmware_version: string | null }>('firmware_update_success',
-      m => m.device_id === deviceId && callback(m.firmware_version))
   }
 
   // ============ Health ============
@@ -65,12 +43,6 @@ class ApiClient {
   /** False only on Windows until frame metadata is enabled there */
   async getMetadataEnabled(deviceId: string): Promise<boolean> {
     const response = await this.client.get<boolean>(`/devices/${deviceId}/is_metadata_enabled`)
-    return response.data
-  }
-
-  /** The firmware version the online DB recommends for this device, if any. */
-  async getRecommendedFirmware(deviceId: string): Promise<{ recommended?: string }> {
-    const response = await this.client.get(`/devices/${deviceId}/firmware/`)
     return response.data
   }
 
@@ -126,29 +98,41 @@ class ApiClient {
     return visibleOptions(response.data)
   }
 
-  async updateFirmwareFromFile(
-    deviceId: string,
-    file: File
-  ): Promise<{ status: string; firmware_version?: string | null; progress?: number }> {
-    const form = new FormData()
-    form.append('file', file)
-    // Clear the per-client default Content-Type (`application/json`) so the
-    // browser sets `multipart/form-data; boundary=...` itself when posting
-    // FormData. Hard-coding `multipart/form-data` here would strip the boundary
-    // and break FastAPI parsing (422).
-    const response = await this.client.post(
-      `/devices/${deviceId}/firmware/update_from_file`,
-      form,
-      { headers: { 'Content-Type': undefined as unknown as string } },
-    )
-    return response.data
+  /**
+   * Update a camera's firmware through the SDK's calls in turn, as rs-fw-update makes them: check the image,
+   * switch to recovery mode, write it, wait for the camera back. One already in recovery mode is written at once.
+   * The write's progress comes as firmware_progress events.
+   */
+  async updateFirmware(deviceId: string, image: Blob): Promise<void> {
+    if (!(await this.isUpdateDevice(deviceId))) {
+      if (!(await this.postImage<boolean>(deviceId, 'check_firmware_compatibility', image))) {
+        throw new Error('Firmware is not compatible with this device')
+      }
+      await this.client.post(`/devices/${deviceId}/firmware/enter_update_state`)
+      await this.waitForUpdateDevice(deviceId, true, 'Recovery device did not connect in time')
+    }
+    await this.postImage(deviceId, 'update', image)
+    await this.waitForUpdateDevice(deviceId, false, 'Original device did not reconnect in time')
   }
 
-  async updateFirmwareFromRecommended(
-    deviceId: string
-  ): Promise<{ status: string; firmware_version?: string | null; progress?: number }> {
-    const response = await this.client.post(`/devices/${deviceId}/firmware/update_from_recommended`)
-    return response.data
+  /** Whether the camera is in recovery mode */
+  async isUpdateDevice(deviceId: string): Promise<boolean> {
+    return (await this.client.get<boolean>(`/devices/${deviceId}/is_update_device`)).data
+  }
+
+  /** Until the camera is in (or out of) recovery mode, 60 s as the legacy viewer; gone meanwhile is not yet */
+  private async waitForUpdateDevice(deviceId: string, recovery: boolean, error: string): Promise<void> {
+    for (const deadline = Date.now() + 60_000; Date.now() < deadline;) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      if ((await this.isUpdateDevice(deviceId).catch(() => undefined)) === recovery) return
+    }
+    throw new Error(error)
+  }
+
+  private async postImage<T>(deviceId: string, step: string, image: Blob): Promise<T> {
+    // The body is the image itself
+    const headers = { 'Content-Type': 'application/octet-stream' }
+    return (await this.client.post<T>(`/devices/${deviceId}/firmware/${step}`, image, { headers })).data
   }
 
   // ============ Sensors ============

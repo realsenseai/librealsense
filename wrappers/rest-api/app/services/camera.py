@@ -58,6 +58,21 @@ class Camera:
     def is_update_device(self) -> bool:
         return self.dev.is_update_device()
 
+    def check_firmware_compatibility(self, image: bytearray) -> bool:
+        return rs.updatable(self.dev).check_firmware_compatibility(image)
+
+    def enter_update_state(self) -> None:
+        rs.updatable(self.dev).enter_update_state()
+
+    def update_firmware(self, image: bytearray) -> None:
+        last = [-1]  # one firmware_progress event per percent: the SDK ticks far more often
+
+        def on_progress(progress: float) -> None:
+            if int(progress * 100) != last[0]:
+                last[0] = int(progress * 100)
+                self._events.emit("firmware_progress", {"device_id": self.id, "progress": progress})
+        self.dev.as_update_device().update(image, on_progress)
+
     def hardware_reset(self) -> None:
         """The devices-changed callback reports it leaving and coming back, as in the legacy viewer"""
         self.dev.hardware_reset()
