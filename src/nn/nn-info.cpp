@@ -8,6 +8,8 @@
 #include <rsutils/json.h>
 #include <rsutils/string/from.h>
 
+#include <cmath>
+
 namespace librealsense {
 namespace nn {
 
@@ -42,10 +44,12 @@ static bool is_dense( const std::vector< int > & sizes, const std::vector< int >
 
 static uint32_t parse_model_id( const rsutils::json & metadata )
 {
+    // As the camera reads it: a whole number in range, 42.0 included
     auto const id = metadata.find( "model_id" );
-    if( id == metadata.end() || ! id->is_number_unsigned() || id->get< uint64_t >() > UINT32_MAX )
+    if( id == metadata.end() || ! id->is_number() )
         return 0;
-    return id->get< uint32_t >();
+    double const value = id->get< double >();
+    return value >= 0 && value <= UINT32_MAX && value == std::floor( value ) ? uint32_t( value ) : 0;
 }
 
 

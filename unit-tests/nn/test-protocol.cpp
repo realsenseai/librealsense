@@ -317,9 +317,10 @@ TEST_CASE( "model description" )
     CHECK( desc->model_id == 0 );
     CHECK( model_id( "305441741" ) == 0x1234ABCD );
     CHECK( model_id( "4294967295" ) == 0xFFFFFFFF );
+    CHECK( model_id( "42.0" ) == 42 );
+    CHECK( model_id( "42.5" ) == 0 );
     CHECK( model_id( "4294967296" ) == 0 );
     CHECK( model_id( "-1" ) == 0 );
-    CHECK( model_id( "1.5" ) == 0 );
     CHECK( model_id( "\"7\"" ) == 0 );
     CHECK( nn::parse_model_description( with( "\"model_id\": null,", "" ), 0 )->model_id == 0 );
 }
