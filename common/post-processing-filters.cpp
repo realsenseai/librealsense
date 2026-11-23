@@ -44,6 +44,7 @@ rs2::frame post_processing_filters::apply_filters(rs2::frame f, const rs2::frame
 
 std::shared_ptr<subdevice_model> post_processing_filters::get_frame_origin(const rs2::frame& f)
 {
+    std::lock_guard< std::mutex > lock( viewer.streams_mutex );  // begin_stream / gc_streams change it on the UI thread
     for (auto&& s : viewer.streams)
     {
         if (s.second.dev)
