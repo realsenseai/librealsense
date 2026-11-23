@@ -381,7 +381,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                         expected_size = compute_frame_expected_size( width, height, bpp );
 
                     // Compressed and perception streams carry variable-length payloads; copy the data as received.
-                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } )
+                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG, RS2_FORMAT_H264 } )
                         || is_perception || is_depth_mapping )
                     {
                         expected_size = f.frame_size;
