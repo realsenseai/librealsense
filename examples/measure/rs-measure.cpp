@@ -100,6 +100,7 @@ void render_simple_distance(const rs2::depth_frame& depth,
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-measure" );
     auto settings = rs2::cli( "rs-measure example" )
         .process( argc, argv );
 

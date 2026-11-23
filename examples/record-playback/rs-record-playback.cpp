@@ -24,6 +24,7 @@ void draw_seek_bar(rs2::playback& playback, int* seek_pos, float2& location, flo
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-record-playback" );
     // Create a simple OpenGL window for rendering:
     window app(1280, 720, "RealSense Record and Playback Example");
     // Setup Dear ImGui context

@@ -96,6 +96,11 @@ _static_dir = Path(__file__).parent / "static"
 if (_static_dir / "index.html").exists():
     app.router.default = StaticFiles(directory=_static_dir, html=True)
 
+# Name this app in the RUM report over pyrealsense2's default; older wheels lack the call
+import pyrealsense2 as rs
+_set_app_name = getattr(getattr(rs, "rum", None), "set_app_name", None) or (lambda name: None)
+_set_app_name("rest-api")
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -115,7 +120,11 @@ if __name__ == "__main__":
     # localhost by default, which also avoids Windows Firewall prompts
     parser.add_argument("--host", default="127.0.0.1", help="interface to listen on; 0.0.0.0 accepts remote clients")
     parser.add_argument("--port", type=int, choices=range(1, 65536), metavar="PORT", default=8000, help="port to listen on (1-65535)")
+    # A client that launches this server, like the React viewer app, names itself over "rest-api"
+    parser.add_argument("--app-name", help="app name for the RUM usage report")
     args = parser.parse_args()
+    if args.app_name:
+        _set_app_name(args.app_name)
 
     # Disable reload when running as a bundled executable (PyInstaller)
     # Reload mode doesn't work in PyInstaller and causes issues with device access

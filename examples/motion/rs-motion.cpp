@@ -237,6 +237,7 @@ rs2_vector to_rs2_vector( T const & value )
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-motion" );
     rs2::context ctx;
     auto mode = detect_imu_mode( ctx.query_devices() );
     if( mode == imu_mode::none )

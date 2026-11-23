@@ -17,6 +17,7 @@ at 64 KB; once full, the least-used stream configurations are dropped to make ro
 - **Options changed**: device-sensor options set to a non-default value (name + last value).
 - **Filters**: which SDK post-processing filters were actually applied to frames.
 - **Notifications**: SDK notification categories, counted.
+- **Apps**: the name each application gives itself (e.g. `realsense-viewer`, `pyrealsense2`), counted per run.
 
 ## What is NOT collected
 

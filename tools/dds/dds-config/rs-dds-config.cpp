@@ -174,6 +174,7 @@ bool find_device( rs2::context const & ctx,
 int main( int argc, char * argv[] )
 try
 {
+    rs2::rum::set_app_name( "rs-dds-config" );
     using cli = rs2::cli_no_dds;
 
     cli::flag quiet_arg( "quiet", "Suppress regular informational (-I-) messages" );

@@ -162,6 +162,7 @@ void demonstrate_config_changes( rs2::eth_config_device & eth_device )
 int main( int argc, char * argv[] )
 try
 {
+    rs2::rum::set_app_name( "rs-eth-config" );
     auto settings = rs2::cli( "Ethernet Configuration Example" ).process( argc, argv );
 
     std::cout << "RealSense Ethernet Configuration Example" << std::endl;

@@ -8,6 +8,7 @@
 
 int main( int argc, const char ** argv ) try
 {
+    rs2::rum::set_app_name( "realsense-viewer" );
     return run_viewer( argc, argv );
 }
 catch( const rs2::error & e )

@@ -132,6 +132,7 @@ EXPORTS
     rs2_rum_get_report_path
     rs2_rum_set_cloud_enabled
     rs2_rum_is_cloud_enabled
+    rs2_rum_set_app_name
 
     rs2_get_device_info
     rs2_supports_device_info

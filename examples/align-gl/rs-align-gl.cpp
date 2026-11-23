@@ -37,7 +37,8 @@ enum class direction
 void render_slider(rect location, float* alpha, direction* dir);
 
 int main(int argc, char * argv[]) try
-{   
+{
+    rs2::rum::set_app_name( "rs-align-gl" );
     auto settings = rs2::cli( "rs-align-gl example" )
         .process( argc, argv );
 

@@ -292,6 +292,7 @@ bool data_collector::configure_sensors()
 
 int main(int argc, char** argv) try
 {
+    rs2::rum::set_app_name( "rs-data-collect" );
     // Parse command line arguments
     cli::value<int>    timeout('t', "Timeout", "seconds", 10, "Max amount of time to receive frames (in seconds)");
     cli::value<int>    max_frames('m', "MaxFrames_Number", "", 100, "Maximum number of frames-per-stream to receive");

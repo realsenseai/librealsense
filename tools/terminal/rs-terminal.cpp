@@ -178,6 +178,7 @@ rs2::device wait_for_device(const rs2::device_hub& hub, bool print_info = true)
 
 int main(int argc, char** argv) try
 {
+    rs2::rum::set_app_name( "rs-terminal" );
     using cli = rs2::cli;
     cli cmd( "librealsense rs-terminal tool" );
     cli::value<string> xml_arg('l', "load", "path", "", "Full commands XML file path");

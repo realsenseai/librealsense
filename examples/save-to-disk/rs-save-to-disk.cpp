@@ -18,6 +18,7 @@ void metadata_to_csv(const rs2::frame& frm, const std::string& filename);
 // It can be useful for debugging an embedded system with no display.
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-save-to-disk" );
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 

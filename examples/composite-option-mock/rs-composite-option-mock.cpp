@@ -272,6 +272,7 @@ bool test_icr_control()
 int main()
 try
 {
+    rs2::rum::set_app_name( "rs-composite-option-mock" );
     bool ok = test_decimation_filter_dpp();
     ok = test_temporal_filter_dpp() && ok;
     ok = test_icr_control() && ok;

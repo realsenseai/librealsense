@@ -370,6 +370,7 @@ int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image, devic
 int main(int argc, char** argv)
 try
 {
+    rs2::rum::set_app_name( "rs-fw-update" );
     using rs2::cli;
     cli cmd("librealsense rs-fw-update tool");
 
