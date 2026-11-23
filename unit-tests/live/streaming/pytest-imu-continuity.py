@@ -4,7 +4,7 @@
 """
 IMU stream continuity: streams accel + gyro via sensor.start(callback) and fails on any frame-number gap,
 hardware-timestamp gap (> TIMESTAMP_GAP_FACTOR periods, or backward), or a rate more than RATE_TOLERANCE
-below the requested one. wait_for_frames / poll_for_frames are not used: they fabricate gaps.
+below the expected one. wait_for_frames / poll_for_frames are not used: they fabricate gaps.
 """
 
 import sys
@@ -12,6 +12,7 @@ import os
 import time
 import logging
 import platform
+import statistics
 
 import pytest
 import pyrealsense2 as rs
@@ -34,8 +35,6 @@ pytestmark = [
 
 STANDALONE_DURATION_S = 3
 VIDEO_DURATION_S = 10
-MAX_FRAME_NUMBER_GAPS = 0
-MAX_TIMESTAMP_GAPS = 0
 TIMESTAMP_GAP_FACTOR = 1.5
 RATE_TOLERANCE = 0.02
 MIN_FRAMES_PER_STREAM = 10
@@ -77,39 +76,39 @@ def unwrapped_deltas_ms(timestamps_ms):
 def evaluate_stream(name, rec, fps):
     """Return a list of violation strings for one recorded stream (empty when it passes)."""
     warmup = int(WARMUP_S * fps)
-    rec.frame_numbers, rec.timestamps_ms, rec.domains = (
-        rec.frame_numbers[warmup:], rec.timestamps_ms[warmup:], rec.domains[warmup:])
-    n = len(rec.frame_numbers)
+    frame_numbers, timestamps_ms, domains = rec.frame_numbers[warmup:], rec.timestamps_ms[warmup:], rec.domains[warmup:]
+    n = len(frame_numbers)
     if n < MIN_FRAMES_PER_STREAM:
         return [f"{name}@{fps}: only {n} frames received"]
 
     problems = []
-    fn_gaps = count_frame_number_gaps(rec.frame_numbers)
-    if fn_gaps > MAX_FRAME_NUMBER_GAPS:
-        problems.append(f"{name}@{fps}: {fn_gaps} missing frame numbers (max {MAX_FRAME_NUMBER_GAPS})")
+    fn_gaps = count_frame_number_gaps(frame_numbers)
+    if fn_gaps:
+        problems.append(f"{name}@{fps}: {fn_gaps} missing frame numbers")
 
     # Without a hardware clock the timestamps are host arrival times, so the gap and rate checks would be fake
-    non_hw = [d for d in rec.domains if d != rs.timestamp_domain.hardware_clock]
+    non_hw = [d for d in domains if d != rs.timestamp_domain.hardware_clock]
     if non_hw:
         problems.append(f"{name}@{fps}: {len(non_hw)}/{n} frames not in hardware_clock domain "
                         f"({', '.join(sorted({str(d) for d in non_hw}))})")
         return problems
 
-    period_ms = 1000.0 / fps
-    deltas = unwrapped_deltas_ms(rec.timestamps_ms)
+    deltas = unwrapped_deltas_ms(timestamps_ms)
+    # A stream delivered faster than requested (D457 GMSL gyro: 100 Hz for 50) is judged at its own period
+    period_ms = min(1000.0 / fps, statistics.median(deltas))
     gaps = [(i + 1, d) for i, d in enumerate(deltas) if d > TIMESTAMP_GAP_FACTOR * period_ms or d < 0]
-    if len(gaps) > MAX_TIMESTAMP_GAPS:
+    if gaps:
         missing = sum(max(round(d / period_ms) - 1, 1) for _, d in gaps)
         worst = max(gaps, key=lambda g: abs(g[1]))
         problems.append(f"{name}@{fps}: {len(gaps)} timestamp gaps (~{missing} samples, worst {worst[1]:.1f} ms "
-                        f"at frame #{rec.frame_numbers[worst[0]]}; max {MAX_TIMESTAMP_GAPS})")
+                        f"at frame #{frame_numbers[worst[0]]})")
 
     span_ms = sum(deltas)
     rate = (n - 1) * 1000.0 / span_ms if span_ms > 0 else 0.0
-    log.info("%s@%d: %d frames, frame #%d..#%d, %.2f Hz", name, fps, n,
-             rec.frame_numbers[0], rec.frame_numbers[-1], rate)
-    if rate < fps * (1 - RATE_TOLERANCE):
-        problems.append(f"{name}@{fps}: measured {rate:.2f} Hz, at least {fps * (1 - RATE_TOLERANCE):.2f} Hz expected")
+    expected = 1000.0 / period_ms
+    log.info("%s@%d: %d frames, frame #%d..#%d, %.2f Hz", name, fps, n, frame_numbers[0], frame_numbers[-1], rate)
+    if rate < expected * (1 - RATE_TOLERANCE):
+        problems.append(f"{name}@{fps}: measured {rate:.2f} Hz, at least {expected * (1 - RATE_TOLERANCE):.2f} Hz expected")
     elif rate > fps * (1 + RATE_TOLERANCE):
         log.warning("%s@%d: measured %.2f Hz, faster than requested (no loss)", name, fps, rate)
     return problems
@@ -186,14 +185,14 @@ def _stream_and_record(dev, motion, accel_fps, gyro_fps, with_video, duration_s)
         started.append(motion)
         time.sleep(duration_s)
     finally:
-        # Restore while the sensor is still open: set_option on a closed sensor can throw and mask the result
+        for sensor in reversed(started):
+            sensor.stop()
+        # Restore after stop, so no frame is stamped global_time, and before close, where set_option can throw
         if restore_global_time is not None:
             try:
                 motion.set_option(rs.option.global_time_enabled, restore_global_time)
             except Exception as e:
                 log.warning("Could not restore global_time_enabled: %s", e)
-        for sensor in reversed(started):
-            sensor.stop()
         for sensor in reversed(opened):
             sensor.close()
 
