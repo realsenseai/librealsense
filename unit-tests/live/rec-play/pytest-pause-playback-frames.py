@@ -23,6 +23,7 @@ pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
     pytest.mark.context("weekly"),
+    pytest.mark.requires( fw={"D585S": None, "D585": "7.62"} ),   # older D585 FW rejects an HWM command over GMSL (EINVAL)
 ]
 
 STREAMING_DURATION = 3
