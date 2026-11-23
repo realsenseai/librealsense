@@ -9,7 +9,7 @@
 
 import { test, expect, dismissToasts } from './fixtures'
 import type { Locator, Page } from '@playwright/test'
-import type { DeviceInfo, OptionInfo, SensorInfo } from '../../src/api/types'
+import type { DeviceInfo, OptionMap, SensorInfo } from '../../src/api/types'
 
 // Start/stop is rendered once per sensor module, so it has to be scoped to the module
 // holding the depth toggle - .first() can land on the colour sensor's disabled button.
@@ -141,12 +141,13 @@ test.describe('@real-device Real Device Tests', () => {
 
     const sensorsUrl = `${baseURL}/api/v1/devices/${device.device_id}/sensors/`
     const sensors: SensorInfo[] = await (await fetch(sensorsUrl)).json()
-    const options: OptionInfo[][] = await Promise.all(sensors.map(async (s) =>
+    // The server's shape: options keyed by their ID
+    const options: OptionMap[] = await Promise.all(sensors.map(async (s) =>
       (await fetch(`${sensorsUrl}${s.sensor_index}/options/`)).json()))
-    const i = options.findIndex((o) => o.some((x) => x.option_id === 'exposure'))
+    const i = options.findIndex((o) => 'exposure' in o)
     expect(i, 'no sensor exposes an exposure control').toBeGreaterThanOrEqual(0)
     const sensor = sensors[i]
-    const exposure = options[i].find((x) => x.option_id === 'exposure')!
+    const exposure = options[i].exposure
     const target = Math.min(exposure.max_value, Math.round(Number(exposure.default_value) * 2))
 
     const sensorModule = await openControls(page, device, sensor.name, 'exposure')

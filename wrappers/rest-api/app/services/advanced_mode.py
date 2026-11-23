@@ -1,25 +1,16 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""RS400 advanced-mode controls, flattened into OptionInfo objects."""
+"""RS400 advanced-mode controls, each field as an AdvancedControl."""
 
 import pyrealsense2 as rs
-from typing import Dict, List
+from typing import Dict
 
-from app.models.option import OptionInfo
+from app.models.option import AdvancedControl
 
 
-def control(field: str, value, minimum, maximum) -> OptionInfo:
-    return OptionInfo(
-        option_id=field,
-        current_value=value,
-        default_value=value,  # advanced mode exposes no per-field default
-        min_value=minimum,
-        max_value=maximum,
-        # JSON loses the difference between 10 and 10.0, so an integer field says so
-        # through its step. The SDK states no step for the others.
-        step=1 if isinstance(value, int) else None,
-    )
+def control(value, minimum, maximum) -> AdvancedControl:
+    return AdvancedControl(current_value=value, min_value=minimum, max_value=maximum, integer=isinstance(value, int))
 
 
 def status(dev) -> Dict[str, bool]:
@@ -40,21 +31,35 @@ def toggle(dev, enable: bool) -> None:
     rs.rs400_advanced_mode(dev).toggle_advanced_mode(enable)
 
 
-def controls(dev) -> Dict[str, List[OptionInfo]]:
-    """Every advanced-mode control the device has, keyed by the group the writes go to."""
+def controls(dev) -> Dict[str, Dict[str, AdvancedControl]]:
+    """Every advanced-mode control the device has, by field, keyed by the group the writes go to."""
     groups = rs.rs400_advanced_mode(dev).get_all_controls()
-    by_group: Dict[str, List[OptionInfo]] = {}
+    by_group: Dict[str, Dict[str, AdvancedControl]] = {}
     for group in groups.keys():
         values, mins, maxes = groups[group]
-        by_group[group] = [control(f, values[f], mins[f], maxes[f]) for f in values.keys()]
+        by_group[group] = {f: control(values[f], mins[f], maxes[f]) for f in values.keys()}
     return by_group
 
 
-def set_control(dev, group: str, field: str, value: float) -> OptionInfo:
-    """Set one control: firmware only accepts whole groups, so it is a read-modify-write."""
+def _check_group_exists(am, group: str) -> None:
+    if group not in am.keys():
+        raise KeyError(group)  # answered 404, as in the GETs, not 500 on the SDK's AttributeError
+
+
+def group(dev, group: str) -> Dict[str, AdvancedControl]:
+    """One group's controls, reading only that group: its values, minimums and maximums"""
     am = rs.rs400_advanced_mode(dev)
+    _check_group_exists(am, group)
+    values, mins, maxes = (am[group, mode] for mode in range(3))
+    return {f: control(values[f], mins[f], maxes[f]) for f in values.keys()}
+
+
+def set_control(dev, group: str, field: str, value: float) -> None:
+    """Set one control: firmware only accepts whole groups, so it is a read-modify-write of that group."""
+    am = rs.rs400_advanced_mode(dev)
+    _check_group_exists(am, group)
     values = am[group]
+    if field not in values.keys():
+        raise KeyError(field)
     values[field] = value  # the SDK rounds to the field's own type
     am[group] = values
-    value, minimum, maximum = am[group][field], am[group, 1][field], am[group, 2][field]
-    return control(field, value, minimum, maximum)

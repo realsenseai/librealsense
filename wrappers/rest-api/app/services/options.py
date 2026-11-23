@@ -4,7 +4,7 @@
 """Reading and writing the options of anything implementing rs2::options: a sensor, a
 post-processing filter, the colorizer."""
 
-from typing import List
+from typing import Dict
 
 from app.models.option import OptionInfo
 
@@ -17,9 +17,9 @@ def _value_descriptions(obj, opt, rng):
     probed 165,000 times; a partial set is reported rather than dropped, since whether
     labels mean "dropdown" is the viewer's call.
     """
-    if rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
-        return None
     descs = {}
+    if rng is None or rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
+        return descs
     for val in range(int(rng.min), int(rng.max) + 1):
         try:
             desc = obj.get_option_value_description(opt, float(val))
@@ -31,34 +31,40 @@ def _value_descriptions(obj, opt, rng):
     return descs
 
 
-def _info(obj, opt, rng) -> OptionInfo:
+def _info(obj, opt, value, rng) -> OptionInfo:
+    """rng None: the SDK could not read the option's range, so its fields are null, as the SDK reports it"""
     return OptionInfo(
-        option_id=opt.name,
         description=obj.get_option_description(opt),
-        current_value=obj.get_option(opt),
-        default_value=rng.default,
-        min_value=rng.min,
-        max_value=rng.max,
-        step=rng.step,
+        current_value=value,
+        default_value=rng and rng.default,
+        min_value=rng and rng.min,
+        max_value=rng and rng.max,
+        step=rng and rng.step,
         read_only=obj.is_option_read_only(opt),
         value_descriptions=_value_descriptions(obj, opt, rng),
     )
 
 
-def all_options(obj) -> List[OptionInfo]:
-    """Every option the object holds."""
-    options = []
-    for opt in obj.get_supported_options():
-        try:
-            options.append(_info(obj, opt, obj.get_option_range(opt)))
-        except RuntimeError:
-            pass  # an option the device refuses to describe is one we cannot show
-    return options
+def all_options(obj) -> Dict[str, OptionInfo]:
+    """Every option the object supports, by its ID, values and ranges in one call, as the legacy viewer reads them;
+    one it cannot read now (a temperature while not streaming) has a null value, as the SDK reports it"""
+    return {o.id.name: _info(obj, o.id, o.value, o.range) for o in obj.get_supported_option_values()}
 
 
-def set_option(obj, field: str, value: float) -> OptionInfo:
-    """Set one option and report it as the object holds it."""
-    opt = {o.name: o for o in obj.get_supported_options()}[field]  # an unknown one 404s
-    rng = obj.get_option_range(opt)
-    obj.set_option(opt, float(value))
-    return _info(obj, opt, rng)
+def option(obj, field: str) -> OptionInfo:
+    """One option, read alone: 404 only if the object doesn't support it, a null value if it can't read it now"""
+    opt = _supported(obj)[field]
+    try:
+        rng = obj.get_option_range(opt)
+    except RuntimeError:  # as the SDK's options list, which then has no range
+        rng = None
+    return _info(obj, opt, obj.get_option_value(opt).value, rng)
+
+
+def _supported(obj):
+    return {o.name: o for o in obj.get_supported_options()}
+
+
+def set_option(obj, field: str, value: float) -> None:
+    """Set one option, as the SDK's set_option: nothing answered"""
+    obj.set_option(_supported(obj)[field], float(value))

@@ -41,6 +41,10 @@ function patchGroup(state: States, deviceId: string, key: string, patch: (g: Con
     ds.controls[key] ? { controls: { ...ds.controls, [key]: patch(ds.controls[key]) } } : {})
 }
 
+/** The group with these options' values replaced */
+const withValues = (g: ControlGroup, values: Record<string, OptionInfo['current_value']>): ControlGroup =>
+  ({ ...g, options: g.options.map(o => o.option_id in values ? { ...o, current_value: values[o.option_id] } : o) })
+
 const resolutionOf = (p: SupportedStreamProfile) => ({ width: p.width, height: p.height })
 
 /**
@@ -139,6 +143,10 @@ interface AppState {
   updateFirmwareFromRecommended: (deviceId: string) => Promise<void>
   toggleAdvancedMode: (deviceId: string, enable: boolean) => Promise<void>
   fetchDeviceControls: (deviceId: string) => Promise<void>
+  /** One group of controls as the device now holds it, after any client wrote it */
+  refreshControlGroup: (deviceId: string, key: string) => Promise<void>
+  /** An options_changed event: the new values the SDK reported */
+  applyOptionsChanged: (deviceId: string, key: string, values: Record<string, OptionInfo['current_value'] | null>) => Promise<void>
   setControl: (deviceId: string, key: string, optionId: string, value: number | boolean | string) => Promise<void>
   setControlEnabled: (deviceId: string, key: string, enabled: boolean) => Promise<void>
   setPostProcessing: (deviceId: string, sensorIndex: number, enabled: boolean) => Promise<void>
@@ -299,11 +307,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
 
   toggleAdvancedMode: async (deviceId: string, enable: boolean) => {
     try {
-      // Restarts the device on the backend; wait, then refresh device + sensors + status.
+      // The device resets: devices_changed drops it and brings it back, which reloads it as a new one
       await apiClient.setAdvancedMode(deviceId, enable)
-      await get().fetchDevices(true)
-      await get().fetchSensors(deviceId)
-      await get().fetchDeviceControls(deviceId)
     } catch (error) {
       set({ error: `Failed to ${enable ? 'enable' : 'disable'} advanced mode: ${error instanceof Error ? error.message : 'unknown error'}` })
     }
@@ -359,22 +364,46 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     set((state) => patchDevice(state, deviceId, () => ({ controls: groups, advancedMode })))
   },
 
+  refreshControlGroup: async (deviceId, key) => {
+    const read = async (): Promise<Partial<ControlGroup>> => {
+      if (key === 'colorizer') return { options: await apiClient.getColorizerOptions(deviceId) }
+      const [source, index, kind, name] = key.split('/') // sensors/0/options, sensors/0/filters/<name>
+      // advanced_mode/controls/<group>
+      if (source === 'advanced_mode') return { options: (await apiClient.getAdvancedControls(deviceId))[kind] }
+      if (kind === 'options') return { options: await apiClient.getSensorOptions(deviceId, Number(index)) }
+      const { enabled, options } = (await apiClient.getSensorFilters(deviceId, Number(index)))[name]
+      // While the sensor's post-processing is off, the server has every filter off but the viewer keeps the choices
+      return get().deviceStates[deviceId]?.postProcessing?.[Number(index)] === false ? { options } : { enabled, options }
+    }
+    const fresh = await read()
+    set((state) => patchGroup(state, deviceId, key, (group) => ({ ...group, ...fresh })))
+  },
+
+  applyOptionsChanged: async (deviceId, key, values) => {
+    const group = get().deviceStates[deviceId]?.controls[key]
+    if (!group) return
+    // One the page doesn't show, or that can't be read now, changes which options show: read the group again
+    if (Object.entries(values).some(([id, v]) => v === null || !group.options.some(o => o.option_id === id))) {
+      return get().refreshControlGroup(deviceId, key)
+    }
+    set((state) => patchGroup(state, deviceId, key, (g) => withValues(g, values as Record<string, OptionInfo['current_value']>)))
+  },
 
   setControl: async (deviceId, key, optionId, value) => {
     try {
-      const applied = await apiClient.setControl(deviceId, key, optionId, value)
-      set((state) => patchGroup(state, deviceId, key, (group) => ({
-        ...group,
-        options: group.options.map((o) =>
-          // Match by option_id OR by label (case-insensitive) for chatbot compatibility
-          (o.option_id === optionId || optionLabel(o.option_id).toLowerCase() === optionId.toLowerCase())
-            ? applied
-            : o
-        ),
-      })))
+      await apiClient.setControl(deviceId, key, optionId, value)
     } catch (error) {
       set({ error: `Failed to set option: ${error instanceof Error ? error.message : 'Unknown error'}` })
       throw error
+    }
+    // What the device took, which may be clamped, as the legacy viewer reads back its own write. The write
+    // stands even if it can't be read now: the group is read again instead
+    try {
+      const taken = await apiClient.getControlValue(deviceId, key, optionId)
+      if (taken === null) throw new Error('unreadable now')
+      set((state) => patchGroup(state, deviceId, key, (g) => withValues(g, { [optionId]: taken })))
+    } catch {
+      await get().refreshControlGroup(deviceId, key).catch(() => {}) // a device gone meanwhile
     }
   },
 
@@ -772,7 +801,12 @@ const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p 
           const match = deviceState.sensors?.find(s => s.sensor_index === change.sensorIndex)
             ?? deviceState.sensors?.find(s => s.name === change.sensorId)
           if (!match) throw new Error(`No sensor ${change.sensorIndex ?? `named "${change.sensorId}"`}`)
-          await get().setControl(deviceId, `sensors/${match.sensor_index}/options`, change.optionId, change.value)
+          const key = `sensors/${match.sensor_index}/options`
+          // It names the option as the user sees it ("Laser Power"); the API takes its ID
+          const named = change.optionId.toLowerCase()
+          const option = deviceState.controls[key]?.options.find(o =>
+            [o.option_id, optionLabel(o.option_id)].some(n => n.toLowerCase() === named))
+          await get().setControl(deviceId, key, option?.option_id ?? change.optionId, change.value)
         }
       }
       

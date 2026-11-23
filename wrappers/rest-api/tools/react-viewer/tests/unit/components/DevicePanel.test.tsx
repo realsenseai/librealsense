@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { DevicePanel } from '@/components/DevicePanel'
@@ -520,6 +520,32 @@ streamConfigs: [{ sensor_index: 0, stream_type: 'depth', format: 'z16',
 
       await waitFor(() => expect(screen.getByText('Ignore SAD')).toBeInTheDocument())
       expect(screen.getByRole('checkbox')).toBeInTheDocument()
+    })
+
+    // options_changed brings the SDK's polled values about a second late, auto exposure's every second
+    it('keeps a slider where the user drags it while new values come in, and writes that value', async () => {
+      const setControl = vi.fn().mockResolvedValue(undefined)
+      await renderWithControls({
+        setControl,
+        options: [createMockOption({ option_id: 'Exposure', name: 'Exposure', current_value: 100,
+          min_value: 1, max_value: 1000, step: 1 })],
+      })
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'Exposure')
+      const slider = await screen.findByRole('slider')
+
+      fireEvent.mouseDown(slider)
+      fireEvent.change(slider, { target: { value: '500' } })
+      const id = Object.keys(useAppStore.getState().deviceStates)[0]
+      useAppStore.setState((s) => {
+        const ds = s.deviceStates[id]
+        const group = ds.controls['sensors/0/options']
+        return { deviceStates: { [id]: { ...ds, controls: { 'sensors/0/options':
+          { ...group, options: [{ ...group.options[0], current_value: 300 }] } } } } }
+      })
+      await waitFor(() => expect((slider as HTMLInputElement).value).toBe('500'))
+      fireEvent.mouseUp(slider)
+
+      expect(setControl).toHaveBeenCalledWith(id, 'sensors/0/options', 'Exposure', 500)
     })
   })
 })

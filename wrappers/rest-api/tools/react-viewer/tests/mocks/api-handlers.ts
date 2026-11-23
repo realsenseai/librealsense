@@ -4,6 +4,10 @@ import { mockSensors, mockDepthOptions, mockColorOptions, mockMotionOptions, moc
 
 const API_BASE = '/api/v1'
 
+// The server's shape: options keyed by their ID
+const byId = (options: { option_id: string }[]) =>
+  Object.fromEntries(options.map(({ option_id, ...o }) => [option_id, o]))
+
 // Sensor options by sensor_index
 const sensorOptionsMap: Record<string, any[]> = {
   0: mockDepthOptions,
@@ -43,45 +47,47 @@ export const handlers = [
 
   // Get sensor options
   http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/options/`, ({ params }) => {
-    return HttpResponse.json(sensorOptionsMap[params.sensorIndex as string] || [])
+    return HttpResponse.json(byId(sensorOptionsMap[params.sensorIndex as string] || []))
   }),
 
   // Set sensor option; answers it as the device now holds it, as every control write does
   http.put(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/options/:optionId`, async ({ params, request }) => {
     const body = await request.json() as { value: number }
-    return HttpResponse.json({ option_id: params.optionId, current_value: body.value, read_only: false })
+    return HttpResponse.json({ current_value: body.value, read_only: false })
   }),
 
   // Post-processing filters, keyed by name; only the depth sensor has any
   http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/filters/`, ({ params }) => {
-    return HttpResponse.json(params.sensorIndex === '0' ? mockFilters : {})
+    return HttpResponse.json(params.sensorIndex === '0'
+      ? Object.fromEntries(Object.entries(mockFilters).map(([name, f]) => [name, { ...f, options: byId(f.options) }]))
+      : {})
   }),
 
   // Bypass or apply one filter; answers the state it now holds
   http.put(
-    `${API_BASE}/devices/:deviceId/sensors/:sensorIndex/filters/:filterName/enabled/`,
-    async ({ params, request }) => {
+    `${API_BASE}/devices/:deviceId/sensors/:sensorIndex/filters/:filterName/enabled`,
+    async ({ request }) => {
       const body = await request.json() as { value: boolean }
-      return HttpResponse.json({ name: params.filterName, enabled: body.value })
+      return HttpResponse.json(body.value)
     }
   ),
 
-  // Device-level controls: a list to read, one option at a time to write
-  http.get(`${API_BASE}/devices/:deviceId/colorizer/`, () => HttpResponse.json([])),
-  http.put(`${API_BASE}/devices/:deviceId/colorizer/:field/`, async ({ params, request }) => {
+  // Device-level controls: a map to read, one option at a time to write
+  http.get(`${API_BASE}/devices/:deviceId/colorizer/`, () => HttpResponse.json({})),
+  http.put(`${API_BASE}/devices/:deviceId/colorizer/:field`, async ({ params, request }) => {
     const body = await request.json() as { value: number }
     return HttpResponse.json({
-      option_id: params.field, current_value: body.value,
+      current_value: body.value,
       default_value: body.value, min_value: 0, max_value: 100, read_only: false,
     })
   }),
   http.get(`${API_BASE}/devices/:deviceId/advanced_mode/controls/`, () => HttpResponse.json({})),
   http.put(
-    `${API_BASE}/devices/:deviceId/advanced_mode/controls/:group/:field/`,
+    `${API_BASE}/devices/:deviceId/advanced_mode/controls/:group/:field`,
     async ({ params, request }) => {
       const body = await request.json() as { value: number }
       return HttpResponse.json({
-        option_id: params.field, current_value: body.value,
+        current_value: body.value,
         default_value: body.value, min_value: 0, max_value: 100, read_only: false,
       })
     }

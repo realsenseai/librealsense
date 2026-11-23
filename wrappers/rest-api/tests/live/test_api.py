@@ -9,7 +9,9 @@ machine (GHA) with no hardware attached.
 
 import importlib
 import logging
+import queue
 import sys
+import threading
 
 import pytest
 
@@ -79,20 +81,19 @@ class TestRealSenseAPIIntegration:
         device_id = next(iter(real_rs_manager.cameras))
 
         writable_option = None
-        sensor = None
+        sensor_index = None
         original_value = None
 
-        for candidate in real_rs_manager.cameras[device_id].sensors:
-            for option in candidate.options():
+        for sensor in real_rs_manager.cameras[device_id].sensors:
+            for option_id, option in sensor.options().items():
                 if not option.read_only and option.min_value != option.max_value:
                     writable_option = option
-                    sensor = candidate
+                    sensor_index = sensor.index
                     original_value = option.current_value
                     break
             if writable_option:
                 break
 
-        option_id = writable_option.option_id
         min_val = writable_option.min_value
         max_val = writable_option.max_value
         step = writable_option.step
@@ -110,10 +111,9 @@ class TestRealSenseAPIIntegration:
         test_value = max(min_val, min(max_val, test_value))
 
         try:
-            applied = sensor.set_option(option_id, test_value)
-            assert applied.option_id == option_id
+            real_rs_manager.cameras[device_id].sensors[sensor_index].set_option(option_id, test_value)
 
-            updated_option = sensor.option(option_id)
+            updated_option = real_rs_manager.cameras[device_id].sensors[sensor_index].option(option_id)
 
             # For stepped values, check exact match; for continuous, allow small tolerance
             if step > 0:
@@ -123,7 +123,7 @@ class TestRealSenseAPIIntegration:
 
         finally:
             try:
-                sensor.set_option(option_id, original_value)
+                real_rs_manager.cameras[device_id].sensors[sensor_index].set_option(option_id, original_value)
             except Exception:
                 pass
 
@@ -225,17 +225,90 @@ class TestRealSenseAPIIntegration:
         assert response.status_code == 200
 
         options = response.json()
-        assert isinstance(options, list)
+        assert isinstance(options, dict)
         assert len(options) > 0
 
-        option = options[0]
-        for key in ("option_id", "current_value", "min_value", "max_value"):
+        option_id, option = next(iter(options.items()))
+        for key in ("current_value", "min_value", "max_value"):
             assert key in option
 
-        option_id = option["option_id"]
-        response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_index}/options/{option_id}/")
+        response = client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_index}/options/{option_id}")
         assert response.status_code == 200
-        assert response.json()["option_id"] == option_id
+        assert response.json() == option
+
+    def test_sdk_reports_an_option_write_with_its_new_value_rs(self):
+        """A sensor option written is reported to the clients by the SDK's options watcher, with the new value"""
+        client = real_client()
+        device_id = first_device_id(client)
+        sensors = client.get(f"/api/v1/devices/{device_id}/sensors").json()
+        index = next(s["sensor_index"] for s in sensors
+                     if "exposure" in client.get(f"/api/v1/devices/{device_id}/sensors/{s['sensor_index']}/options").json())
+        url = f"/api/v1/devices/{device_id}/sensors/{index}/options"
+        exposure = client.get(f"{url}/exposure").json()
+        value = exposure["min_value"] if exposure["current_value"] != exposure["min_value"] else exposure["max_value"]
+
+        with client.websocket_connect("/api/v1/events") as events:
+            received = queue.Queue()
+
+            def read():  # the socket gives no timeout of its own
+                try:
+                    while True:
+                        received.put(events.receive_json())
+                except Exception:  # closed at the test's end
+                    pass
+            threading.Thread(target=read, daemon=True).start()
+            try:
+                assert client.put(f"{url}/exposure", json={"value": value}).status_code == 200
+                message = received.get(timeout=5)  # the SDK reads the options about once a second
+                assert message["event"] == "options_changed" and message["group"] == f"sensors/{index}/options" and message["options"]["exposure"] == value
+            finally:
+                client.put(f"{url}/exposure", json={"value": exposure["current_value"]})
+
+    def test_filters_endpoint_rs(self):
+        """Every filter route of a sensor with filters: each read agrees with the list, and a write reads back"""
+        client = real_client()
+        device_id = first_device_id(client)
+        url = next(u for u in (f"/api/v1/devices/{device_id}/sensors/{s['sensor_index']}/filters"
+                               for s in client.get(f"/api/v1/devices/{device_id}/sensors").json())
+                   if client.get(f"{u}/").json())
+
+        filters = client.get(f"{url}/").json()
+        name, options = next((n, f["options"]) for n, f in filters.items() if f["options"])
+        assert client.get(f"{url}/{name}/").json() == options
+        field, option = next((f, o) for f, o in options.items() if not o["read_only"])
+        assert client.get(f"{url}/{name}/{field}").json() == option
+
+        assert filters[name]["enabled"] is False
+        assert client.get(f"{url}/{name}/enabled").json() is False
+        assert client.put(f"{url}/{name}/enabled", json={"value": True}).status_code == 200
+        try:
+            assert client.get(f"{url}/{name}/enabled").json() is True
+        finally:
+            client.put(f"{url}/{name}/enabled", json={"value": False})
+
+        assert client.put(f"{url}/{name}/{field}", json={"value": option["current_value"]}).status_code == 200
+        assert client.get(f"{url}/{name}/{field}").json() == option
+
+    def test_colorizer_and_advanced_reads_rs(self):
+        """Each colorizer option, advanced group and advanced control reads alone as the full read has it"""
+        client = real_client()
+        url = f"/api/v1/devices/{first_device_id(client)}"
+
+        colorizer = client.get(f"{url}/colorizer/").json()
+        field, option = next(iter(colorizer.items()))
+        assert client.get(f"{url}/colorizer/{field}").json() == option
+        assert client.get(f"{url}/colorizer/nope").status_code == 404
+
+        if client.get(url).json().get("advanced_mode") != "YES":
+            pytest.skip("advanced mode is off")
+        controls = client.get(f"{url}/advanced_mode/controls/").json()
+        group, fields = next(iter(controls.items()))
+        assert client.get(f"{url}/advanced_mode/controls/{group}/").json() == fields
+        field, control = next(iter(fields.items()))
+        assert client.get(f"{url}/advanced_mode/controls/{group}/{field}").json() == control
+        assert client.get(f"{url}/advanced_mode/controls/nope/").status_code == 404
+        assert client.put(f"{url}/advanced_mode/controls/{group}/nope", json={"value": 1}).status_code == 404
+        assert client.put(f"{url}/advanced_mode/controls/nope/{field}", json={"value": 1}).status_code == 404
 
     @staticmethod
     def _parse_gvd_d400(data):

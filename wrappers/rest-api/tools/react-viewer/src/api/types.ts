@@ -30,8 +30,13 @@ const HIDDEN_OPTIONS = [
   'noise_estimation', 'region_of_interest', 'readout_shaping', 'sensors_config_mode',
 ]
 
-export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
-  return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
+/** The options to draw: as the legacy viewer, none it can't read now, nor one without a range to draw */
+export function visibleOptions(options: OptionMap): OptionInfo[] {
+  return Object.entries(options)
+    .filter(([optionId, o]) => o.current_value !== null && o.min_value !== null && o.max_value !== null
+      && !HIDDEN_OPTIONS.includes(optionId.toLowerCase()))
+    .map(([optionId, o]) => ({ option_id: optionId, ...o, current_value: o.current_value!, min_value: o.min_value!,
+      max_value: o.max_value!, default_value: o.default_value ?? undefined, step: o.step ?? undefined }))
 }
 
 export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
@@ -92,17 +97,32 @@ export function profilesAt(
     p.width === resolution.width && p.height === resolution.height)
 }
 
-export interface OptionInfo {
-  option_id: string
-  description?: string
-  current_value: number | boolean | string
-  default_value: number | boolean | string
+// Wire shapes: the API keys each option by its ID
+// Null fields as the SDK reports them: current_value, one it can't read now (a temperature while not streaming);
+// default, min, max and step, one whose range it couldn't read
+type Nullable<T, K extends keyof T> = Omit<T, K> & { [P in K]: T[P] | null }
+export type WireOption = Nullable<Required<Omit<OptionInfo, 'option_id'>>,
+  'current_value' | 'default_value' | 'min_value' | 'max_value' | 'step'>
+export type OptionMap = Record<string, WireOption>
+
+/** An advanced-mode field as the API sends it: the SDK gives these only a value, a minimum and a maximum */
+export interface WireAdvancedControl {
+  current_value: number
   min_value: number
   max_value: number
+  integer: boolean // an int field, which JSON can't tell from a float
+}
+
+export interface OptionInfo {
+  option_id: string  // the key it came under
+  description?: string  // these four: none for advanced-mode controls
+  default_value?: number | boolean | string
   step?: number
-  units?: string
+  value_descriptions?: Record<string, string>  // each value's label, as far as the SDK has them
+  current_value: number | boolean | string
+  min_value: number
+  max_value: number
   read_only: boolean
-  value_descriptions?: Record<string, string>  // For enum-type options: {value: description}
 }
 
 // A sensor's post-processing filters, keyed by name. Filters share option names

@@ -5,6 +5,8 @@ import { visibleOptions } from './types'
 import type {
   AdvancedControls,
   AdvancedModeStatus,
+  OptionMap,
+  WireAdvancedControl,
   DeviceInfo,
   SensorFilters,
   SensorInfo,
@@ -78,38 +80,42 @@ class ApiClient {
     return response.data
   }
 
-  async setAdvancedMode(deviceId: string, enable: boolean): Promise<AdvancedModeStatus> {
-    const response = await this.client.post(`/devices/${deviceId}/advanced_mode/`, { enable })
-    return response.data
+  /** Resets the device: it leaves and comes back through devices_changed */
+  async setAdvancedMode(deviceId: string, enable: boolean): Promise<void> {
+    await this.client.post(`/devices/${deviceId}/advanced_mode/`, { enable })
   }
 
   async getAdvancedControls(deviceId: string): Promise<AdvancedControls> {
-    const response = await this.client.get(`/devices/${deviceId}/advanced_mode/controls/`)
-    return response.data
+    const response = await this.client.get<Record<string, Record<string, WireAdvancedControl>>>(
+      `/devices/${deviceId}/advanced_mode/controls/`)
+    // Drawn as options: a whole-numbered step for an int field, nothing more the SDK doesn't say
+    return Object.fromEntries(Object.entries(response.data).map(([group, fields]) => [group,
+      Object.entries(fields).map(([field, { integer, ...c }]) =>
+        ({ option_id: field, ...c, step: integer ? 1 : undefined, read_only: false }))]))
   }
 
   /**
-   * Write one control and get it back as the device now holds it. `key` is the group's
-   * path under the device (`colorizer`, `advanced_mode/controls/depth_table`,
-   * `sensors/<id>/filters/Spatial Filter`), which is all that separates the four sources.
+   * Write one control. `key` is the group's path under the device (`colorizer`, `advanced_mode/controls/depth_table`,
+   * `sensors/<id>/filters/Spatial Filter`), which is all that separates the four sources. Nothing comes back, as
+   * from the SDK's set_option
    */
-  async setControl(
-    deviceId: string,
-    key: string,
-    field: string,
-    value: number | boolean | string
-  ): Promise<OptionInfo> {
-    const response = await this.client.put(`/devices/${deviceId}/${key}/${field}/`, { value })
-    return response.data
+  async setControl(deviceId: string, key: string, field: string, value: number | boolean | string): Promise<void> {
+    await this.client.put(`/devices/${deviceId}/${key}/${field}`, { value })
+  }
+
+  /** The value one control holds now; `key` as for setControl */
+  async getControlValue(deviceId: string, key: string, field: string): Promise<OptionInfo['current_value'] | null> {
+    return (await this.client.get<{ current_value: OptionInfo['current_value'] | null }>(`/devices/${deviceId}/${key}/${field}`))
+      .data.current_value
   }
 
   /** Bypass or apply one post-processing filter; `key` is the filter's own path. */
   async setFilterEnabled(deviceId: string, key: string, enabled: boolean): Promise<void> {
-    await this.client.put(`/devices/${deviceId}/${key}/enabled/`, { value: enabled })
+    await this.client.put(`/devices/${deviceId}/${key}/enabled`, { value: enabled })
   }
 
   async getSensorFilters(deviceId: string, sensorIndex: number): Promise<SensorFilters> {
-    const response = await this.client.get<SensorFilters>(
+    const response = await this.client.get<Record<string, { enabled: boolean; options: OptionMap }>>(
       `/devices/${deviceId}/sensors/${sensorIndex}/filters/`
     )
     return Object.fromEntries(
@@ -118,7 +124,7 @@ class ApiClient {
   }
 
   async getColorizerOptions(deviceId: string): Promise<OptionInfo[]> {
-    const response = await this.client.get(`/devices/${deviceId}/colorizer/`)
+    const response = await this.client.get<OptionMap>(`/devices/${deviceId}/colorizer/`)
     return visibleOptions(response.data)
   }
 
@@ -155,7 +161,7 @@ class ApiClient {
   }
 
   async getSensorOptions(deviceId: string, sensorIndex: number): Promise<OptionInfo[]> {
-    const response = await this.client.get<OptionInfo[]>(`/devices/${deviceId}/sensors/${sensorIndex}/options/`)
+    const response = await this.client.get<OptionMap>(`/devices/${deviceId}/sensors/${sensorIndex}/options/`)
     return visibleOptions(response.data)
   }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
 import { useAppStore } from '@/store'
-import { firmwareStatus, isStreaming, type SupportedStreamProfile } from '@/api/types'
+import { firmwareStatus, isStreaming, type OptionMap, type SupportedStreamProfile } from '@/api/types'
 import { resetStore, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { mockDevice } from '../../mocks/fixtures/devices'
 import { mockDepthSensorProfiles, mockSensors } from '../../mocks/fixtures/sensors'
@@ -142,16 +142,38 @@ describe('AppStore', () => {
       
       expect(useAppStore.getState().chatMessages).toEqual([])
     })
+
+    it('sets an option the chatbot names by its label through its ID', async () => {
+      const key = 'sensors/0/options'
+      const option = createMockOption({ option_id: 'laser_power', current_value: 150 })
+      useAppStore.setState({
+        deviceStates: { [mockDevice.device_id]: createMockDeviceState(mockDevice, {
+          sensors: [createMockSensor()],
+          controls: { [key]: { section: 'Controls', name: '', options: [option] } },
+        }) },
+        pendingSettings: { deviceSerial: mockDevice.serial_number,
+          optionChanges: [{ sensorId: 'Stereo Module', optionId: 'Laser Power', value: 200 }] },
+      })
+      const fields: unknown[] = []
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/0/options/:field', ({ params }) => {
+        fields.push(params.field)
+        return new HttpResponse(null)
+      }))
+
+      await useAppStore.getState().applyProposedSettings()
+
+      expect(fields).toEqual(['laser_power'])
+    })
   })
 
   describe('Post-processing defaults', () => {
     // Activates the mock device; the filters the viewer turns on, in the order it does, go to the returned list
-    async function activate(filters: Record<string, { enabled: boolean; options: [] }>) {
+    async function activate(filters: Record<string, { enabled: boolean; options: OptionMap }>) {
       const enabled: string[] = []
       server.use(
         http.get('/api/v1/devices/:deviceId/sensors/:sensorIndex/filters/', ({ params }) =>
           HttpResponse.json(params.sensorIndex === '0' ? filters : {})),
-        http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/filters/:name/enabled/', async ({ params, request }) => {
+        http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/filters/:name/enabled', async ({ params, request }) => {
           if (((await request.json()) as { value: boolean }).value) enabled.push(params.name as string)
           return HttpResponse.json({})
         }),
@@ -160,7 +182,7 @@ describe('AppStore', () => {
       await vi.waitFor(() => expect(useAppStore.getState().deviceStates[mockDevice.device_id]?.controls).not.toEqual({}))
       return enabled
     }
-    const off = { enabled: false, options: [] as [] }
+    const off = { enabled: false, options: {} }
 
     it('starts a fresh device with the legacy viewer filters', async () => {
       const enabled = await activate({ 'Decimation Filter': off, 'Spatial Filter': off, 'Temporal Filter': off,
@@ -317,7 +339,7 @@ describe('AppStore', () => {
     it("applies a chatbot option change to the sensor at its index, whatever name it gives", async () => {
       await loadSensors()
       let written = ''
-      server.use(http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/options/:optionId/', ({ params }) => {
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/:sensorIndex/options/:optionId', ({ params }) => {
         written = `${params.sensorIndex}/${params.optionId}`
         return HttpResponse.json(null)
       }))
@@ -501,5 +523,83 @@ it('isAnyDeviceStreaming tracks deviceStates after a state update', () => {
 
       expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(true)
     })
+  })
+})
+
+describe('refreshControlGroup', () => {
+  it('reads the group another client wrote and shows what the device now holds', async () => {
+    const device = createMockDevice()
+    const option = createMockOption({ option_id: 'exposure', current_value: 100 })
+    const ds = createMockDeviceState(device, {
+      controls: { 'sensors/0/options': { section: 'Controls', sensorIndex: 0, name: '', options: [option] } },
+    })
+    useAppStore.setState({ deviceStates: { [device.device_id]: ds } })
+    const { option_id, ...wire } = option
+    server.use(http.get('/api/v1/devices/:deviceId/sensors/0/options/', () =>
+      HttpResponse.json({ [option_id]: { ...wire, current_value: 200 } })))
+
+    await useAppStore.getState().refreshControlGroup(device.device_id, 'sensors/0/options')
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options[0].current_value)
+      .toBe(200)
+  })
+  it('hides an option the device cannot read now, as a temperature while not streaming', async () => {
+    const device = createMockDevice()
+    const option = createMockOption({ option_id: 'asic_temperature', current_value: 30 })
+    useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { 'sensors/0/options': { section: 'Controls', sensorIndex: 0, name: '', options: [option] } } }) } })
+    const { option_id, ...wire } = option
+    server.use(http.get('/api/v1/devices/:deviceId/sensors/0/options/', () =>
+      HttpResponse.json({ [option_id]: { ...wire, current_value: null } })))
+
+    await useAppStore.getState().applyOptionsChanged(device.device_id, 'sensors/0/options', { asic_temperature: null })
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options).toEqual([])
+  })
+  it('shows the values the SDK reported without reading the group again', async () => {
+    const device = createMockDevice()
+    const options = [createMockOption({ option_id: 'exposure', current_value: 100 }),
+      createMockOption({ option_id: 'enable_auto_exposure', current_value: 1 })]
+    useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { 'sensors/0/options': { section: 'Controls', sensorIndex: 0, name: '', options } } }) } })
+    let reads = 0
+    server.use(http.get('/api/v1/devices/:deviceId/sensors/0/options/', () => { reads++; return HttpResponse.json({}) }))
+
+    await useAppStore.getState().applyOptionsChanged(device.device_id, 'sensors/0/options',
+      { exposure: 5000, enable_auto_exposure: 0 })
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options
+      .map(o => o.current_value)).toEqual([5000, 0])
+    expect(reads).toBe(0)
+  })
+  it('shows what the device took after its own write, which may be clamped', async () => {
+    const device = createMockDevice()
+    useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { colorizer: { section: 'Controls', sensorIndex: 0, name: '',
+        options: [createMockOption({ option_id: 'max_distance', current_value: 6 })] } } }) } })
+    server.use(
+      http.put('/api/v1/devices/:deviceId/colorizer/max_distance', () => HttpResponse.json(null)),
+      http.get('/api/v1/devices/:deviceId/colorizer/max_distance', () => HttpResponse.json({ current_value: 16 })))
+
+    await useAppStore.getState().setControl(device.device_id, 'colorizer', 'max_distance', 99)
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls.colorizer.options[0].current_value).toBe(16)
+  })
+
+  it('keeps a write that went through when reading it back fails, and reads the group again', async () => {
+    const device = createMockDevice()
+    useAppStore.setState({ error: null, deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { colorizer: { section: 'Controls', sensorIndex: 0, name: '',
+        options: [createMockOption({ option_id: 'max_distance', current_value: 6 })] } } }) } })
+    server.use(
+      http.put('/api/v1/devices/:deviceId/colorizer/max_distance', () => HttpResponse.json(null)),
+      http.get('/api/v1/devices/:deviceId/colorizer/max_distance', () => new HttpResponse(null, { status: 404 })),
+      http.get('/api/v1/devices/:deviceId/colorizer/', () =>
+        HttpResponse.json({ max_distance: createMockOption({ option_id: 'max_distance', current_value: 9 }) })))
+
+    await useAppStore.getState().setControl(device.device_id, 'colorizer', 'max_distance', 9)
+
+    expect(useAppStore.getState().error).toBeNull()
+    expect(useAppStore.getState().deviceStates[device.device_id].controls.colorizer.options[0].current_value).toBe(9)
   })
 })
