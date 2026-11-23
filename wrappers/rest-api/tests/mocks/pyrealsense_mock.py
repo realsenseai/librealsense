@@ -189,6 +189,9 @@ class sensor:
     def get_supported_option_values(self):
         return [SimpleNamespace(id=o, value=v, range=self._option_ranges.get(o)) for o, v in self._options.items()]
 
+    def get_option_value(self, option_type):
+        return SimpleNamespace(id=option_type, value=self._options.get(option_type))
+
     def get_option(self, option_type):
         if option_type in self._options:
             return self._options[option_type]

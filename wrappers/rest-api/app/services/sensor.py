@@ -34,7 +34,7 @@ class Sensor:
         # Its post-processing filters, in the SDK's recommended order, each to whether it is on: the SDK holds
         # everything else about a filter, its options included. All start off
         self.filters = {f: False for f in sensor.get_recommended_filters()}
-        self._named = {f.get_info(rs.camera_info.name): f for f in self.filters}  # the same filters, by name
+        self._filters_by_name = {f.get_info(rs.camera_info.name): f for f in self.filters}  # the same filters, by name
 
     def info(self) -> SensorInfo:
         return SensorInfo(
@@ -57,7 +57,7 @@ class Sensor:
         return options.all_options(self._sensor)
 
     def option(self, option_id: str) -> OptionInfo:
-        return self.options()[option_id]
+        return options.option(self._sensor, option_id)
 
     def set_option(self, option_id: str, value: float) -> None:
         options.set_option(self._sensor, option_id, value)
@@ -68,25 +68,25 @@ class Sensor:
         """Its filters, keyed by filter name. Keyed rather than flat because filters share option names -
         holes_fill exists on Spatial, Temporal and Hole Filling with a different meaning on each."""
         return {name: FilterInfo(enabled=self.filters[f], options=options.all_options(f))
-                for name, f in self._named.items()}
+                for name, f in self._filters_by_name.items()}
 
     def filter_options(self, filter_name: str) -> Dict[str, OptionInfo]:
         """One filter's options"""
-        return options.all_options(self._named[filter_name])
+        return options.all_options(self._filters_by_name[filter_name])
 
     def filter_option(self, filter_name: str, field: str) -> OptionInfo:
         """One option of one filter"""
-        return self.filter_options(filter_name)[field]
+        return options.option(self._filters_by_name[filter_name], field)
 
     def set_filter_option(self, filter_name: str, field: str, value: float) -> None:
-        options.set_option(self._named[filter_name], field, value)
+        options.set_option(self._filters_by_name[filter_name], field, value)
 
     def filter_enabled(self, filter_name: str) -> bool:
-        return self.filters[self._named[filter_name]]
+        return self.filters[self._filters_by_name[filter_name]]
 
     def set_filter_enabled(self, filter_name: str, enabled: float) -> None:
         """Bypass or apply one filter"""
-        self.filters[self._named[filter_name]] = bool(enabled)
+        self.filters[self._filters_by_name[filter_name]] = bool(enabled)
 
     # ---- streaming, through the sensor API ---------------------------------
 

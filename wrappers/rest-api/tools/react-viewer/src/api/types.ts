@@ -30,10 +30,11 @@ const HIDDEN_OPTIONS = [
   'noise_estimation', 'region_of_interest', 'readout_shaping', 'sensors_config_mode',
 ]
 
+/** The options to draw: as the legacy viewer, none it can't read now */
 export function visibleOptions(options: OptionMap): OptionInfo[] {
   return Object.entries(options)
-    .filter(([optionId]) => !HIDDEN_OPTIONS.includes(optionId.toLowerCase()))
-    .map(([optionId, o]) => ({ option_id: optionId, ...o }))
+    .filter(([optionId, o]) => o.current_value !== null && !HIDDEN_OPTIONS.includes(optionId.toLowerCase()))
+    .map(([optionId, o]) => ({ option_id: optionId, ...o, current_value: o.current_value! }))
 }
 
 export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
@@ -95,7 +96,8 @@ export function profilesAt(
 }
 
 // Wire shapes: the API keys each option by its ID
-export type WireOption = Required<Omit<OptionInfo, 'option_id'>>
+// current_value null: one the device supports but can't read now (a temperature while not streaming)
+export type WireOption = Omit<Required<Omit<OptionInfo, 'option_id'>>, 'current_value'> & { current_value: OptionInfo['current_value'] | null }
 export type OptionMap = Record<string, WireOption>
 
 /** An advanced-mode field as the API sends it: the SDK gives these only a value, a minimum and a maximum */

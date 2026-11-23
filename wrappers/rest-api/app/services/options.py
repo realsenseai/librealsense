@@ -45,12 +45,21 @@ def _info(obj, opt, value, rng) -> OptionInfo:
 
 
 def all_options(obj) -> Dict[str, OptionInfo]:
-    """Every option the object can read now, by its ID, values and ranges in one call, as the legacy viewer reads
-    them; one it cannot read (a temperature while not streaming) has no value and is left out, as before."""
-    return {o.id.name: _info(obj, o.id, o.value, o.range)
-            for o in obj.get_supported_option_values() if o.value is not None}
+    """Every option the object supports, by its ID, values and ranges in one call, as the legacy viewer reads them;
+    one it cannot read now (a temperature while not streaming) has a null value, as the SDK reports it"""
+    return {o.id.name: _info(obj, o.id, o.value, o.range) for o in obj.get_supported_option_values()}
+
+
+def option(obj, field: str) -> OptionInfo:
+    """One option, read alone: 404 only if the object doesn't support it, a null value if it can't read it now"""
+    opt = _supported(obj)[field]
+    return _info(obj, opt, obj.get_option_value(opt).value, obj.get_option_range(opt))
+
+
+def _supported(obj):
+    return {o.name: o for o in obj.get_supported_options()}
 
 
 def set_option(obj, field: str, value: float) -> None:
-    """Set one option, as the SDK's set_option: nothing answered, the clients are told to read it again"""
-    obj.set_option({o.name: o for o in obj.get_supported_options()}[field], float(value))
+    """Set one option, as the SDK's set_option: nothing answered"""
+    obj.set_option(_supported(obj)[field], float(value))

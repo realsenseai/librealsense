@@ -392,12 +392,18 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
   setControl: async (deviceId, key, optionId, value) => {
     try {
       await apiClient.setControl(deviceId, key, optionId, value)
-      // What the device took, which may be clamped, as the legacy viewer reads back its own write
-      const taken = await apiClient.getControlValue(deviceId, key, optionId)
-      set((state) => patchGroup(state, deviceId, key, (g) => withValues(g, { [optionId]: taken })))
     } catch (error) {
       set({ error: `Failed to set option: ${error instanceof Error ? error.message : 'Unknown error'}` })
       throw error
+    }
+    // What the device took, which may be clamped, as the legacy viewer reads back its own write. The write
+    // stands even if it can't be read now: the group is read again instead
+    try {
+      const taken = await apiClient.getControlValue(deviceId, key, optionId)
+      if (taken === null) throw new Error('unreadable now')
+      set((state) => patchGroup(state, deviceId, key, (g) => withValues(g, { [optionId]: taken })))
+    } catch {
+      await get().refreshControlGroup(deviceId, key).catch(() => {}) // a device gone meanwhile
     }
   },
 

@@ -41,10 +41,25 @@ def controls(dev) -> Dict[str, Dict[str, AdvancedControl]]:
     return by_group
 
 
-def set_control(dev, group: str, field: str, value: float) -> None:
-    """Set one control: firmware only accepts whole groups, so it is a read-modify-write."""
-    controls(dev)[group][field]  # an unknown one 404s as in the GETs, not 500 on the SDK's AttributeError
+def _check_group_exists(am, group: str) -> None:
+    if group not in am.keys():
+        raise KeyError(group)  # answered 404, as in the GETs, not 500 on the SDK's AttributeError
+
+
+def group(dev, group: str) -> Dict[str, AdvancedControl]:
+    """One group's controls, reading only that group: its values, minimums and maximums"""
     am = rs.rs400_advanced_mode(dev)
+    _check_group_exists(am, group)
+    values, mins, maxes = (am[group, mode] for mode in range(3))
+    return {f: control(values[f], mins[f], maxes[f]) for f in values.keys()}
+
+
+def set_control(dev, group: str, field: str, value: float) -> None:
+    """Set one control: firmware only accepts whole groups, so it is a read-modify-write of that group."""
+    am = rs.rs400_advanced_mode(dev)
+    _check_group_exists(am, group)
     values = am[group]
+    if field not in values.keys():
+        raise KeyError(field)
     values[field] = value  # the SDK rounds to the field's own type
     am[group] = values

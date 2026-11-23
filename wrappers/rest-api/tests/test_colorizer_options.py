@@ -30,6 +30,9 @@ class _FakeColorizer:
     def get_option(self, opt):
         return self.written.get(opt.name, 0.0)
 
+    def get_option_value(self, opt):
+        return OptionValue(opt, self.get_option(opt), None)
+
     def get_option_description(self, opt):
         return f"{opt.name} description"
 

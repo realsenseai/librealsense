@@ -83,7 +83,7 @@ class Camera:
         return options.all_options(self.colorizer)
 
     def colorizer_option(self, field: str) -> OptionInfo:
-        return self.colorizer_options()[field]
+        return options.option(self.colorizer, field)
 
     def set_colorizer_option(self, field: str, value: float) -> None:
         options.set_option(self.colorizer, field, value)
@@ -97,7 +97,7 @@ class Camera:
         return advanced_mode.controls(self.dev)
 
     def advanced_group(self, group: str) -> Dict[str, AdvancedControl]:
-        return self.advanced_controls()[group]
+        return advanced_mode.group(self.dev, group)
 
     def advanced_control(self, group: str, field: str) -> AdvancedControl:
         return self.advanced_group(group)[field]

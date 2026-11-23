@@ -991,10 +991,11 @@ interface OptionControlProps {
 
 function OptionControl({ option, onSet }: OptionControlProps) {
   const [localValue, setLocalValue] = useState(option.current_value)
+  const dragging = useRef(false)
 
-  // Sync with external changes (e.g., from chatbot)
+  // Sync with external changes (another client, auto exposure), except under a slider being dragged
   useEffect(() => {
-    setLocalValue(option.current_value)
+    if (!dragging.current) setLocalValue(option.current_value)
   }, [option.current_value])
 
   const handleChange = async (value: number | boolean | string) => {
@@ -1082,9 +1083,11 @@ function OptionControl({ option, onSet }: OptionControlProps) {
             max={option.max_value}
             step={option.step ?? 'any'}
             value={Number(localValue)}
+            onMouseDown={() => { dragging.current = true }}
+            onTouchStart={() => { dragging.current = true }}
             onChange={(e) => setLocalValue(Number(e.target.value))}
-            onMouseUp={() => handleChange(Number(localValue))}
-            onTouchEnd={() => handleChange(Number(localValue))}
+            onMouseUp={() => { dragging.current = false; handleChange(Number(localValue)) }}
+            onTouchEnd={() => { dragging.current = false; handleChange(Number(localValue)) }}
             className="flex-1 h-1"
           />
           <span className="text-rs-text w-10 text-right nums">

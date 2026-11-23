@@ -543,6 +543,19 @@ describe('refreshControlGroup', () => {
     expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options[0].current_value)
       .toBe(200)
   })
+  it('hides an option the device cannot read now, as a temperature while not streaming', async () => {
+    const device = createMockDevice()
+    const option = createMockOption({ option_id: 'asic_temperature', current_value: 30 })
+    useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { 'sensors/0/options': { section: 'Controls', sensorIndex: 0, name: '', options: [option] } } }) } })
+    const { option_id, ...wire } = option
+    server.use(http.get('/api/v1/devices/:deviceId/sensors/0/options/', () =>
+      HttpResponse.json({ [option_id]: { ...wire, current_value: null } })))
+
+    await useAppStore.getState().applyOptionsChanged(device.device_id, 'sensors/0/options', { asic_temperature: null })
+
+    expect(useAppStore.getState().deviceStates[device.device_id].controls['sensors/0/options'].options).toEqual([])
+  })
   it('shows the values the SDK reported without reading the group again', async () => {
     const device = createMockDevice()
     const options = [createMockOption({ option_id: 'exposure', current_value: 100 }),
@@ -571,5 +584,22 @@ describe('refreshControlGroup', () => {
     await useAppStore.getState().setControl(device.device_id, 'colorizer', 'max_distance', 99)
 
     expect(useAppStore.getState().deviceStates[device.device_id].controls.colorizer.options[0].current_value).toBe(16)
+  })
+
+  it('keeps a write that went through when reading it back fails, and reads the group again', async () => {
+    const device = createMockDevice()
+    useAppStore.setState({ error: null, deviceStates: { [device.device_id]: createMockDeviceState(device, {
+      controls: { colorizer: { section: 'Controls', sensorIndex: 0, name: '',
+        options: [createMockOption({ option_id: 'max_distance', current_value: 6 })] } } }) } })
+    server.use(
+      http.put('/api/v1/devices/:deviceId/colorizer/max_distance', () => HttpResponse.json(null)),
+      http.get('/api/v1/devices/:deviceId/colorizer/max_distance', () => new HttpResponse(null, { status: 404 })),
+      http.get('/api/v1/devices/:deviceId/colorizer/', () =>
+        HttpResponse.json({ max_distance: createMockOption({ option_id: 'max_distance', current_value: 9 }) })))
+
+    await useAppStore.getState().setControl(device.device_id, 'colorizer', 'max_distance', 9)
+
+    expect(useAppStore.getState().error).toBeNull()
+    expect(useAppStore.getState().deviceStates[device.device_id].controls.colorizer.options[0].current_value).toBe(9)
   })
 })

@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 class OptionUpdate(BaseModel):
     value: float
@@ -10,7 +10,7 @@ class OptionUpdate(BaseModel):
 class OptionInfo(BaseModel):
     """One option, as rs2::options reports it; the map holding it, or the URL it came from, names it"""
     description: str
-    current_value: Union[float, int, bool, str]  # by the option's type in the SDK
+    current_value: Optional[Union[float, int, bool, str]]  # by the option's type in the SDK; null: can't be read now, like temperature when not streaming
     default_value: float
     min_value: float
     max_value: float

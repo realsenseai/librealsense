@@ -41,6 +41,9 @@ class _FakeAM:
     def is_enabled(self):
         return self._enabled
 
+    def keys(self):
+        return list(self.groups)
+
     def get_all_controls(self):
         return _FakeControls(self)
 
@@ -119,8 +122,18 @@ def test_reports_every_group_the_device_has(device_for):
         }
 
 
+def test_one_group_is_read_alone_with_its_range(device_for):
+    am = _FakeAM()
+    am.get_all_controls = None  # reading every group for one is what this avoids
+    o = advanced_mode.group(device_for(am), "depth_control")["deepSeaSecondPeakThreshold"]
+    assert (o.current_value, o.min_value, o.max_value) == (325, 0, 1023)
+    with pytest.raises(KeyError):  # answered 404
+        advanced_mode.group(device_for(am), "nope")
+
+
 def test_set_patches_the_field_and_writes_its_group_back(device_for):
     am = _FakeAM()
+    am.get_all_controls = None  # a write reads only its own group
     advanced_mode.set_control(device_for(am), "depth_control", "deepSeaSecondPeakThreshold", 500.4)
     assert am.written["depth_control"]["deepSeaSecondPeakThreshold"] == 500  # int-coerced
 

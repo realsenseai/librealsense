@@ -104,8 +104,8 @@ class ApiClient {
   }
 
   /** The value one control holds now; `key` as for setControl */
-  async getControlValue(deviceId: string, key: string, field: string): Promise<OptionInfo['current_value']> {
-    return (await this.client.get<{ current_value: OptionInfo['current_value'] }>(`/devices/${deviceId}/${key}/${field}`))
+  async getControlValue(deviceId: string, key: string, field: string): Promise<OptionInfo['current_value'] | null> {
+    return (await this.client.get<{ current_value: OptionInfo['current_value'] | null }>(`/devices/${deviceId}/${key}/${field}`))
       .data.current_value
   }
 
