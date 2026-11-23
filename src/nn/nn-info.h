@@ -29,6 +29,7 @@ struct model_description
 {
     uint32_t generation;  // CRC-32 of the metadata, as in each frame the model makes
     std::string model;
+    uint32_t model_id;  // as in each frame: 0 when the metadata has none or it isn't a whole number in range
     std::vector< output_description > outputs;  // by the index the frame's tensors carry
 };
 

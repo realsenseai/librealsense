@@ -64,6 +64,6 @@ void init_nn( py::module & m )
               py::call_guard< py::gil_scoped_release >() )
         .def( "get_model_info", &rs2::nn_loader::get_model_info,
               "The NN model stored in a slot, as a JSON string: present, model_state, generation, frame_size, "
-              "frame_height and the model's metadata. Slot 2 holds a custom network; it runs from the camera's next boot.",
+              "frame_height, the model's metadata and model_id. Slot 2 holds a custom network; it runs from the camera's next boot.",
               "slot"_a = 2, py::call_guard< py::gil_scoped_release >() );
 }

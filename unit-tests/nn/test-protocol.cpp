@@ -310,6 +310,18 @@ TEST_CASE( "model description" )
     CHECK_FALSE( nn::parse_model_description( with( "\"strides\": [80, 80, 1]", "\"strides\": [96, 96, 1]" ), 0 )->outputs[0].dense );
     CHECK_FALSE( nn::parse_model_description( with( "\"strides\": [80, 80, 1]", "\"strides\": [80, 1]" ), 0 )->outputs[0].dense );
     CHECK( nn::parse_model_description( with( ", \"strides\": [80, 80, 1]", "" ), 0 )->outputs[0].dense );
+
+    // Model id: 0 unless a whole number that fits 32 bits
+    auto model_id = [&]( const std::string & value )
+    { return nn::parse_model_description( with( "\"model_id\": null", "\"model_id\": " + value ), 0 )->model_id; };
+    CHECK( desc->model_id == 0 );
+    CHECK( model_id( "305441741" ) == 0x1234ABCD );
+    CHECK( model_id( "4294967295" ) == 0xFFFFFFFF );
+    CHECK( model_id( "4294967296" ) == 0 );
+    CHECK( model_id( "-1" ) == 0 );
+    CHECK( model_id( "1.5" ) == 0 );
+    CHECK( model_id( "\"7\"" ) == 0 );
+    CHECK( nn::parse_model_description( with( "\"model_id\": null,", "" ), 0 )->model_id == 0 );
 }
 
 
@@ -319,6 +331,10 @@ TEST_CASE( "model info json" )
     CHECK( j["present"] == true );
     CHECK( j["frame_height"] == 283 );
     CHECK( j["metadata"]["outputs"].size() == 2 );
+    CHECK( j["model_id"] == 0 );
+    auto md = YOLO_METADATA;
+    md.replace( md.find( "null" ), 4, "42" );
+    CHECK( rsutils::json::parse( nn::to_json( nn::parse_info( make_info( md ) ) ) )["model_id"] == 42 );
 
     auto none = rsutils::json::parse( nn::to_json( nn::parse_info( make_info( "", false, 0, 0 ) ) ) );
     CHECK( none["present"] == false );
