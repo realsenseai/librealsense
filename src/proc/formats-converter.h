@@ -39,6 +39,10 @@ namespace librealsense
 
         stream_profiles get_all_possible_profiles( const stream_profiles & raw_profiles );
         void prepare_to_convert( stream_profiles to_profiles );
+        // Converts more profiles while the active ones keep converting; returns the raw profiles that become active
+        stream_profiles add_to_convert( stream_profiles to_profiles );
+        // Stops converting these profiles; returns the raw profiles no other active profile uses
+        stream_profiles remove_from_convert( const stream_profiles & to_profiles );
 
         stream_profiles get_active_source_profiles() const;
         std::vector< std::shared_ptr< processing_block > > get_active_converters() const;
@@ -67,9 +71,24 @@ namespace librealsense
         std::unordered_map< processing_block_factory *, stream_profiles > _pbf_supported_profiles;
         std::unordered_map< stream_profile, stream_profiles > _target_profiles_to_raw_profiles;
 
-        std::unordered_map< std::shared_ptr< stream_profile_interface >,
-                            std::unordered_set< std::shared_ptr< processing_block > > > _raw_profile_to_converters;
+        // A converter of one raw profile and the target profiles it serves; it is dropped with the last of them
+        struct converter_use
+        {
+            std::shared_ptr< processing_block > pb;
+            std::unordered_set< stream_profile > targets;
+        };
+        // An active raw profile's converters by factory, and a copy of them that frames use outside the lock
+        struct raw_profile_use
+        {
+            std::map< std::shared_ptr< processing_block_factory >, converter_use > by_factory;
+            std::shared_ptr< const std::unordered_set< std::shared_ptr< processing_block > > > converters;
+        };
+        static void refresh_converters( raw_profile_use & use );
+        std::unordered_map< std::shared_ptr< stream_profile_interface >, raw_profile_use > _raw_profile_to_converters;
         std::unordered_map< rs2_format, stream_profiles > _format_mapping_to_from_profiles;
+        // Guards the two active maps above: streams may be added or removed while frames are converted
+        mutable std::mutex _active_mutex;
+        rs2_frame_callback_sptr _output_callback;
 
         // Swapped from the record sensor's start/stop while converter threads may be using it; copy it under the
         // mutex (get_frames_callback) before calling it.

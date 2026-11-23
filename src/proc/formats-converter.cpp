@@ -247,14 +247,43 @@ bool formats_converter::is_profile_in_list( const std::shared_ptr< stream_profil
 // Not passing const & because we modify from_profiles, would otherwise need to create a copy
 void formats_converter::prepare_to_convert( stream_profiles from_profiles )
 {
-    LOG_DEBUG( "Requested: " << from_profiles );
     clear_active_cache();
+    add_to_convert( std::move( from_profiles ) );
+}
+
+stream_profiles formats_converter::add_to_convert( stream_profiles from_profiles )
+{
+    LOG_DEBUG( "Requested: " << from_profiles );
+    std::lock_guard< std::mutex > lock( _active_mutex );
+    stream_profiles added;
 
     // Add missing data to target profiles (was not available during get_all_possible_target_profiles)
     update_target_profiles_data( from_profiles );
 
     // Caching from_profiles to set as processed frames profile before calling user callback
     cache_from_profiles( from_profiles );
+
+    // A profile that an active converter already outputs only keeps that converter's raw profile active
+    for( auto it = from_profiles.begin(); it != from_profiles.end(); )
+    {
+        auto const target = to_profile( it->get() );
+        auto const outputs_target = [&]( const std::shared_ptr< processing_block_factory > & pbf )
+        { return ! pbf->find_satisfied_requests( { *it }, _pbf_supported_profiles[pbf.get()] ).empty(); };
+        // Recorded under every raw profile the converter reads, so none closes while the profile still needs it
+        bool active = false;
+        for( auto & raw_profile : _target_profiles_to_raw_profiles[target] )
+        {
+            auto use = _raw_profile_to_converters.find( raw_profile );
+            if( use != _raw_profile_to_converters.end() )
+                for( auto & converter : use->second.by_factory )
+                    if( outputs_target( converter.first ) )
+                    {
+                        converter.second.targets.insert( target );
+                        active = true;
+                    }
+        }
+        it = active ? from_profiles.erase( it ) : std::next( it );
+    }
 
     while( ! from_profiles.empty() )
     {
@@ -298,13 +327,65 @@ void formats_converter::prepare_to_convert( stream_profiles from_profiles )
                     }
 
                     // Caching converters to invoke appropriate converters for received frames
-                    _raw_profile_to_converters[raw_profile].insert( pb );
+                    auto & use = _raw_profile_to_converters[raw_profile];
+                    if( use.by_factory.empty() )
+                        added.push_back( raw_profile );
+                    auto & converter = use.by_factory[factory_of_best_match];
+                    converter.pb = pb;
+                    converter.targets.insert( to_profile( from_profile.get() ) );
+                    refresh_converters( use );
+                    if( _output_callback )
+                        pb->set_output_callback( _output_callback );
                 }
             }
         }
         const stream_profiles & print_current_resolved_reqs = { current_resolved_reqs.begin(), current_resolved_reqs.end() };
         LOG_DEBUG( "Resolved to: " << print_current_resolved_reqs );
     }
+    return added;
+}
+
+stream_profiles formats_converter::remove_from_convert( const stream_profiles & from_profiles )
+{
+    std::lock_guard< std::mutex > lock( _active_mutex );
+    stream_profiles removed;
+    for( auto & from_profile : from_profiles )
+    {
+        auto & cached = _format_mapping_to_from_profiles[from_profile->get_format()];
+        cached.erase( std::remove_if( cached.begin(), cached.end(),
+                                      [&]( const std::shared_ptr< stream_profile_interface > & sp )
+                                      { return to_profile( sp.get() ) == to_profile( from_profile.get() ); } ),
+                      cached.end() );
+        auto const target = to_profile( from_profile.get() );
+        for( auto & raw_profile : _target_profiles_to_raw_profiles[target] )
+        {
+            auto it = _raw_profile_to_converters.find( raw_profile );
+            if( it == _raw_profile_to_converters.end() )
+                continue;
+            auto & by_factory = it->second.by_factory;
+            for( auto converter = by_factory.begin(); converter != by_factory.end(); )
+                if( converter->second.targets.erase( target ) && converter->second.targets.empty() )
+                    converter = by_factory.erase( converter );
+                else
+                    ++converter;
+            if( ! by_factory.empty() )
+                refresh_converters( it->second );
+            else
+            {
+                _raw_profile_to_converters.erase( it );
+                removed.push_back( raw_profile );
+            }
+        }
+    }
+    return removed;
+}
+
+void formats_converter::refresh_converters( raw_profile_use & use )
+{
+    auto converters = std::make_shared< std::unordered_set< std::shared_ptr< processing_block > > >();
+    for( auto & converter : use.by_factory )
+        converters->insert( converter.second.pb );
+    use.converters = converters;
 }
 
 
@@ -325,6 +406,8 @@ void formats_converter::update_target_profiles_data( const stream_profiles & fro
     {
         for( auto & raw_profile : _target_profiles_to_raw_profiles[to_profile( from_profile.get() )] )
         {
+            if( _raw_profile_to_converters.count( raw_profile ) )
+                continue;  // already streaming: frames are being read with these values
             raw_profile->set_stream_index( from_profile->get_stream_index() );
             raw_profile->set_unique_id( from_profile->get_unique_id() );
             raw_profile->set_stream_type( from_profile->get_stream_type() );
@@ -364,12 +447,14 @@ void formats_converter::cache_from_profiles( const stream_profiles & from_profil
 
 void formats_converter::clear_active_cache()
 {
+    std::lock_guard< std::mutex > lock( _active_mutex );
     _raw_profile_to_converters.clear();
     _format_mapping_to_from_profiles.clear();
 }
 
 stream_profiles formats_converter::get_active_source_profiles() const
 {
+    std::lock_guard< std::mutex > lock( _active_mutex );
     stream_profiles active_source_profiles;
 
     for( auto & iter : _raw_profile_to_converters )
@@ -382,13 +467,14 @@ stream_profiles formats_converter::get_active_source_profiles() const
 
 std::vector< std::shared_ptr< processing_block > > formats_converter::get_active_converters() const
 {
+    std::lock_guard< std::mutex > lock( _active_mutex );
     std::vector< std::shared_ptr< processing_block > > active_converters;
 
     for( auto & source_converters : _raw_profile_to_converters )
     {
         active_converters.insert( active_converters.end(),
-                                  source_converters.second.begin(),
-                                  source_converters.second.end() );
+                                  source_converters.second.converters->begin(),
+                                  source_converters.second.converters->end() );
     }
 
     return active_converters;
@@ -482,10 +568,12 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
         }
     } );
 
-    // Set callbacks for all of the relevant processing blocks
+    // Set callbacks for all of the relevant processing blocks, and for those added later
+    std::lock_guard< std::mutex > lock( _active_mutex );
+    _output_callback = output_cb;
     for( const auto & entry : _raw_profile_to_converters )
     {
-        auto & converters = entry.second;
+        auto & converters = *entry.second.converters;
         for( auto & converter : converters )
             if( converter )
             {
@@ -499,8 +587,15 @@ void formats_converter::convert_frame( frame_holder & f )
     if( ! f )
         return;
 
-    auto & converters = _raw_profile_to_converters[f->get_stream()];
-    for( auto & converter : converters )
+    std::shared_ptr< const std::unordered_set< std::shared_ptr< processing_block > > > converters;
+    {
+        std::lock_guard< std::mutex > lock( _active_mutex );
+        auto it = _raw_profile_to_converters.find( f->get_stream() );
+        if( it == _raw_profile_to_converters.end() )
+            return;
+        converters = it->second.converters;
+    }
+    for( auto & converter : *converters )
     {
         f->acquire();
         converter->invoke( f.frame );
@@ -509,6 +604,7 @@ void formats_converter::convert_frame( frame_holder & f )
 
 std::shared_ptr< stream_profile_interface > formats_converter::find_cached_profile_for_frame( rs2_format format, rs2_stream stream, int index )
 {
+    std::lock_guard< std::mutex > lock( _active_mutex );
     const auto & iter = _format_mapping_to_from_profiles.find( format );
     if( iter == _format_mapping_to_from_profiles.end() )
         return nullptr;

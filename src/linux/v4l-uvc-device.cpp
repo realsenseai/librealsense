@@ -360,12 +360,12 @@ namespace librealsense
                             _buf_dispatch.set_md_attributes(0,nullptr);
                         }
 
-                        // Relax the required frame size for compressed formats, i.e. MJPG, Z16H
+                        // Relax the required frame size for compressed formats, i.e. MJPG, H264, Z16H
                         // The D5xx mapping streams need the same relaxation: their descriptor
                         // advertises the occupancy/point-cloud canvas, while the payload on the
                         // wire is a MAP1 frame whose length is the data, not width*height*bpp.
                         // Without this every frame is rejected as incomplete.
-                        bool compressed_format = val_in_range(_profile.format, { 0x4d4a5047U , 0x5a313648U})
+                        bool compressed_format = val_in_range(_profile.format, { 0x4d4a5047U, 0x48323634U, 0x5a313648U })
                                               || is_d5xx_mapping_interface( _info.pid, _info.mi );
 
                         // Compressed and kernel-reported variable-size formats deliver frames shorter than the buffer,
