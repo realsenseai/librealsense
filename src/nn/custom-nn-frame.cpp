@@ -37,7 +37,8 @@ void custom_nn_frame::describe( parsed & p ) const
     p.outputs.clear();
     p.shapes.clear();
     p.description_mismatch = false;
-    bool const same_model = _description && _description->generation == p.layout.header.generation;
+    // Generation 0 is a frame with no model loaded, as after an install before the reset
+    bool const same_model = _description && p.layout.header.generation && _description->generation == p.layout.header.generation;
     for( auto const & t : p.layout.tensors )
     {
         const nn::output_description * out = same_model && t.output_index < _description->outputs.size()
