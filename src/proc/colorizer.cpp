@@ -10,6 +10,9 @@
 #include "option.h"
 #include "colorizer.h"
 #include "disparity-transform.h"
+#include "cuda/cuda-frame-memory.h"
+
+#include <cstring>
 
 namespace librealsense
 {
@@ -267,7 +270,22 @@ namespace librealsense
             _d2d_convert_factor = 681678.625;
         }
 
-        auto make_equalized_histogram = [this](const rs2::video_frame& depth, rs2::video_frame rgb)
+        // The colorizer is CPU-only and reads every depth pixel (twice with histogram equalization). Under
+        // zero-copy the frame lives in CUDA mapped host memory, which the CPU reads very slowly with scalar loads
+        // (~4 FPS at 1280x720 on Jetson, RSDEV-16398). Copy it once with wide loads to ordinary memory first.
+        const void * depth_src = f.as< rs2::video_frame >().get_data();
+#ifdef RS2_USE_CUDA_ZEROCOPY
+        if( rs_frame_zc_device_ptr( depth_src ) )
+        {
+            auto const size = f.as< rs2::video_frame >().get_data_size();
+            if( _cpu_depth_copy.size() < static_cast< size_t >( size ) )
+                _cpu_depth_copy.resize( size );
+            std::memcpy( _cpu_depth_copy.data(), depth_src, size );
+            depth_src = _cpu_depth_copy.data();
+        }
+#endif
+
+        auto make_equalized_histogram = [this, depth_src](const rs2::video_frame& depth, rs2::video_frame rgb)
         {
             auto depth_format = depth.get_profile().format();
             const auto w = depth.get_width(), h = depth.get_height();
@@ -280,19 +298,19 @@ namespace librealsense
 
             if (depth_format == RS2_FORMAT_DISPARITY32)
             {
-                auto depth_data = reinterpret_cast<const float*>(depth.get_data());
+                auto depth_data = reinterpret_cast<const float*>(depth_src);
                 update_histogram(_hist_data, depth_data, w, h);
                 make_rgb_data<float>(depth_data, rgb_data, w, h, coloring_function);
             }
             else if (depth_format == RS2_FORMAT_Z16)
             {
-                auto depth_data = reinterpret_cast<const uint16_t*>(depth.get_data());
+                auto depth_data = reinterpret_cast<const uint16_t*>(depth_src);
                 update_histogram(_hist_data, depth_data, w, h);
                 make_rgb_data<uint16_t>(depth_data, rgb_data, w, h, coloring_function);
             }
         };
 
-        auto make_value_cropped_frame = [this](const rs2::video_frame& depth, rs2::video_frame rgb)
+        auto make_value_cropped_frame = [this, depth_src](const rs2::video_frame& depth, rs2::video_frame rgb)
         {
             auto depth_format = depth.get_profile().format();
             const auto w = depth.get_width(), h = depth.get_height();
@@ -300,7 +318,7 @@ namespace librealsense
 
             if (depth_format == RS2_FORMAT_DISPARITY32)
             {
-                auto depth_data = reinterpret_cast<const float*>(depth.get_data());
+                auto depth_data = reinterpret_cast<const float*>(depth_src);
                 // convert from depth min max to disparity min max
                 // note: max min value is inverted in disparity domain
                 auto __min = _min;
@@ -314,7 +332,7 @@ namespace librealsense
             }
             else if (depth_format == RS2_FORMAT_Z16)
             {
-                auto depth_data = reinterpret_cast<const uint16_t*>(depth.get_data());
+                auto depth_data = reinterpret_cast<const uint16_t*>(depth_src);
                 auto min = _min;
                 auto max = _max;
                 auto coloring_function = [&, this](float data) {

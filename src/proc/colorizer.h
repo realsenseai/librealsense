@@ -163,6 +163,7 @@ namespace librealsense {
 
         std::vector<int> _histogram;
         int* _hist_data;
+        std::vector< uint8_t > _cpu_depth_copy;  // CPU-readable copy of zero-copy (mapped) depth frames
 
         int _preset = 0;
         rs2::stream_profile _target_stream_profile;
