@@ -92,10 +92,12 @@ std::string error_message( int32_t code );
 [[noreturn]] void throw_error( int32_t code );
 
 
-// Custom NN frame, version 2: frame and payload headers in the first 64 bytes, then per tensor a header padded to 64
-// bytes and its data padded to 64 bytes. The CRC covers payload_size bytes after the frame header; zeros follow.
+// Custom NN frame, version 3 (D585): frame and payload headers in the first 64 bytes, then per tensor a header padded to
+// 64 bytes and its data padded to 64 bytes. Version 1 (D555E test FW): the same without a model id, every part packed
+// right after the one before. The CRC covers payload_size bytes after the frame header; zeros follow.
 constexpr uint32_t CUSTOM_NN_MAGIC = 0x4E4E5543;  // "CUNN"
-constexpr uint16_t CUSTOM_NN_VERSION = 0x0200;
+constexpr uint16_t CUSTOM_NN_VERSION = 0x0300;
+constexpr uint16_t CUSTOM_NN_VERSION_PACKED = 0x0100;
 constexpr size_t CUSTOM_NN_ALIGNMENT = 64;
 constexpr uint8_t CUSTOM_NN_ERROR_FLAG = 0x01;
 
@@ -116,7 +118,18 @@ struct custom_nn_frame_header
     uint16_t version;
     uint8_t flags;
     uint32_t payload_size;
+    uint32_t model_id;    // from the model's package, 0 when it has none
     uint32_t generation;  // CRC-32 of the model's metadata, 0 when none was loaded
+    uint32_t crc32;
+};
+
+struct custom_nn_frame_header_v1
+{
+    uint32_t magic;
+    uint16_t version;
+    uint8_t flags;
+    uint32_t payload_size;
+    uint32_t generation;
     uint32_t crc32;
 };
 
@@ -136,7 +149,8 @@ struct custom_nn_tensor_header
     uint32_t byte_size;
 };
 #pragma pack( pop )
-static_assert( sizeof( custom_nn_frame_header ) == 19, "unexpected Custom NN frame header size" );
+static_assert( sizeof( custom_nn_frame_header ) == 23, "unexpected Custom NN frame header size" );
+static_assert( sizeof( custom_nn_frame_header_v1 ) == 19, "unexpected Custom NN version 1 frame header size" );
 static_assert( sizeof( custom_nn_payload_header ) == 22, "unexpected Custom NN payload header size" );
 static_assert( sizeof( custom_nn_tensor_header ) == 6, "unexpected Custom NN tensor header size" );
 
@@ -150,7 +164,7 @@ struct custom_nn_tensor
 
 struct custom_nn_frame_layout
 {
-    custom_nn_frame_header header;
+    custom_nn_frame_header header;  // a version 1 header is read into it, with model id 0
     custom_nn_payload_header payload;
     std::vector< custom_nn_tensor > tensors;  // empty when the frame has an error status
 };

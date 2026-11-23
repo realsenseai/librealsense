@@ -170,6 +170,7 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_SOURCE_FRAME_ID                      , /**< Custom NN: the camera's number of the RGB frame the network ran on, counted from the Custom NN start; not the Color frame counter */
     RS2_FRAME_METADATA_NN_MODEL_GENERATION                  , /**< Custom NN: generation (CRC-32 of the metadata) of the model that made the frame; 0 when none was loaded */
     RS2_FRAME_METADATA_NN_STATUS                            , /**< Custom NN: inference status, 0 - OK, 4 - model load failed, 5 - inference failed */
+    RS2_FRAME_METADATA_NN_MODEL_ID                          , /**< Custom NN: id of the model that made the frame, from its package; 0 when it has none */
     RS2_FRAME_METADATA_COUNT
 } rs2_frame_metadata_value;
 const char* rs2_frame_metadata_to_string(rs2_frame_metadata_value metadata);

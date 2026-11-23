@@ -106,49 +106,64 @@ size_t dtype_size( rs2_nn_dtype dtype )
 }
 
 
-static size_t round_up( size_t size ) { return ( size + CUSTOM_NN_ALIGNMENT - 1 ) / CUSTOM_NN_ALIGNMENT * CUSTOM_NN_ALIGNMENT; }
+static size_t round_up( size_t size, size_t alignment ) { return ( size + alignment - 1 ) / alignment * alignment; }
 
 
 custom_nn_frame_layout parse_custom_nn_frame( const uint8_t * data, size_t size )
 {
     auto fail = []( std::string const & why ) { throw invalid_value_exception( "Invalid Custom NN frame: " + why ); };
-    if( size < CUSTOM_NN_ALIGNMENT )
+    if( size < sizeof( custom_nn_frame_header_v1 ) + sizeof( custom_nn_payload_header ) )
         fail( rsutils::string::from() << size << " bytes" );
 
     custom_nn_frame_layout layout;
-    std::memcpy( &layout.header, data, sizeof( layout.header ) );
-    std::memcpy( &layout.payload, data + sizeof( layout.header ), sizeof( layout.payload ) );
-    auto const & header = layout.header;
+    auto & header = layout.header;
+    std::memcpy( &header, data, sizeof( header ) );
     if( header.magic != CUSTOM_NN_MAGIC )
         fail( rsutils::string::from() << "magic 0x" << std::hex << header.magic );
-    if( header.version != CUSTOM_NN_VERSION )
+    bool const packed = header.version == CUSTOM_NN_VERSION_PACKED;
+    if( packed )
+    {
+        custom_nn_frame_header_v1 v1;
+        std::memcpy( &v1, data, sizeof( v1 ) );
+        header = { v1.magic, v1.version, v1.flags, v1.payload_size, 0, v1.generation, v1.crc32 };
+    }
+    else if( header.version != CUSTOM_NN_VERSION )
         fail( rsutils::string::from() << "unsupported version 0x" << std::hex << header.version );
 
-    size_t const end = sizeof( header ) + size_t( header.payload_size );
-    if( end < CUSTOM_NN_ALIGNMENT || end > size )
+    // Version 3 keeps both headers in the first 64 bytes
+    size_t const header_size = packed ? sizeof( custom_nn_frame_header_v1 ) : sizeof( header );
+    size_t const headers_end = packed ? header_size + sizeof( layout.payload ) : CUSTOM_NN_ALIGNMENT;
+    if( size < headers_end )
+        fail( rsutils::string::from() << size << " bytes" );
+    std::memcpy( &layout.payload, data + header_size, sizeof( layout.payload ) );
+
+    size_t const end = header_size + size_t( header.payload_size );
+    if( end < headers_end || end > size )
         fail( rsutils::string::from() << "payload size " << header.payload_size << " in a frame of " << size << " bytes" );
-    auto const crc = rsutils::number::calc_crc32( data + sizeof( header ), header.payload_size );
+    auto const crc = rsutils::number::calc_crc32( data + header_size, header.payload_size );
     if( crc != header.crc32 )
         fail( rsutils::string::from() << "CRC 0x" << std::hex << crc << ", expected 0x" << header.crc32 );
 
     if( ( header.flags & CUSTOM_NN_ERROR_FLAG ) || layout.payload.status != uint8_t( custom_nn_status::ok ) )
         return layout;
 
-    size_t offset = CUSTOM_NN_ALIGNMENT;
+    size_t const alignment = packed ? 1 : CUSTOM_NN_ALIGNMENT;
+    size_t const tensor_header_size = packed ? sizeof( custom_nn_tensor_header ) : CUSTOM_NN_ALIGNMENT;
+    size_t offset = headers_end;
     for( int i = 0; i < layout.payload.tensor_count; ++i )
     {
-        if( offset + CUSTOM_NN_ALIGNMENT > end )
+        if( offset + tensor_header_size > end )
             fail( rsutils::string::from() << "tensor " << i << " header past the payload" );
         custom_nn_tensor_header th;
         std::memcpy( &th, data + offset, sizeof( th ) );
-        custom_nn_tensor t{ th.output_index, rs2_nn_dtype( th.dtype ), offset + CUSTOM_NN_ALIGNMENT, th.byte_size };
+        custom_nn_tensor t{ th.output_index, rs2_nn_dtype( th.dtype ), offset + tensor_header_size, th.byte_size };
         size_t const element = th.dtype < RS2_NN_DTYPE_COUNT ? dtype_size( t.dtype ) : 0;
         if( ! element || t.size % element )
             fail( rsutils::string::from() << "tensor " << i << " dtype " << int( th.dtype ) << " with " << t.size << " bytes" );
         if( t.offset + t.size > end )
             fail( rsutils::string::from() << "tensor " << i << " of " << t.size << " bytes past the payload" );
         layout.tensors.push_back( t );
-        offset = t.offset + round_up( t.size );
+        offset = t.offset + round_up( t.size, alignment );
     }
     return layout;
 }

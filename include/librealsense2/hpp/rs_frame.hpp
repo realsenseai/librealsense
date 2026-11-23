@@ -1357,7 +1357,13 @@ namespace rs2
         uint32_t generation() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_NN_MODEL_GENERATION)); }
 
         /**
-        * \return sequence number of the camera's RGB frame the network ran on
+        * \return id of the model that made the frame, from its package; 0 when it has none
+        */
+        uint32_t model_id() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_NN_MODEL_ID)); }
+
+        /**
+        * \return the camera's number of the RGB frame the network ran on, counted from the Custom NN start; not the
+        * Color frame counter
         */
         uint32_t source_frame_id() const { return uint32_t(get_frame_metadata(RS2_FRAME_METADATA_SOURCE_FRAME_ID)); }
     };

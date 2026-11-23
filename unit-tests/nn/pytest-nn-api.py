@@ -17,9 +17,10 @@ def test_custom_nn_api_is_exposed():
     assert rs.stream.custom_nn
     assert rs.extension.custom_nn_frame
     assert rs.nn_dtype.s16 and rs.nn_dtype.f32
-    for name in ( 'source_frame_id', 'nn_model_generation', 'nn_status' ):
+    for name in ( 'source_frame_id', 'nn_model_generation', 'nn_status', 'nn_model_id' ):
         assert hasattr( rs.frame_metadata_value, name )
-    for name in ( 'tensor_count', 'tensor', 'tensors', 'status', 'status_message', 'generation', 'source_frame_id' ):
+    for name in ( 'tensor_count', 'tensor', 'tensors', 'status', 'status_message', 'generation', 'model_id',
+                  'source_frame_id' ):
         assert hasattr( rs.custom_nn_frame, name )
     for name in ( 'name', 'dtype', 'shape', 'layout', 'data', 'dequant_scale', 'as_float' ):
         assert hasattr( rs.nn_tensor, name )

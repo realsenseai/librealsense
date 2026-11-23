@@ -1518,6 +1518,7 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_SOURCE_FRAME_ID] = "The camera's number of the RGB frame the network ran on, counted from the Custom NN start";
         descriptions[RS2_FRAME_METADATA_NN_MODEL_GENERATION] = "CRC-32 of the model's metadata; 0 when no model was loaded";
         descriptions[RS2_FRAME_METADATA_NN_STATUS] = "0 - OK, 4 - model load failed, 5 - inference failed";
+        descriptions[RS2_FRAME_METADATA_NN_MODEL_ID] = "Id of the Custom NN model, from its package; 0 when it has none";
 
         meanings =
         {

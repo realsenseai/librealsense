@@ -18,11 +18,12 @@ using Catch::Matchers::ContainsSubstring;
 
 static size_t round64( size_t n ) { return ( n + 63 ) / 64 * 64; }
 
-// A version 2 frame as the camera sends it: every part on a 64-byte boundary, padded to 1024 x H
+// A version 3 frame as the D585 sends it: every part on a 64-byte boundary, padded to 1024 x H
 static std::vector< uint8_t > make_frame( std::vector< std::vector< uint8_t > > const & tensors,
                                           uint8_t status = 0,
                                           uint32_t generation = 0x2472D988,
-                                          uint8_t dtype = RS2_NN_DTYPE_U8 )
+                                          uint8_t dtype = RS2_NN_DTYPE_U8,
+                                          uint32_t model_id = 0x1234ABCD )
 {
     size_t end = 64;
     for( auto const & t : tensors )
@@ -42,9 +43,29 @@ static std::vector< uint8_t > make_frame( std::vector< std::vector< uint8_t > > 
 
     uint32_t const payload_size = uint32_t( end - sizeof( nn::custom_nn_frame_header ) );
     nn::custom_nn_frame_header header{ nn::CUSTOM_NN_MAGIC, nn::CUSTOM_NN_VERSION, uint8_t( status ? nn::CUSTOM_NN_ERROR_FLAG : 0 ),
-                                       payload_size, generation,
+                                       payload_size, model_id, generation,
                                        rsutils::number::calc_crc32( frame.data() + sizeof( header ), payload_size ) };
     std::memcpy( frame.data(), &header, sizeof( header ) );
+    return frame;
+}
+
+// A version 1 frame, as the D555E test FW sends it: every part packed right after the one before, padded to 1024 x H
+static std::vector< uint8_t > make_frame_v1( std::vector< std::vector< uint8_t > > const & tensors )
+{
+    std::vector< uint8_t > body;
+    nn::custom_nn_payload_header payload{ 1234.5, 77, 76, uint8_t( tensors.size() ), 0 };
+    body.insert( body.end(), (const uint8_t *)&payload, (const uint8_t *)&payload + sizeof( payload ) );
+    for( size_t i = 0; i < tensors.size(); ++i )
+    {
+        nn::custom_nn_tensor_header th{ uint8_t( i ), RS2_NN_DTYPE_U8, uint32_t( tensors[i].size() ) };
+        body.insert( body.end(), (const uint8_t *)&th, (const uint8_t *)&th + sizeof( th ) );
+        body.insert( body.end(), tensors[i].begin(), tensors[i].end() );
+    }
+    nn::custom_nn_frame_header_v1 header{ nn::CUSTOM_NN_MAGIC, nn::CUSTOM_NN_VERSION_PACKED, 0, uint32_t( body.size() ),
+                                          0x2472D988, rsutils::number::calc_crc32( body.data(), body.size() ) };
+    std::vector< uint8_t > frame( (const uint8_t *)&header, (const uint8_t *)&header + sizeof( header ) );
+    frame.insert( frame.end(), body.begin(), body.end() );
+    frame.resize( ( frame.size() + 1023 ) / 1024 * 1024 );
     return frame;
 }
 
@@ -88,8 +109,11 @@ static void fix_crc( std::vector< uint8_t > & frame )
 TEST_CASE( "custom nn frame layout" )
 {
     CHECK( offsetof( nn::custom_nn_frame_header, payload_size ) == 7 );
-    CHECK( offsetof( nn::custom_nn_frame_header, generation ) == 11 );
-    CHECK( offsetof( nn::custom_nn_frame_header, crc32 ) == 15 );
+    CHECK( offsetof( nn::custom_nn_frame_header, model_id ) == 11 );
+    CHECK( offsetof( nn::custom_nn_frame_header, generation ) == 15 );
+    CHECK( offsetof( nn::custom_nn_frame_header, crc32 ) == 19 );
+    CHECK( offsetof( nn::custom_nn_frame_header_v1, generation ) == 11 );
+    CHECK( offsetof( nn::custom_nn_frame_header_v1, crc32 ) == 15 );
     CHECK( offsetof( nn::custom_nn_payload_header, frame_id ) == 8 );
     CHECK( offsetof( nn::custom_nn_payload_header, source_frame_id ) == 16 );
     CHECK( offsetof( nn::custom_nn_payload_header, tensor_count ) == 20 );
@@ -112,6 +136,7 @@ TEST_CASE( "custom nn frame tensors" )
     REQUIRE( frame.size() == 2048 );
 
     auto layout = parse( frame );
+    CHECK( layout.header.model_id == 0x1234ABCD );
     CHECK( layout.header.generation == 0x2472D988 );
     CHECK( layout.payload.timestamp_ms == 1234.5 );
     CHECK( layout.payload.frame_id == 77 );
@@ -130,6 +155,34 @@ TEST_CASE( "custom nn frame tensors" )
         CHECK( std::memcmp( frame.data() + t.offset, tensors[i].data(), t.size ) == 0 );
         offset += round64( t.size ) + 64;
     }
+
+    // A package without a model id
+    CHECK( parse( make_frame( tensors, 0, 1, RS2_NN_DTYPE_U8, 0 ) ).header.model_id == 0 );
+}
+
+
+TEST_CASE( "custom nn version 1 frames" )
+{
+    std::vector< std::vector< uint8_t > > tensors = { bytes( 1 ), bytes( 63, 10 ), bytes( 338, 50 ) };
+    auto frame = make_frame_v1( tensors );
+    auto layout = parse( frame );
+    CHECK( layout.header.version == nn::CUSTOM_NN_VERSION_PACKED );
+    CHECK( layout.header.model_id == 0 );
+    CHECK( layout.header.generation == 0x2472D988 );
+    CHECK( layout.payload.frame_id == 77 );
+    REQUIRE( layout.tensors.size() == tensors.size() );
+    size_t offset = 19 + 22;
+    for( size_t i = 0; i < tensors.size(); ++i )
+    {
+        offset += 6;
+        CHECK( layout.tensors[i].offset == offset );
+        CHECK( std::memcmp( frame.data() + offset, tensors[i].data(), tensors[i].size() ) == 0 );
+        offset += tensors[i].size();
+    }
+
+    // Measured on a D555E: MobileNetV2's 2,048 B output makes a 2,095 B frame
+    auto const mobilenet = parse( make_frame_v1( { bytes( 2048 ) } ) ).tensors.at( 0 );
+    CHECK( mobilenet.offset + mobilenet.size == 2095 );
 }
 
 
@@ -171,9 +224,10 @@ TEST_CASE( "custom nn invalid frames" )
     frame[0] ^= 1;
     CHECK_THAT( error_of( frame ), ContainsSubstring( "magic" ) );
 
+    // Version 2, sent only by earlier D585 test images, is refused
     frame = good;
-    frame[5] = 0x01;  // version 0x0100
-    CHECK_THAT( error_of( frame ), ContainsSubstring( "version" ) );
+    frame[5] = 0x02;
+    CHECK_THAT( error_of( frame ), ContainsSubstring( "unsupported version 0x200" ) );
 
     frame = good;
     frame[200] ^= 0xFF;
@@ -192,7 +246,7 @@ TEST_CASE( "custom nn invalid frames" )
 
     // More tensors than the payload holds
     frame = good;
-    frame[19 + 20] = 3;
+    frame[23 + 20] = 3;
     fix_crc( frame );
     CHECK_THAT( error_of( frame ), ContainsSubstring( "tensor 2 header" ) );
 
