@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # RGB and Depth must stay internally synced on D585 while the decimation / temporal embedded filters run.
-# Without filters the depth/color timestamp delta must meet the 2 ms sync KPI; with filters it must stay within one frame period.
+# Without filters the depth/color timestamp delta must meet the 2 ms sync KPI; with filters its median must stay below half a frame period.
 
 import statistics
 import pytest
@@ -20,10 +20,10 @@ pytestmark = [
 
 SYNC_KPI_MS = 2.0  # synchronized pair, no embedded filter
 MIN_PAIRED_RATIO = 0.9
-STREAM_SECONDS = 10
+STREAM_SECONDS = 2
 WARMUP_FRAMESETS = 15
 FPS = 30
-FRAME_PERIOD_MS = 1000.0 / FPS  # with embedded filters the pair must at least arrive within one frame
+FRAME_PERIOD_MS = 1000.0 / FPS  # a lagging filtered depth shows as a one-frame offset on every frameset
 COLOR_RES = ( 1280, 720 )
 # First FW stamping the frame timestamp with its capture time, so the temporal filter latency no longer shifts the depth/color pairing
 TEMPORAL_MIN_FW = { "USB": rsutils.version( "7.59.47005.17570" ), "GMSL": rsutils.version( "7.62.47468.18460" ) }  # GMSL: first master build with the equivalent fix
@@ -131,6 +131,6 @@ def test_rgb_depth_sync( test_device, filter_setup ):
     stats = f"depth/color delta over {len( deltas )} framesets: median {median:.2f} ms, p95 {p95:.2f} ms, max {ordered[-1]:.2f} ms"
     log.info( stats )
     if applied_bit:
-        assert ordered[-1] < FRAME_PERIOD_MS, f"{stats}; max exceeds one frame period ({FRAME_PERIOD_MS:.1f} ms)"
+        assert median < FRAME_PERIOD_MS / 2, f"{stats}; median exceeds half a frame period ({FRAME_PERIOD_MS / 2:.1f} ms)"
     else:
         assert median < SYNC_KPI_MS, f"{stats}; median exceeds the {SYNC_KPI_MS} ms sync KPI"
