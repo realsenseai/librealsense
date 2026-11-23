@@ -10,7 +10,9 @@
 #include "option.h"
 #include "colorizer.h"
 #include "disparity-transform.h"
+#ifdef RS2_USE_CUDA_ZEROCOPY
 #include "cuda/cuda-frame-memory.h"
+#endif
 
 #include <cstring>
 
