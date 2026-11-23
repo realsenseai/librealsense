@@ -91,7 +91,8 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
 def test_pipeline_first_color_frame_delay(pipeline_device):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = MAX_DELAY_COLOR_FROM_DEPTH if any(m in product_name for m in ('D401', 'D405')) else max_delay_for(dev)
+    color_from_depth = any(m in product_name for m in ('D401', 'D405'))
+    max_delay = MAX_DELAY_COLOR_FROM_DEPTH if color_from_depth else max_delay_for(dev)
     os_name = platform.system()
 
     log.info(f"Testing pipeline first color frame delay on {product_name} device - {os_name} OS")
@@ -102,7 +103,8 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
     color_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     color_cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
-    for run, limit in (("start", max_delay), ("restart after stop", MAX_DELAY)):
+    restart_delay = MAX_DELAY_COLOR_FROM_DEPTH if color_from_depth else MAX_DELAY  # ISP powers up on every start
+    for run, limit in (("start", max_delay), ("restart after stop", restart_delay)):
         frame_delay = time_to_first_frame(ctx, color_cfg)
         log.info(f"Delay from pipeline.start() until first color frame on {run} is: {frame_delay:.3f} [sec] "
               f"max allowed is: {limit:.1f} [sec]")
