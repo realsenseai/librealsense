@@ -104,7 +104,7 @@ namespace librealsense
     // The transport profile is GREY (Y8); the payload is XYZ32F. Validate the frame against the
     // committed profile, then relabel it to the requested XYZ32F profile without copying, so the
     // metadata and the buffer are kept. Invalid frames are dropped.
-    class pcl_xyz_relabel_block : public stream_filter_processing_block
+    class mapping_payload_relabel_block : public stream_filter_processing_block
     {
         std::shared_ptr< stream_profile_interface > _source;
         std::shared_ptr< stream_profile_interface > _target;
@@ -115,10 +115,12 @@ namespace librealsense
         bool _warned_no_metadata = false;
         bool _warned_unknown_layout = false;
         rs2_format _format;
+        rs2_stream _stream;
 
     public:
-        explicit pcl_xyz_relabel_block( rs2_format format = RS2_FORMAT_XYZ32F )
-            : stream_filter_processing_block( "PCL passthrough" ), _format( format )
+        explicit mapping_payload_relabel_block( rs2_format format = RS2_FORMAT_XYZ32F,
+                                                rs2_stream stream = RS2_STREAM_POINT_CLOUD )
+            : stream_filter_processing_block( "Mapping passthrough" ), _format( format ), _stream( stream )
         {
         }
 
@@ -132,20 +134,26 @@ namespace librealsense
                 _source = source;
                 _target = source->clone();
                 _target->set_format( _format );
-                _target->set_stream_type( RS2_STREAM_POINT_CLOUD );
+                _target->set_stream_type( _stream );
                 _target->set_stream_index( source->get_stream_index() );  // clone() does not copy the index
 
                 _expected = pcl_expected();
                 const bool rgb = _format == RS2_FORMAT_XYZRGB32F;
-                _expected.point_format = rgb ? 1 : 0;
-                _expected.point_stride = rgb ? 16 : 12;
+                const bool labeled = _stream == RS2_STREAM_LABELED_POINT_CLOUD;
+                const bool grid = _stream == RS2_STREAM_OCCUPANCY;
+                _expected.point_format = labeled ? 2 : rgb ? 1 : 0;
+                _expected.point_stride = labeled ? 13 : grid ? 1 : rgb ? 16 : 12;
                 if( auto vsp = dynamic_cast< video_stream_profile_interface * >( source.get() ) )
                 {
                     _expected.width = vsp->get_width();
                     _expected.height = vsp->get_height();
                     auto tuple = rgb ? find_pcl_xyzrgb_tuple( _expected.width, _expected.height, source->get_framerate() )
                                      : find_pcl_xyz_tuple( _expected.width, _expected.height, source->get_framerate() );
-                    if( auto t = tuple )
+                    if( labeled )
+                        _expected.profile_id = 0x0101;
+                    else if( grid )
+                        _expected.profile_id = 0x0201;
+                    else if( auto t = tuple )
                         _expected.profile_id = t->profile_id;
                 }
             }
@@ -168,7 +176,8 @@ namespace librealsense
                 LOG_WARNING( "Point cloud frames carry no UVC metadata: only the payload size is validated" );
             }
 
-            auto result = check_pcl_frame( reinterpret_cast< const uint8_t * >( lf->get_frame_data() ),
+            auto const check = _stream == RS2_STREAM_OCCUPANCY ? check_occupancy_frame : check_pcl_frame;
+            auto result = check( reinterpret_cast< const uint8_t * >( lf->get_frame_data() ),
                                            lf->get_frame_data_size(),
                                            md,
                                            md_size,
@@ -966,7 +975,9 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         processing_block_factory occ_pbf
             = { { { RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY } },
                 { { RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY } },
-                []() {
+                [this]() -> std::shared_ptr< processing_block > {
+                    if( _mapping_selectors )
+                        return std::make_shared< mapping_payload_relabel_block >( RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY );
                     return std::make_shared< identity_processing_block >();
                 } };
         mapping_ep->register_processing_block( occ_pbf );
@@ -974,7 +985,9 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         processing_block_factory lpc_pbf
             = { { { RS2_FORMAT_Y8, RS2_STREAM_LABELED_POINT_CLOUD } },
                 { { RS2_FORMAT_Y8, RS2_STREAM_LABELED_POINT_CLOUD } },
-                []() {
+                [this]() -> std::shared_ptr< processing_block > {
+                    if( _mapping_selectors )
+                        return std::make_shared< mapping_payload_relabel_block >( RS2_FORMAT_Y8, RS2_STREAM_LABELED_POINT_CLOUD );
                     return std::make_shared< identity_processing_block >();
                 } };
         mapping_ep->register_processing_block( lpc_pbf );
@@ -982,7 +995,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             = { { { RS2_FORMAT_Y8, RS2_STREAM_POINT_CLOUD } },
                 { { RS2_FORMAT_XYZ32F, RS2_STREAM_POINT_CLOUD } },
                 []() {
-                    return std::make_shared< pcl_xyz_relabel_block >();
+                    return std::make_shared< mapping_payload_relabel_block >();
                 } };
         mapping_ep->register_processing_block( pcl_pbf );
         if( _mapping_xyzrgb )
@@ -990,7 +1003,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             processing_block_factory xyzrgb_pbf
                 = { { { RS2_FORMAT_Y8, RS2_STREAM_POINT_CLOUD } },
                     { { RS2_FORMAT_XYZRGB32F, RS2_STREAM_POINT_CLOUD } },
-                    []() { return std::make_shared< pcl_xyz_relabel_block >( RS2_FORMAT_XYZRGB32F ); } };
+                    []() { return std::make_shared< mapping_payload_relabel_block >( RS2_FORMAT_XYZRGB32F ); } };
             mapping_ep->register_processing_block( xyzrgb_pbf );
         }
     }

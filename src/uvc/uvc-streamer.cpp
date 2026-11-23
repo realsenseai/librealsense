@@ -42,6 +42,8 @@ namespace librealsense
             _action_dispatcher.start();
 
             _watchdog_timeout = static_cast<int64_t>(((1000.0 / _context.profile.fps) * 10));
+            if( _context.variable_payload )
+                _watchdog_timeout = std::max< int64_t >( _watchdog_timeout, 1000 );
 
             init();
         }
@@ -131,9 +133,13 @@ namespace librealsense
                       return;
 
                     auto al = r->get_actual_length();
+                    const bool header_valid = al >= 2 && r->get_buffer()[0] >= 2
+                                              && r->get_buffer()[0] <= al;
+                    const bool payload_fits = header_valid
+                        && size_t( al - r->get_buffer()[0] ) <= _context.control->dwMaxVideoFrameSize;
                     if( _split_transfers )
                         consume_transfer( r->get_buffer().data(), al );
-                    else if( al > 0L
+                    else if( payload_fits
                         && ( al == r->get_buffer().data()[0] + _context.control->dwMaxVideoFrameSize
                              || _allow_variable_length_payload ) )
                     {

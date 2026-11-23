@@ -92,3 +92,81 @@ int main() {
         str(code), "-o", str(binary),
     ], check=True)
     subprocess.run([str(binary)], check=True, timeout=10)
+
+
+def test_mapping_profile_and_payload_validation(tmp_path):
+    from rspy import repo
+    compiler = shutil.which("g++")
+    if not compiler or sys.platform != "linux":
+        pytest.skip("A Linux host C++ compiler is required")
+    root = Path(__file__).resolve().parents[2]
+    code = r'''
+#include <src/ds/d500/mapping-pcl-check.h>
+#include <cassert>
+#include <vector>
+using namespace librealsense;
+int main() {
+    pcl_expected expected;
+    expected.width=4;expected.height=3;expected.profile_id=0x0101;
+    expected.point_stride=13;expected.point_format=2;
+    std::vector<uint8_t> labels(4*3*13,42);
+    md_point_cloud cloud{};
+    cloud.header.md_type_id=md_type::META_DATA_INTEL_POINT_CLOUD_ID;
+    cloud.header.md_size=sizeof(cloud);cloud.version=0x00020002;
+    cloud.flags=uint32_t(md_point_cloud_attributes::profile_id_attribute)
+        |uint32_t(md_point_cloud_attributes::point_stride_attribute)
+        |uint32_t(md_point_cloud_attributes::point_format_attribute)
+        |uint32_t(md_point_cloud_attributes::payload_crc32_attribute);
+    cloud.profile_id=0x0101;cloud.point_stride=13;cloud.point_format=2;
+    cloud.payload_crc32=rsutils::number::calc_crc32(labels.data(),labels.size());
+    pcl_session session;
+    auto check_cloud=[&] {
+        return check_pcl_frame(labels.data(),labels.size(),
+            reinterpret_cast<const uint8_t*>(&cloud),sizeof(cloud),expected,session);
+    };
+    assert(check_cloud()==pcl_frame_check::ok);
+    cloud.point_stride=16;
+    assert(check_cloud()==pcl_frame_check::format_mismatch);
+    cloud.point_stride=13;cloud.profile_id=3;
+    assert(check_cloud()==pcl_frame_check::profile_mismatch);
+
+    expected.profile_id=0x0201;expected.point_stride=1;
+    std::vector<uint8_t> cells(12,50);
+    md_occupancy grid{};
+    grid.header.md_type_id=md_type::META_DATA_INTEL_OCCUPANCY_ID;
+    grid.header.md_size=sizeof(grid);grid.version=0x00020002;
+    grid.flags=uint32_t(md_occupancy_attributes::profile_id_attribute)
+        |uint32_t(md_occupancy_attributes::grid_rows_attribute)
+        |uint32_t(md_occupancy_attributes::grid_columns_attribute)
+        |uint32_t(md_occupancy_attributes::payload_crc32_attribute);
+    grid.profile_id=0x0201;grid.grid_rows=3;grid.grid_columns=4;
+    grid.payload_crc32=rsutils::number::calc_crc32(cells.data(),cells.size());
+    auto check_grid=[&] {
+        return check_occupancy_frame(cells.data(),cells.size(),
+            reinterpret_cast<const uint8_t*>(&grid),sizeof(grid),expected,session);
+    };
+    assert(check_grid()==pcl_frame_check::ok);
+    assert(check_occupancy_frame(labels.data(),labels.size(),nullptr,0,expected,session)
+           ==pcl_frame_check::size_mismatch);
+    grid.header.md_type_id=md_type::META_DATA_INTEL_POINT_CLOUD_ID;
+    assert(check_grid()==pcl_frame_check::abi_mismatch);
+    grid.header.md_type_id=md_type::META_DATA_INTEL_OCCUPANCY_ID;
+    cells[0]^=1;
+    assert(check_grid()==pcl_frame_check::crc_mismatch);
+    cells[0]^=1;grid.profile_id=0x0101;
+    assert(check_grid()==pcl_frame_check::profile_mismatch);
+    grid.profile_id=0x0201;grid.grid_columns=5;
+    assert(check_grid()==pcl_frame_check::abi_mismatch);
+}
+'''
+    source, binary = tmp_path / "mapping.cpp", tmp_path / "mapping"
+    source.write_text(code)
+    subprocess.run([
+        compiler, "-std=c++14", "-O2", "-pthread", "-fsanitize=address,undefined",
+        "-fno-pie", "-no-pie", "-I" + str(root), "-I" + str(root / "include"),
+        "-I" + str(root / "third-party/rsutils/include"), str(source),
+        "-I" + str(root / "third-party/easyloggingpp/src"),
+        "-I" + str(Path(repo.build or root / "build") / "third-party/json/include"),
+        str(root / "third-party/rsutils/src/crc32.cpp"), "-o", str(binary),
+    ], check=True)
+    subprocess.run([str(binary)], check=True, timeout=10)
