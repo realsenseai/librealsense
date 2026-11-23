@@ -1029,7 +1029,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                                                                       { RS2_STREAM_OCCUPANCY, ds::MAPPING_STREAM_OG } };
         if( ! _supports_stream_selection || requests.empty() )
             return;
-        auto const type = requests.front()->get_stream_type();
+        rs2_stream const type = requests.front()->get_stream_type();
         auto const it = stream_select.find( type );
         if( it == stream_select.end() )
             return;

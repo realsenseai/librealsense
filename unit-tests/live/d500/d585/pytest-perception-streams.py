@@ -182,10 +182,9 @@ def test_standalone_lifecycle(device, stream):
     stop( sensor )
 
 
+@pytest.mark.device_exclude( "D555" )
 def test_mapping_stream_switch(device):
-    """The Mapping sensor switches between its streams; Phase 2 FW selects each one by the Mapping XU."""
-    if "D555" in device.get_info( rs.camera_info.name ):
-        pytest.skip( "Perception lifecycle metadata checks are D585-only" )
+    """One Mapping sensor switches Point Cloud -> Labeled Point Cloud -> Occupancy -> Point Cloud, each with valid frames."""
     skip_d585_on_gmsl( device, REASON )
     require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "labeled point cloud" )
     frames = Collector()
