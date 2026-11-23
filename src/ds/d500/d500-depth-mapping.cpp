@@ -518,6 +518,9 @@ namespace librealsense
 
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
 
+        _supports_stream_selection = is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::STREAM_SELECT,
+                                                      sizeof( uint8_t ) );
+
         // Not every transport exposes these controls (no GMSL driver CIDs yet)
         if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
                              sizeof( uint8_t ), RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION ) )
@@ -1015,7 +1018,32 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << requests.size() << " profiles were requested");
 
         _owner->mapping_allowed_or_throw(requests);
+        _owner->select_mapping_stream(requests);
         synthetic_sensor::open(requests);
+    }
+
+    void d500_depth_mapping::select_mapping_stream( const stream_profiles & requests ) const
+    {
+        static const std::map< rs2_stream, uint8_t > stream_select = { { RS2_STREAM_POINT_CLOUD, ds::MAPPING_STREAM_PCL },
+                                                                      { RS2_STREAM_LABELED_POINT_CLOUD, ds::MAPPING_STREAM_LPCL },
+                                                                      { RS2_STREAM_OCCUPANCY, ds::MAPPING_STREAM_OG } };
+        if( ! _supports_stream_selection || requests.empty() )
+            return;
+        auto const type = requests.front()->get_stream_type();
+        auto const it = stream_select.find( type );
+        if( it == stream_select.end() )
+            return;
+        LOG_DEBUG( "Mapping XU stream select " << int( it->second ) << " for " << rs2_stream_to_string( type ) );
+        // Writable copies: on Windows the KS SET buffer is in/out, and a read-only one faults
+        uint8_t select = it->second, format = ds::MAPPING_PCL_FORMAT_XYZ;
+        _raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
+        {
+            if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &select, sizeof( select ) )
+                || ( type == RS2_STREAM_POINT_CLOUD
+                     && ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &format, sizeof( format ) ) ) )
+                throw io_exception( rsutils::string::from()
+                                    << "Failed to select " << rs2_stream_to_string( type ) << " on the Mapping XU" );
+        } );
     }
 
     rs2_intrinsics d500_depth_mapping_sensor::get_intrinsics(const stream_profile& profile) const

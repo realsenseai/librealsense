@@ -160,7 +160,7 @@ namespace librealsense
         void register_dpp_embedded_filters();
         void set_imu_type( const std::vector< uint8_t > & gvd_buf, ds::d500_gvd_parsed_fields * parsed_fields );
         static bool is_xu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::extension_unit & xu,
-                                     uint8_t control, int size, rs2_option id );
+                                     uint8_t control, int size, rs2_option id = RS2_OPTION_COUNT );
         static bool is_pu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::processing_unit & pu,
                                      rs2_option id );
         // GMSL MUX control: have the camera produce a stream multiplexed on the IR node at this profile, or stop it
