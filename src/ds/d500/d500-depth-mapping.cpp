@@ -1088,6 +1088,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         const uint8_t format = profile->get_format() == RS2_FORMAT_XYZRGB32F ? 1 : 0;
         raw->invoke_powered( [&]( platform::uvc_device & dev )
         {
+            std::lock_guard< platform::uvc_device > device_lock( dev );
             uint8_t previous_select = 0, previous_format = 0;
             if( ! dev.get_xu( ds::mapping_xu, ds::STREAM_SELECT, &previous_select, 1 ) ||
                 ! dev.get_xu( ds::mapping_xu, ds::PCL_FORMAT, &previous_format, 1 ) )
@@ -1116,6 +1117,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         if( _owner->_mapping_selectors )
             _owner->_raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
             {
+                std::lock_guard< platform::uvc_device > device_lock( dev );
                 const uint8_t automatic = 0;
                 if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 ) ||
                     ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) )
