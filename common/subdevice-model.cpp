@@ -2465,9 +2465,9 @@ namespace rs2
                 {
                     auto id = f.get_profile().unique_id();
                     auto decoder = h264->find( id );
+                    // The synchronization condition here must match the condition inside render_loop()!
                     if( decoder != h264->end() )
                         decoder->second.invoke( f );
-                    // The condition here must match the condition inside render_loop()!
                     else if( viewer.synchronization_enable )
                         syncer->invoke( f );
                     else

@@ -174,7 +174,6 @@ void rs2::post_processing_filters::map_id_frame_to_frame(rs2::frame first, rs2::
         // An unfiltered frame maps to itself, unless it maps to a shown stream (decoded H.264 to its source)
         if( first_uid == second_uid )
         {
-            std::lock_guard< std::mutex > lock( viewer.streams_mutex );
             auto it = viewer.streams_origin.find( first_uid );
             if( it == viewer.streams_origin.end() || ! viewer.streams.count( it->second ) )
                 viewer.streams_origin[first_uid] = first_uid;
@@ -194,7 +193,11 @@ std::vector<rs2::frame> post_processing_filters::handle_frame(rs2::frame f, cons
 
     auto filtered = apply_filters(f, source);
 
-    map_id(filtered, f);
+    {
+        // Also written by the H.264 decoder callback (subdevice-model.cpp)
+        std::lock_guard< std::mutex > lock( viewer.streams_mutex );
+        map_id( filtered, f );
+    }
 
     if (auto composite = filtered.as<rs2::frameset>())
     {
