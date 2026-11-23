@@ -18,7 +18,13 @@ namespace librealsense
     {
         auto count = width * height;
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+#if defined( __aarch64__ ) && ! defined( RS2_USE_HIP )
+        // On Jetson, staging host Y8I through CUDA can block the capture thread on GPU mappings.
+        bool const use_gpu = rsutils::rs2_is_cuda_available() && ! rsutils::rs2_is_cuda_integrated();
+#else
+        bool const use_gpu = rsutils::rs2_is_gpu_available();
+#endif
+        if( use_gpu )
         {
             rscuda::split_frame_y8_y8_from_y8i_cuda(dest, count, reinterpret_cast<const y8i_pixel*>(source));
             return;
