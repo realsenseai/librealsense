@@ -28,7 +28,7 @@ namespace librealsense
             // Queue bounded transfers continuously while assembling the one-payload
             // Mapping frame in userspace. Two full HD XYZRGB requests exceed the
             // default Linux usbfs budget before another sensor can start.
-            _transfer_buffer_size = _split_transfers ? 2U * 1024U * 1024U : _read_buff_length;
+            _transfer_buffer_size = _split_transfers ? 4U * 1024U * 1024U : _read_buff_length;
             // Compressed streams have a variable payload length. Perception stream does too.
             // Scope the exception to perception interface so regular Y8 images retain strict frame-size validation.
             // Streaming MI is control MI + 1 (control MI 9, confirmed with the HKR firmware team).
