@@ -272,9 +272,8 @@ namespace librealsense
             _d2d_convert_factor = 681678.625;
         }
 
-        // The colorizer is CPU-only and reads every depth pixel (twice with histogram equalization). Under
-        // zero-copy the frame lives in CUDA mapped host memory, which the CPU reads very slowly with scalar loads
-        // (~4 FPS at 1280x720 on Jetson, RSDEV-16398). Copy it once with wide loads to ordinary memory first.
+        // Over GMSL a zero-copy frame can be the Tegra VI's uncached capture buffer, where the CPU's scalar loads
+        // are very slow (~4 FPS at 1280x720). Copy it once to cached memory before the two read passes.
         const void * depth_src = f.as< rs2::video_frame >().get_data();
 #ifdef RS2_USE_CUDA_ZEROCOPY
         if( rs_frame_zc_device_ptr( depth_src ) )
