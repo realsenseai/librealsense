@@ -102,7 +102,7 @@ namespace librealsense
 
         bool aggregator::dequeue(frame_holder* item, unsigned int timeout_ms)
         {
-            return _queue->dequeue(item, timeout_ms);
+            return _queue->dequeue(item, timeout_ms, true);
         }
 
         bool aggregator::try_dequeue(frame_holder* item)
