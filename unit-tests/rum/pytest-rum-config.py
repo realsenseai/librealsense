@@ -107,3 +107,28 @@ def test_processing_block_option_excluded_from_options_changed( rum_report ):
     for d in rum_report().get( "devices", {} ).values():
         names += list( d.get( "options_changed", {} ).keys() )
     assert "Min Distance" not in names
+
+
+def test_playback_device_not_in_report( tmp_path, rum_report ):
+    filename = str( tmp_path / "rum.db3" )
+    sd = rs.software_device()
+    sd.register_info( rs.camera_info.name, "RUM Recorded Device" )
+    vs = rs.video_stream()
+    vs.type, vs.width, vs.height, vs.fps, vs.bpp, vs.fmt = rs.stream.depth, 640, 480, 30, 2, rs.format.z16
+    sensor = sd.add_sensor( "Synthetic" )
+    profile = sensor.add_video_stream( vs )
+    recorder = rs.recorder( filename, sd )
+    sensor.open( profile )
+    sensor.start( lambda f: None )
+    frame = rs.software_video_frame()   # device info is written to the file only with a frame
+    frame.pixels, frame.bpp, frame.stride, frame.profile = bytearray( 640 * 480 * 2 ), 2, 640 * 2, profile.as_video_stream_profile()
+    sensor.on_video_frame( frame )
+    sensor.stop()
+    sensor.close()
+    del recorder
+    ctx = rs.context()
+    playback = ctx.load_device( filename )   # the context lists it only while this is alive
+    # Creating it from the context's list (needs the sw_only mask) runs the RUM device hook.
+    devices = ctx.query_devices( int( rs.product_line.sw_only ) | int( rs.product_line.any ) )
+    assert "RUM Recorded Device" in [ d.get_info( rs.camera_info.name ) for d in devices ]
+    assert "RUM Recorded Device" not in [ key.rsplit( "-", 1 )[0] for key in rum_report().get( "devices", {} ) ]

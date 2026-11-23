@@ -12,6 +12,7 @@
 #include "core/enum-helpers.h"               // get_string( rs2_stream / rs2_format / rs2_option / rs2_notification_category )
 
 #include "core/frame-interface.h"           // frame_interface::get_sensor (on_filter)
+#include "media/playback/playback_device.h"
 
 #include <string>
 
@@ -34,8 +35,11 @@ std::string dev_info( device_interface & dev, rs2_camera_info i )
 
 // Per-device key used to nest everything: "<name>-<connection>" (transports stay distinct).
 // Connection is also stored as an explicit property so the consumer needn't parse the key.
+// Empty for recordings: they carry the recorded camera's name and connection, so they'd land in that camera's entry.
 std::string device_key_of( device_interface & dev )
 {
+    if( dynamic_cast< playback_device * >( &dev ) )
+        return {};
     return dev_info( dev, RS2_CAMERA_INFO_NAME ) + "-" + dev_info( dev, RS2_CAMERA_INFO_CONNECTION_TYPE );
 }
 
@@ -54,8 +58,11 @@ std::string stream_label( rs2_stream type, rs2_format format, int width, int hei
 
 void on_device( device_interface & dev )
 {
+    auto key = device_key_of( dev );
+    if( key.empty() )
+        return;
     // Serial is read only to count distinct units in memory (see record_device); never uploaded.
-    rum_collector::instance().record_device( device_key_of( dev ),
+    rum_collector::instance().record_device( key,
                                              dev_info( dev, RS2_CAMERA_INFO_CONNECTION_TYPE ),
                                              dev_info( dev, RS2_CAMERA_INFO_FIRMWARE_VERSION ),
                                              dev_info( dev, RS2_CAMERA_INFO_MIPI_DRIVER_VERSION ),
