@@ -11,10 +11,10 @@ class OptionInfo(BaseModel):
     """One option, as rs2::options reports it; the map holding it, or the URL it came from, names it"""
     description: str
     current_value: Optional[Union[float, int, bool, str]]  # by the option's type in the SDK; null: can't be read now, like temperature when not streaming
-    default_value: float
-    min_value: float
-    max_value: float
-    step: float
+    default_value: Optional[float]  # these four null: the SDK could not read the range
+    min_value: Optional[float]
+    max_value: Optional[float]
+    step: Optional[float]
     read_only: bool
     value_descriptions: Dict[str, str]  # each value's label, as far as the SDK has them; often none
 

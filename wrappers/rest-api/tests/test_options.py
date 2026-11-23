@@ -55,3 +55,19 @@ def test_one_option_it_cannot_read_now_answers_without_a_value():
 def test_one_option_it_does_not_support_raises():
     with pytest.raises(KeyError):  # answered 404
         options.option(_Sensor(), "nope")
+
+
+class _SensorWithoutRange(_Sensor):
+    """One whose range the SDK could not read: the options list has no range for it, its own read raises"""
+
+    def get_supported_option_values(self):
+        return [OptionValue(_Opt("ambient_light"), 1.0, None)]
+
+    def get_option_range(self, opt):
+        raise RuntimeError("failed to query range")
+
+
+def test_an_option_without_a_range_is_listed_with_null_range():
+    o = options.all_options(_SensorWithoutRange())["ambient_light"]
+    assert (o.current_value, o.min_value, o.max_value, o.step, o.default_value) == (1.0, None, None, None, None)
+    assert options.option(_SensorWithoutRange(), "ambient_light") == o

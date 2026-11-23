@@ -18,7 +18,7 @@ def _value_descriptions(obj, opt, rng):
     labels mean "dropdown" is the viewer's call.
     """
     descs = {}
-    if rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
+    if rng is None or rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
         return descs
     for val in range(int(rng.min), int(rng.max) + 1):
         try:
@@ -32,13 +32,14 @@ def _value_descriptions(obj, opt, rng):
 
 
 def _info(obj, opt, value, rng) -> OptionInfo:
+    """rng None: the SDK could not read the option's range, so its fields are null, as the SDK reports it"""
     return OptionInfo(
         description=obj.get_option_description(opt),
         current_value=value,
-        default_value=rng.default,
-        min_value=rng.min,
-        max_value=rng.max,
-        step=rng.step,
+        default_value=rng and rng.default,
+        min_value=rng and rng.min,
+        max_value=rng and rng.max,
+        step=rng and rng.step,
         read_only=obj.is_option_read_only(opt),
         value_descriptions=_value_descriptions(obj, opt, rng),
     )
@@ -53,7 +54,11 @@ def all_options(obj) -> Dict[str, OptionInfo]:
 def option(obj, field: str) -> OptionInfo:
     """One option, read alone: 404 only if the object doesn't support it, a null value if it can't read it now"""
     opt = _supported(obj)[field]
-    return _info(obj, opt, obj.get_option_value(opt).value, obj.get_option_range(opt))
+    try:
+        rng = obj.get_option_range(opt)
+    except RuntimeError:  # as the SDK's options list, which then has no range
+        rng = None
+    return _info(obj, opt, obj.get_option_value(opt).value, rng)
 
 
 def _supported(obj):
