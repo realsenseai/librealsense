@@ -2,6 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
@@ -91,7 +92,10 @@ int main() {
         "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
         str(code), "-o", str(binary),
     ], check=True)
-    subprocess.run([str(binary)], check=True, timeout=10)
+    # This standalone executable owns its ASan runtime, including in the TSan Python job.
+    native_env = dict(os.environ)
+    native_env.pop("LD_PRELOAD", None)
+    subprocess.run([str(binary)], check=True, timeout=10, env=native_env)
 
 
 def test_mapping_profile_and_payload_validation(tmp_path):
@@ -169,4 +173,6 @@ int main() {
         "-I" + str(Path(repo.build or root / "build") / "third-party/json/include"),
         str(root / "third-party/rsutils/src/crc32.cpp"), "-o", str(binary),
     ], check=True)
-    subprocess.run([str(binary)], check=True, timeout=10)
+    native_env = dict(os.environ)
+    native_env.pop("LD_PRELOAD", None)
+    subprocess.run([str(binary)], check=True, timeout=10, env=native_env)
