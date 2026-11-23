@@ -60,8 +60,7 @@ def time_to_first_frame(ctx, config):
     return delay
 
 
-@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
-def test_pipeline_first_depth_frame_delay(pipeline_device, restart):
+def pipeline_first_depth_frame_delay(pipeline_device, restart):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
     max_delay = max_delay_for(dev, restart)
@@ -93,11 +92,15 @@ def test_pipeline_first_depth_frame_delay(pipeline_device, restart):
         time.sleep(1)
 
 
-# D421/D430 have no color
-@pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D430")
-@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
-def test_pipeline_first_color_frame_delay(pipeline_device, restart):
+def test_pipeline_first_depth_frame_delay(pipeline_device):
+    pipeline_first_depth_frame_delay(pipeline_device, restart=False)
+
+
+def test_pipeline_restart_depth_frame_delay(pipeline_device):
+    pipeline_first_depth_frame_delay(pipeline_device, restart=True)
+
+
+def pipeline_first_color_frame_delay(pipeline_device, restart):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
     max_delay = MAX_DELAY_COLOR_FROM_DEPTH if any(m in product_name for m in ('D401', 'D405')) else max_delay_for(dev, restart)
@@ -123,3 +126,16 @@ def test_pipeline_first_color_frame_delay(pipeline_device, restart):
 
     assert frame_delay < max_delay, \
         f"Color frame delay {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
+
+
+# D421/D430 have no color
+@pytest.mark.device_exclude("D421")
+@pytest.mark.device_exclude("D430")
+def test_pipeline_first_color_frame_delay(pipeline_device):
+    pipeline_first_color_frame_delay(pipeline_device, restart=False)
+
+
+@pytest.mark.device_exclude("D421")
+@pytest.mark.device_exclude("D430")
+def test_pipeline_restart_color_frame_delay(pipeline_device):
+    pipeline_first_color_frame_delay(pipeline_device, restart=True)

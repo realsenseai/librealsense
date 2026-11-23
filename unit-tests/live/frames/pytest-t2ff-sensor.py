@@ -90,8 +90,7 @@ def test_device_creation_time(module_device_setup):
         f"Device creation time {creation_time:.3f}s exceeds maximum {max_time:.1f}s"
 
 
-@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
-def test_first_depth_frame_delay(sensor_device, restart):
+def first_depth_frame_delay(sensor_device, restart):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
     max_delay = 1.5 if is_d585_on_gmsl(dev) and not restart else 1  # slow first start after reset on D585 GMSL
@@ -123,11 +122,15 @@ def test_first_depth_frame_delay(sensor_device, restart):
         time.sleep(1)
 
 
-# D421/D430 have no color; D401/D405 stream color from the depth sensor.
-@pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D430")
-@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
-def test_first_color_frame_delay(sensor_device, restart):
+def test_first_depth_frame_delay(sensor_device):
+    first_depth_frame_delay(sensor_device, restart=False)
+
+
+def test_restart_depth_frame_delay(sensor_device):
+    first_depth_frame_delay(sensor_device, restart=True)
+
+
+def first_color_frame_delay(sensor_device, restart):
     dev, ctx = sensor_device
     if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "first color frame delay" )
@@ -156,3 +159,16 @@ def test_first_color_frame_delay(sensor_device, restart):
     log.info(f"Time until first color frame is: {delay:.3f} [sec] max allowed is: {max_delay:.1f} [sec]")
     assert delay < max_delay, \
         f"Color frame delay {delay:.3f}s exceeds maximum {max_delay:.1f}s"
+
+
+# D421/D430 have no color; D401/D405 stream color from the depth sensor.
+@pytest.mark.device_exclude("D421")
+@pytest.mark.device_exclude("D430")
+def test_first_color_frame_delay(sensor_device):
+    first_color_frame_delay(sensor_device, restart=False)
+
+
+@pytest.mark.device_exclude("D421")
+@pytest.mark.device_exclude("D430")
+def test_restart_color_frame_delay(sensor_device):
+    first_color_frame_delay(sensor_device, restart=True)
