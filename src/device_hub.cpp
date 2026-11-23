@@ -102,11 +102,14 @@ namespace librealsense
 
         std::shared_ptr<device_interface> res = nullptr;
 
-        // check if there is at least one device connected
-        _device_list = _ctx->query_devices(_mask);
+        // The list is kept current by the device-changes callback; query again only when it has no match
         if (_device_list.size() > 0)
-        {
             res = create_device(serial, loop_through_devices);
+        if (!res)
+        {
+            _device_list = _ctx->query_devices(_mask);
+            if (_device_list.size() > 0)
+                res = create_device(serial, loop_through_devices);
         }
 
         if (res) return res;
