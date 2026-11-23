@@ -28,8 +28,8 @@ namespace librealsense
 #endif
         if( ! dest )
             return;
-        auto left = dest[0];
-        auto right = dest[1];
+        uint8_t * left = dest[0];
+        uint8_t * right = dest[1];
 #if defined(__SSE2__) || defined(_M_X64)
         // Each 16-bit lane holds one left/right pair, with the left sample in the low byte.
         const auto low_byte = _mm_set1_epi16( 0xff );
