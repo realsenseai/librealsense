@@ -290,14 +290,14 @@ def test_depth_and_ir_join_mapping(device, mapping, source, indices):
     stop( occ )
 
 
+@pytest.mark.device_exclude( "D555" )
+@pytest.mark.device_type_exclude( "GMSL" )
 @pytest.mark.parametrize( 'depth_size, ir_profile', [
     ( ( 640, 360 ), ( 1280, 720, 30 ) ),
     ( ( 640, 360 ), ( 640, 360, 15 ) ),
     ( ( 848, 480 ), ( 848, 480, 30 ) ),
 ], ids=['different-size', 'different-rate', 'unsupported-ir-size'] )
 def test_mapping_rejects_incompatible_ir(device, mapping, depth_size, ir_profile):
-    if is_gmsl( device ) or 'D555' in device.get_info( rs.camera_info.name ):
-        pytest.skip( "D585 USB stereo profile rules" )
     occ, occ_profile = mapping
     stream_type = occ_profile.stream_type()
     stereo, frames = device.first_depth_sensor(), Collector()
