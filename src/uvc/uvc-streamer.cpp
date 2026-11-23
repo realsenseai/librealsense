@@ -30,6 +30,7 @@ namespace librealsense
             constexpr uint8_t perception_streaming_mi = 10;
             _allow_variable_length_payload
                 = val_in_range( _context.profile.format, { 0x4d4a5047U, 0x48323634U, 0x5a313648U } )  // MJPEG, H264, Z16H
+               || _context.variable_payload
                || context.control->bInterfaceNumber == perception_streaming_mi;
             LOG_INFO("endpoint " << (int)_read_endpoint->get_address() << " read buffer size: " << std::dec <<_read_buff_length);
 
@@ -168,11 +169,25 @@ namespace librealsense
                     _running = true;
                 }
 
-                for(auto&& r : _requests)
+                for( size_t index = 0; index < _requests.size(); ++index )
                 {
+                    auto const & r = _requests[index];
                     auto sts = _context.messenger->submit_request(r);
+                    if( sts == platform::RS2_USB_STATUS_NO_MEM && index != 0 )
+                    {
+                        LOG_WARNING( "USB transfer memory exhausted; streaming endpoint "
+                                     << int( _read_endpoint->get_address() ) << " with " << index
+                                     << " outstanding request(s)" );
+                        _requests.resize( index );
+                        break;
+                    }
                     if(sts != platform::RS2_USB_STATUS_SUCCESS)
+                    {
+                        _running = false;
+                        for( size_t submitted = 0; submitted < index; ++submitted )
+                            _context.messenger->cancel_request( _requests[submitted] );
                         throw std::runtime_error("failed to submit UVC request while start streaming");
+                    }
                 }
 
                 _publish_frame_thread->start();

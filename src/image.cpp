@@ -26,6 +26,7 @@ namespace librealsense
         case RS2_FORMAT_DISPARITY16: return 16;
         case RS2_FORMAT_DISPARITY32: return 32;
         case RS2_FORMAT_XYZ32F: return 12 * 8;
+        case RS2_FORMAT_XYZRGB32F: return 16 * 8;
         case RS2_FORMAT_YUYV:  return 16;
         case RS2_FORMAT_M420:  return 12; // 16 pixels are represented with 24 bytes (16 of Y and 8 of Cr, Cb) - 24 / 16 * 8 = 12
         case RS2_FORMAT_NV12:  return 12; // Semi-planar YUV 4:2:0: Y plane (W*H) + interleaved UV plane (W*H/2) = 12 bpp

@@ -26,6 +26,7 @@ namespace librealsense
             rs_usb_device usb_device;
             rs_usb_messenger messenger;
             uint8_t request_count;
+            bool variable_payload;
         };
 
         class uvc_streamer

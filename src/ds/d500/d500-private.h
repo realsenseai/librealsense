@@ -63,6 +63,7 @@ namespace librealsense
             PCL_FORMAT                  = 0x04,  // Phase 2: 0 = XYZ, 1 = XYZRGB (SDK-internal)
             OCCUPANCY_GRID_SEGMENTATION = 0x05,  // OccupancyGrid_Segmentation: 0 = off, 1 = on
             LPCL_SEGMENTATION           = 0x06,  // LPCL_Segmentation (Labeled PCL): 0 = off, 1 = on
+            PCL_OCCLUSION_REMOVAL       = 0x07,
             DEPTH_MAPPING_PARAMS        = 0x0A   // OG/LPCL params as JSON (D5x5 family only)
         };
         const int DEPTH_MAPPING_PARAMS_LEN = 1024;  // fixed control length; caps the JSON

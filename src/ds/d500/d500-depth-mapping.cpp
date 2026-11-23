@@ -78,6 +78,15 @@ namespace librealsense
 
     struct pcl_tuple { uint32_t width, height, fps; uint16_t profile_id; };
     const pcl_tuple pcl_xyz_tuples[] = { { 640, 480, 30, 0x0001 }, { 1280, 720, 15, 0x0002 } };
+    const pcl_tuple pcl_xyzrgb_tuples[] = { { 640, 480, 15, 0x0003 }, { 1280, 720, 15, 0x0004 } };
+
+    const pcl_tuple * find_pcl_xyzrgb_tuple( uint32_t width, uint32_t height, uint32_t fps )
+    {
+        for( auto const & tuple : pcl_xyzrgb_tuples )
+            if( tuple.width == width && tuple.height == height && tuple.fps == fps )
+                return &tuple;
+        return nullptr;
+    }
 
     const pcl_tuple * find_pcl_xyz_tuple( uint32_t width, uint32_t height, uint32_t fps )
     {
@@ -105,10 +114,11 @@ namespace librealsense
         unsigned _restarts_logged = 0;
         bool _warned_no_metadata = false;
         bool _warned_unknown_layout = false;
+        rs2_format _format;
 
     public:
-        pcl_xyz_relabel_block()
-            : stream_filter_processing_block( "PCL XYZ passthrough" )
+        explicit pcl_xyz_relabel_block( rs2_format format = RS2_FORMAT_XYZ32F )
+            : stream_filter_processing_block( "PCL passthrough" ), _format( format )
         {
         }
 
@@ -121,16 +131,21 @@ namespace librealsense
             {
                 _source = source;
                 _target = source->clone();
-                _target->set_format( RS2_FORMAT_XYZ32F );
+                _target->set_format( _format );
                 _target->set_stream_type( RS2_STREAM_POINT_CLOUD );
                 _target->set_stream_index( source->get_stream_index() );  // clone() does not copy the index
 
                 _expected = pcl_expected();
+                const bool rgb = _format == RS2_FORMAT_XYZRGB32F;
+                _expected.point_format = rgb ? 1 : 0;
+                _expected.point_stride = rgb ? 16 : 12;
                 if( auto vsp = dynamic_cast< video_stream_profile_interface * >( source.get() ) )
                 {
                     _expected.width = vsp->get_width();
                     _expected.height = vsp->get_height();
-                    if( auto t = find_pcl_xyz_tuple( _expected.width, _expected.height, source->get_framerate() ) )
+                    auto tuple = rgb ? find_pcl_xyzrgb_tuple( _expected.width, _expected.height, source->get_framerate() )
+                                     : find_pcl_xyz_tuple( _expected.width, _expected.height, source->get_framerate() );
+                    if( auto t = tuple )
                         _expected.profile_id = t->profile_id;
                 }
             }
@@ -380,8 +395,13 @@ namespace librealsense
                                                         rs2_stream & type,
                                                         std::vector< int > & )
                 {
-                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) &&
+                        ( is_pcl_xyz_tuple( p.width, p.height, p.fps ) ||
+                          find_pcl_xyzrgb_tuple( p.width, p.height, p.fps ) ) )
                         type = RS2_STREAM_POINT_CLOUD;
+                    else if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) &&
+                             p.width == 640 && p.height == 360 && p.fps == 30 )
+                        type = RS2_STREAM_LABELED_POINT_CLOUD;
                 } );
         }
 
@@ -517,6 +537,30 @@ namespace librealsense
             return;
 
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
+
+        if( ! _is_mipi_device )
+        {
+            try
+            {
+                raw_mapping_sensor->invoke_powered( [&]( platform::uvc_device & dev )
+                {
+                    const auto select = dev.get_xu_range( ds::mapping_xu, ds::STREAM_SELECT, 1 );
+                    const auto format = dev.get_xu_range( ds::mapping_xu, ds::PCL_FORMAT, 1 );
+                    _mapping_selectors = !select.max.empty() && select.max[0] >= 3 && !format.max.empty();
+                    _mapping_xyzrgb = _mapping_selectors && format.max[0] >= 1;
+                } );
+            }
+            catch( const std::exception & error )
+            {
+                LOG_DEBUG( "Mapping selection controls unavailable: " << error.what() );
+            }
+        }
+
+        if( _mapping_xyzrgb && is_xu_published( raw_mapping_sensor, ds::mapping_xu,
+                ds::PCL_OCCLUSION_REMOVAL, sizeof( uint8_t ), RS2_OPTION_PCL_OCCLUSION_REMOVAL ) )
+            occupancy_ep->register_option( RS2_OPTION_PCL_OCCLUSION_REMOVAL,
+                std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor, ds::mapping_xu,
+                    ds::PCL_OCCLUSION_REMOVAL, "Remove color from occluded device XYZRGB points", false ) );
 
         // Not every transport exposes these controls (no GMSL driver CIDs yet)
         if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
@@ -941,6 +985,14 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                     return std::make_shared< pcl_xyz_relabel_block >();
                 } };
         mapping_ep->register_processing_block( pcl_pbf );
+        if( _mapping_xyzrgb )
+        {
+            processing_block_factory xyzrgb_pbf
+                = { { { RS2_FORMAT_Y8, RS2_STREAM_POINT_CLOUD } },
+                    { { RS2_FORMAT_XYZRGB32F, RS2_STREAM_POINT_CLOUD } },
+                    []() { return std::make_shared< pcl_xyz_relabel_block >( RS2_FORMAT_XYZRGB32F ); } };
+            mapping_ep->register_processing_block( xyzrgb_pbf );
+        }
     }
 
     stream_profiles d500_depth_mapping_sensor::init_stream_profiles()
@@ -972,7 +1024,10 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             else if (p->get_stream_type() == RS2_STREAM_POINT_CLOUD)
             {
                 const auto&& profile = to_profile(p.get());
-                if (_owner->_is_safety_layout || ! is_pcl_xyz_tuple(profile.width, profile.height, profile.fps))
+                const bool supported = p->get_format() == RS2_FORMAT_XYZRGB32F
+                    ? _owner->_mapping_xyzrgb && find_pcl_xyzrgb_tuple( profile.width, profile.height, profile.fps )
+                    : is_pcl_xyz_tuple( profile.width, profile.height, profile.fps );
+                if (_owner->_is_safety_layout || !supported)
                     continue;
                 relevant_results.push_back(std::move(p));
             }
@@ -1003,11 +1058,16 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 });
         }
 
+        // Keep existing callers' first-profile selection on the original formats.
+        std::stable_partition( relevant_results.begin(), relevant_results.end(),
+            []( const std::shared_ptr< stream_profile_interface > & profile )
+            { return profile->get_format() != RS2_FORMAT_XYZRGB32F; } );
         return relevant_results;
     }
 
     void d500_depth_mapping_sensor::open(const stream_profiles& requests)
     {
+        std::lock_guard< std::mutex > lock( _owner->_mapping_session_mutex );
         // D585S keeps its own Mapping stream rules
         if( ! _owner->_is_safety_layout && requests.size() > 1 )
             throw invalid_value_exception(rsutils::string::from()
@@ -1015,7 +1075,52 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << requests.size() << " profiles were requested");
 
         _owner->mapping_allowed_or_throw(requests);
-        synthetic_sensor::open(requests);
+        if( ! _owner->_mapping_selectors || requests.empty() )
+        {
+            synthetic_sensor::open( requests );
+            return;
+        }
+        auto raw = _owner->_raw_depth_mapping_ep;
+        raw->invoke_if_closed( []() {} );
+        const auto & profile = requests.front();
+        const uint8_t select = profile->get_stream_type() == RS2_STREAM_POINT_CLOUD ? 1 :
+            profile->get_stream_type() == RS2_STREAM_LABELED_POINT_CLOUD ? 2 : 3;
+        const uint8_t format = profile->get_format() == RS2_FORMAT_XYZRGB32F ? 1 : 0;
+        raw->invoke_powered( [&]( platform::uvc_device & dev )
+        {
+            uint8_t previous_select = 0, previous_format = 0;
+            if( ! dev.get_xu( ds::mapping_xu, ds::STREAM_SELECT, &previous_select, 1 ) ||
+                ! dev.get_xu( ds::mapping_xu, ds::PCL_FORMAT, &previous_format, 1 ) )
+                throw io_exception( "Cannot read USB Mapping selection before open" );
+            try
+            {
+                if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &select, 1 ) ||
+                    ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &format, 1 ) )
+                    throw io_exception( "Firmware rejected USB Mapping stream or point-cloud format" );
+                synthetic_sensor::open( requests );
+            }
+            catch( ... )
+            {
+                if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &previous_select, 1 ) ||
+                    ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &previous_format, 1 ) )
+                    LOG_ERROR( "Cannot restore USB Mapping selection after failed open" );
+                throw;
+            }
+        } );
+    }
+
+    void d500_depth_mapping_sensor::close()
+    {
+        std::lock_guard< std::mutex > lock( _owner->_mapping_session_mutex );
+        synthetic_sensor::close();
+        if( _owner->_mapping_selectors )
+            _owner->_raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
+            {
+                const uint8_t automatic = 0;
+                if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 ) ||
+                    ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) )
+                    throw io_exception( "Cannot restore automatic USB Mapping selection after close" );
+            } );
     }
 
     rs2_intrinsics d500_depth_mapping_sensor::get_intrinsics(const stream_profile& profile) const

@@ -90,7 +90,7 @@ namespace librealsense
                 req->set_active(false);
                 std::string strerr = strerror(errno);
                 LOG_WARNING("usb_request_queue returned error, endpoint: " << (int)request->get_endpoint()->get_address() << " error: " << strerr << ", number: " << (int)errno);
-                return libusb_status_to_rs(errno);
+                return libusb_status_to_rs(sts);
             }
             return RS2_USB_STATUS_SUCCESS;
         }
@@ -103,7 +103,7 @@ namespace librealsense
             {
                 std::string strerr = strerror(errno);
                 LOG_WARNING("usb_request_cancel returned error, endpoint: " << (int)request->get_endpoint()->get_address() << " error: " << strerr << ", number: " << (int)errno);
-                return libusb_status_to_rs(errno);
+                return libusb_status_to_rs(sts);
             }
             return RS2_USB_STATUS_SUCCESS;
         }
