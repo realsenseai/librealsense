@@ -7,6 +7,7 @@
 #include "platform/uvc-device.h"
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <set>
 #include <vector>
@@ -31,6 +32,7 @@ public:
 
     void open( const stream_profiles & requests ) override;
     void close() override;
+    void close_streams( const stream_profiles & profiles ) override;
     void start( rs2_frame_callback_sptr callback ) override;
     void stop() override;
     void register_xu( platform::extension_unit xu );
@@ -60,6 +62,10 @@ public:
     // 1,2,3... so counter-gap frame-drop detection no longer works and the value no longer matches
     // RS2_FRAME_METADATA_FRAME_COUNTER, which still reports the raw hardware counter.
     void enable_software_color_frame_numbers() { _sw_color_frame_numbers = true; }
+
+    // Lets open() add streams to an open or streaming sensor, and close_streams() remove some of them. Needs a
+    // device that opens and streams each pin on its own (multi_pins_uvc_device)
+    void enable_incremental_streams();
 
     std::vector< platform::stream_profile > get_configuration() const { return _internal_config; }
     std::shared_ptr< platform::uvc_device > get_uvc_device() { return _device; }
@@ -107,9 +113,12 @@ private:
     void acquire_power();
     void release_power();
     void reset_streaming();
+    void drain_zero_copy_frames( const std::vector< platform::stream_profile > & pins );
+    void update_per_stream_color_fn( const stream_profiles & streams );
     std::atomic<int64_t> _gyro_counter;
     std::atomic<int64_t> _accel_counter;
     bool _sw_color_frame_numbers = false;  // see enable_software_color_frame_numbers()
+    std::atomic< bool > _per_stream_color_fn{ false };  // see update_per_stream_color_fn()
 
 
     struct power
@@ -153,10 +162,10 @@ private:
     std::vector< platform::extension_unit > _xus;
     std::unique_ptr< power > _power;
     std::unique_ptr< frame_timestamp_reader > _timestamp_reader;
-    // Per-stream in-flight zero-copy frame counters (shared with each capture callback). close()
+    // Per-pin in-flight zero-copy frame counters (shared with each capture callback). close()
     // drains these before the backend frees its buffers, so a held zero-copy frame is never left
-    // pointing at unmapped memory. Only used on zero-copy builds; empty/no-op otherwise.
-    std::vector< std::shared_ptr< std::atomic< int > > > _zc_inflight;
+    // pointing at unmapped memory. Only used on zero-copy builds; no-op otherwise.
+    std::map< uint32_t, std::shared_ptr< std::atomic< int > > > _zc_inflight;
 };
 
 

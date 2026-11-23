@@ -35,6 +35,7 @@ EXPORTS
 
     rs2_get_stream_profiles
     rs2_get_active_streams
+    rs2_get_sensor_active_streams
     rs2_get_stream_profile
     rs2_get_stream_profiles_count
     rs2_delete_stream_profiles_list
@@ -42,6 +43,7 @@ EXPORTS
     rs2_open
     rs2_open_multiple
     rs2_close
+    rs2_close_multiple
 
     rs2_start
     rs2_start_queue
@@ -490,6 +492,9 @@ EXPORTS
     rs2_get_composite_options_list_size
     rs2_get_composite_option_from_list
     rs2_delete_composite_options_list
+    rs2_get_composite_option_value_from_list
+    rs2_set_composite_options_changed_callback
+    rs2_set_composite_options_changed_callback_cpp
     rs2_supports_composite_option
     rs2_is_composite_option_read_only
     rs2_get_composite_option_description

@@ -79,9 +79,16 @@ def run_test(device, ctx, resolution, fps):
         return
 
     depth_sensor = device.first_depth_sensor()
-    color_sensor = device.first_color_sensor()
+    try:
+        color_sensor = device.first_color_sensor()
+    except RuntimeError as e:
+        # D405 has no separate color sensor: color streams from the depth sensor
+        if 'Could not find requested sensor type' not in str( e ):
+            raise
+        color_sensor = depth_sensor
+    sensors = [depth_sensor] if color_sensor.is_depth_sensor() else [depth_sensor, color_sensor]
 
-    for sensor in [depth_sensor, color_sensor]:
+    for sensor in sensors:
         if sensor.supports(rs.option.global_time_enabled):
             if not sensor.get_option(rs.option.global_time_enabled):
                 sensor.set_option(rs.option.global_time_enabled, 1)

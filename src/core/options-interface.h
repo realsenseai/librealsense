@@ -38,6 +38,12 @@ public:
 
     virtual ~options_interface() = default;
     virtual rsutils::subscription register_options_changed_callback(options_watcher::callback&& cb) = 0;
+
+    // Composites are reported to the embedded filters that own them, not to the sensor
+    virtual rsutils::subscription register_composite_options_changed_callback( options_watcher::composite_callback && )
+    {
+        return rsutils::subscription();
+    }
 };
 
 MAP_EXTENSION( RS2_EXTENSION_OPTIONS, librealsense::options_interface );

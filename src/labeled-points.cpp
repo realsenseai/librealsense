@@ -91,9 +91,11 @@ lpcl_layout resolve_layout( const uint8_t * bytes, size_t size )
     return out;
 }
 
-lpcl_layout require_layout( const uint8_t * bytes, size_t size )
+// Through the frame accessors: `data` is empty when the pixels live in an external (zero-copy) buffer
+lpcl_layout require_layout( const frame & f )
 {
-    auto out = resolve_layout( bytes, size );
+    const size_t size = f.get_frame_data_size();
+    auto out = resolve_layout( f.get_frame_data(), size );
     if( ! out.valid )
         throw wrong_api_call_sequence_exception( rsutils::string::from()
                                                 << "unsupported buffer size of " << size
@@ -105,30 +107,28 @@ lpcl_layout require_layout( const uint8_t * bytes, size_t size )
 
 size_t labeled_points::get_vertex_count() const
 {
-    return require_layout( data.data(), data.size() ).vertex_count;
+    return require_layout( *this ).vertex_count;
 }
 
 float3* labeled_points::get_vertices()
 {
-    get_frame_data();  // call GetData to ensure data is in main memory
-    return (float3 *)( data.data() + require_layout( data.data(), data.size() ).payload_offset );
+    return (float3 *)( get_frame_data() + require_layout( *this ).payload_offset );
 }
 
 const uint8_t* labeled_points::get_labels() const
 {
-    get_frame_data();  // call GetData to ensure data is in main memory
-    const auto l = require_layout( data.data(), data.size() );
-    return data.data() + l.payload_offset + 3 * sizeof(float) * l.vertex_count;
+    const auto l = require_layout( *this );
+    return get_frame_data() + l.payload_offset + 3 * sizeof(float) * l.vertex_count;
 }
 
 unsigned int labeled_points::get_width() const
 {
-    return require_layout( data.data(), data.size() ).width;
+    return require_layout( *this ).width;
 }
 
 unsigned int labeled_points::get_height() const
 {
-    return require_layout( data.data(), data.size() ).height;
+    return require_layout( *this ).height;
 }
 
 size_t labeled_points::get_bpp() const

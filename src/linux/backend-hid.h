@@ -135,7 +135,10 @@ namespace librealsense
         // declare device sensor with all of its inputs.
         class iio_hid_sensor {
         public:
-            iio_hid_sensor(const std::string& device_path, uint32_t frequency, float sensitivity);
+            iio_hid_sensor( const std::string & device_path, uint32_t frequency, bool apply_sensitivity, float sensitivity );
+
+            // Name of the sysfs attribute holding the sensitivity ("hysteresis"), empty if not found
+            static std::string find_sensitivity_name( const std::string & iio_device_path );
 
             ~iio_hid_sensor();
 
@@ -162,7 +165,7 @@ namespace librealsense
             void create_channel_array();
 
             // initialize the device sensor. reading its name and all of its inputs.
-            void init(uint32_t frequency, float sensitivity);
+            void init( uint32_t frequency, bool apply_sensitivity, float sensitivity );
 
             // calculate the storage size of a scan
             uint32_t get_channel_size() const;
@@ -172,7 +175,6 @@ namespace librealsense
 
             std::string get_sampling_frequency_name() const;
 
-            std::string get_sensitivity_name() const;
 
             // read the IIO device inputs.
             void read_device_inputs();
@@ -220,6 +222,8 @@ namespace librealsense
 
             void set_gyro_scale_factor( double scale_factor ) override{};
             void set_accel_scale_factor( double scale_factor ) override{};
+
+            bool read_sensitivity( const std::string & sensor_name, double & value ) override;
 
         private:
             static bool get_hid_device_info(const char* dev_path, hid_device_info& device_info);

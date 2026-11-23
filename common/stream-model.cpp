@@ -505,13 +505,16 @@ namespace rs2
         const bool show_distance_grid_button
             = RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1
               && dev && device_has_depth_mapping(dev->dev); // hide when zooming in, or for non-depth-mapping devices
+        const bool show_safety_zones_button
+            = RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1
+              && dev && dev->safety_camera;
 
         if (!viewer.allow_stream_close) --num_of_buttons;
         if (viewer.streams.size() > 1) ++num_of_buttons;
         if (profile.as<rs2::video_stream_profile>()) ++num_of_buttons; // Grid/crosshair button - video streams only
         if (RS2_STREAM_DEPTH == profile.stream_type()) ++num_of_buttons; // Color map ruler button
         if (RS2_FORMAT_MOTION_XYZ32F == profile.format()) ++num_of_buttons; // Motion graph button
-        if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) ++num_of_buttons; // Safety zones button
+        if (show_safety_zones_button) ++num_of_buttons;
         if (show_distance_grid_button)
         {
             ++num_of_buttons; // Distance grid button
@@ -803,7 +806,7 @@ namespace rs2
             ImGui::SameLine();
         }
 
-        if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) // hide polygons button when zooming in
+        if (show_safety_zones_button)
         {
             label = rsutils::string::from() << textual_icons::draw_polygon << "##Safety zones " << ui_key;
             if (show_safety_zones_2d)
@@ -1304,7 +1307,7 @@ namespace rs2
                 auto val = (rs2_frame_metadata_value)i;
                 std::string name = rs2_frame_metadata_to_string(val);
                 if( use_depth_mapping_metadata_adaptations )
-                    name = adapt_depth_mapping_metadata_name( name );
+                    name = adapt_depth_mapping_metadata_name( name, dev->safety_camera );  // adaptations imply dev
                 std::string desc;
                 if( descriptions.find( val ) != descriptions.end() )
                     desc = descriptions[val];
@@ -1594,10 +1597,12 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_SAFETY_SMCU_SW_MONITOR_STATUS] = "SMCU SW Monitor Status:" + get_meaning(RS2_FRAME_METADATA_SAFETY_SMCU_SW_MONITOR_STATUS, meanings, "None");
     }
 
-    std::string stream_model::adapt_depth_mapping_metadata_name( const std::string & name ) const
+    std::string stream_model::adapt_depth_mapping_metadata_name( const std::string & name, bool safety_camera ) const
     {
         if( name == "Manual White Balance" )
             return "White Balance"; // D585S also outputs auto white balance values in this fields so the "manual" in the name is wrong
+        if( name == "Safety Depth Frame Counter" && ! safety_camera )
+            return "Depth Frame Counter";
 
         return name;
     }
@@ -2156,8 +2161,13 @@ namespace rs2
         {
             stream_desc = rs2_stream_to_string(colorized_frame.get_profile().stream_type());
             auto filename_png = filename_base + "_" + stream_desc + ".png";
-            save_to_png(filename_png.data(), colorized_frame.get_width(), colorized_frame.get_height(), colorized_frame.get_bytes_per_pixel(),
-                colorized_frame.get_data(), colorized_frame.get_width() * colorized_frame.get_bytes_per_pixel());
+            // RAW16 is not colorized; save the 8-bit preview that is displayed instead of 2 bytes read as gray+alpha
+            if (colorized_frame.get_profile().format() == RS2_FORMAT_RAW16)
+                save_to_png(filename_png.data(), colorized_frame.get_width(), colorized_frame.get_height(), 1,
+                    texture->get_raw16_preview().data(), colorized_frame.get_width());
+            else
+                save_to_png(filename_png.data(), colorized_frame.get_width(), colorized_frame.get_height(), colorized_frame.get_bytes_per_pixel(),
+                    colorized_frame.get_data(), colorized_frame.get_width() * colorized_frame.get_bytes_per_pixel());
 
             ss << "PNG snapshot was saved to " << filename_png << std::endl;
         }
@@ -2165,8 +2175,8 @@ namespace rs2
         auto last_frame = texture->get_last_frame( false );
         auto original_frame = last_frame.as< video_frame >();
 
-        // For Depth-originated streams also provide a copy of the raw data accompanied by sensor-specific metadata
-        if (original_frame && val_in_range(original_frame.get_profile().stream_type(), { RS2_STREAM_DEPTH , RS2_STREAM_INFRARED }))
+        // Also provide a copy of the raw data accompanied by sensor-specific metadata
+        if (original_frame)
         {
             stream_desc = rs2_stream_to_string(original_frame.get_profile().stream_type());
 

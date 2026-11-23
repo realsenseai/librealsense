@@ -29,7 +29,7 @@ namespace librealsense
             // Streaming MI is control MI + 1 (control MI 9, confirmed with the HKR firmware team).
             constexpr uint8_t perception_streaming_mi = 10;
             _allow_variable_length_payload
-                = val_in_range( _context.profile.format, { 0x4d4a5047U, 0x5a313648U } )  // MJPEG, Z16H
+                = val_in_range( _context.profile.format, { 0x4d4a5047U, 0x48323634U, 0x5a313648U } )  // MJPEG, H264, Z16H
                || context.control->bInterfaceNumber == perception_streaming_mi;
             LOG_INFO("endpoint " << (int)_read_endpoint->get_address() << " read buffer size: " << std::dec <<_read_buff_length);
 

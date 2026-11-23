@@ -3,6 +3,7 @@
 // Copyright(c) 2023-4 RealSense, Inc. All Rights Reserved.
 
 #include "hid-sensor.h"
+#include <cmath>
 #include "device.h"
 #include "stream.h"
 #include "image.h"
@@ -111,19 +112,28 @@ void hid_sensor::open( const stream_profiles & requests )
     else if( _is_opened )
         throw wrong_api_call_sequence_exception( "Hid device is already opened!" );
 
+    // Read the FW values while the device is closed, so a query after open() still follows the FW
+    for( auto stream : { RS2_STREAM_GYRO, RS2_STREAM_ACCEL } )
+        if( _default_imu_sensitivity.count( stream ) && ! is_imu_sensitivity_set( stream ) )
+            cached_fw_imu_sensitivity( stream );
+
     std::vector< platform::hid_profile > configured_hid_profiles;
+    decltype(_configured_profiles) configured_profiles;
+    std::vector<bool> configured_stream(RS2_STREAM_COUNT, false);
     for( auto && request : requests )
     {
         auto && sensor_name = rs2_stream_to_sensor_name( request->get_stream_type() );
-        _configured_profiles.insert( std::make_pair( sensor_name, request ) );
-        _is_configured_stream[request->get_stream_type()] = true;
+        configured_profiles.insert( std::make_pair( sensor_name, request ) );
+        configured_stream[request->get_stream_type()] = true;
         configured_hid_profiles.push_back( platform::hid_profile{
             std::move( sensor_name ),
             fps_to_sampling_frequency(request->get_stream_type(), request->get_framerate()),
             get_imu_sensitivity_values( request->get_stream_type() ),
-            _imu_sensitivity_per_rs2_stream.count( RS2_STREAM_ACCEL ) > 0 } );
+            needs_imu_sensitivity_write( request->get_stream_type() ) } );
     }
     _hid_device->open( configured_hid_profiles );
+    _configured_profiles = std::move(configured_profiles);
+    _is_configured_stream = std::move(configured_stream);
     if( Is< librealsense::global_time_interface >( _owner ) )
     {
         As< librealsense::global_time_interface >( _owner )->enable_time_diff_keeper( true );
@@ -184,17 +194,30 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
     rs2_time_t last_timestamp = 0;
     raise_on_before_streaming_changes( true );  // Required to be just before actual start allow recording to work
 
-    _hid_device->start_capture(
-        [this, last_frame_number, last_timestamp]( const platform::sensor_data & sensor_data ) mutable
+    auto on_sample = [this, last_frame_number, last_timestamp]( const platform::sensor_data & sensor_data ) mutable
         {
             const auto system_time = time_service::get_time();  // time frame was received from the backend
             auto timestamp_reader = _hid_iio_timestamp_reader.get();
             static const std::string custom_sensor_name = "custom";
             auto && sensor_name = sensor_data.sensor.name;
+            // A backend may deliver a report during event registration. Do not
+            // take the configure lock held by start(), including its rollback.
+            if( ! this->is_streaming() )
+            {
+                LOG_INFO( "HID Frame received when Streaming is not active," << sensor_name << ",Arrived,"
+                                                                           << std::fixed << system_time );
+                return;
+            }
             std::shared_ptr< stream_profile_interface > request;
             {
                 std::lock_guard< std::mutex > lock( _configure_lock );
-                request = _configured_profiles[sensor_name];
+                // stop() and close() can complete while a report waits for this lock.
+                if( ! this->is_streaming() )
+                    return;
+                auto profile = _configured_profiles.find( sensor_name );
+                if( profile == _configured_profiles.end() )
+                    return;
+                request = profile->second;
             }
             bool is_custom_sensor = false;
             static const uint32_t custom_source_id_offset = 16;
@@ -214,14 +237,6 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
 
                 is_custom_sensor = true;
                 timestamp_reader = _custom_hid_timestamp_reader.get();
-            }
-
-            if( ! this->is_streaming() )
-            {
-                auto stream_type = request->get_stream_type();
-                LOG_INFO( "HID Frame received when Streaming is not active," << get_string( stream_type ) << ",Arrived,"
-                                                                             << std::fixed << system_time );
-                return;
             }
 
             const auto && fr = generate_frame_from_data( sensor_data.fo,
@@ -275,7 +290,18 @@ void hid_sensor::start( rs2_frame_callback_sptr callback )
 
             // Log callback ended
             log_callback_end( fps, callback_start_time, time_service::get_time(), stream_type, frame_number );
-        } );
+        };
+    try
+    {
+        _hid_device->start_capture( std::move(on_sample) );
+    }
+    catch (...)
+    {
+        _source.flush();
+        _source.reset();
+        raise_on_before_streaming_changes( false );
+        throw;
+    }
     _is_streaming = true;
 }
 
@@ -356,7 +382,54 @@ uint32_t hid_sensor::fps_to_sampling_frequency( rs2_stream stream, uint32_t fps 
 }
 void hid_sensor::set_imu_sensitivity( rs2_stream stream, float value ) 
 {
+    std::lock_guard< std::mutex > lock( _configure_lock );
     _imu_sensitivity_per_rs2_stream[stream] = value;
+}
+
+void hid_sensor::set_default_imu_sensitivity( rs2_stream stream, float value )
+{
+    std::lock_guard< std::mutex > lock( _configure_lock );
+    _default_imu_sensitivity[stream] = value;
+}
+
+const std::pair< bool, float > * hid_sensor::cached_fw_imu_sensitivity( rs2_stream stream )
+{
+    auto fw_value = _fw_imu_sensitivity.find( stream );
+    if( fw_value == _fw_imu_sensitivity.end() )
+    {
+        if( _is_opened )
+            return nullptr;
+        float value = 0.f;
+        const bool ok = read_fw_imu_sensitivity( stream, value );
+        fw_value = _fw_imu_sensitivity.emplace( stream, std::make_pair( ok, value ) ).first;
+    }
+    return &fw_value->second;
+}
+
+bool hid_sensor::needs_imu_sensitivity_write( rs2_stream stream )
+{
+    if( is_imu_sensitivity_set( stream ) )
+        return true;
+    // Backends that cannot read the FW value get the default on every open, so what query() reports is what FW holds
+    if( ! _default_imu_sensitivity.count( stream ) )
+        return false;
+    auto fw_value = cached_fw_imu_sensitivity( stream );
+    return fw_value && ! fw_value->first;
+}
+
+float hid_sensor::query_imu_sensitivity( rs2_stream stream )
+{
+    std::lock_guard< std::mutex > lock( _configure_lock );  // serializes with open(), which also touches the device
+    auto user_value = _imu_sensitivity_per_rs2_stream.find( stream );
+    if( user_value != _imu_sensitivity_per_rs2_stream.end() )
+        return user_value->second;
+
+    auto fw_value = cached_fw_imu_sensitivity( stream );
+    if( fw_value && fw_value->first )
+        return fw_value->second;
+
+    auto default_value = _default_imu_sensitivity.find( stream );
+    return default_value != _default_imu_sensitivity.end() ? default_value->second : 0.f;
 }
 
 void hid_sensor::set_gyro_scale_factor(double scale_factor) 
@@ -371,15 +444,13 @@ void hid_sensor::set_accel_scale_factor(double scale_factor)
 
 double hid_sensor::get_imu_sensitivity_values( rs2_stream stream )
 {
-    if( _imu_sensitivity_per_rs2_stream.find( stream ) != _imu_sensitivity_per_rs2_stream.end() )
+    auto user_value = _imu_sensitivity_per_rs2_stream.find( stream );
+    auto default_value = _default_imu_sensitivity.find( stream );
+    if( user_value != _imu_sensitivity_per_rs2_stream.end() || default_value != _default_imu_sensitivity.end() )
     {
-        const auto value = _imu_sensitivity_per_rs2_stream[stream];
-        if( stream == RS2_STREAM_GYRO )
-        {
-            if( _gyro_sensitivity_uses_range_index )
-                return value;
+        const auto value = user_value != _imu_sensitivity_per_rs2_stream.end() ? user_value->second : default_value->second;
+        if( stream == RS2_STREAM_GYRO && ! _gyro_sensitivity_uses_range_index )
             return gyro_sensitivity_convert.at( value );
-        }
         return value;
     }
 
@@ -390,6 +461,43 @@ double hid_sensor::get_imu_sensitivity_values( rs2_stream stream )
 
     // FW receives 0.001 and adjusts the accelerometer sensitivity to its default setting of 4g.
     return 0.001;
+}
+
+bool hid_sensor::read_fw_imu_sensitivity( rs2_stream stream, float & option_value )
+{
+    try
+    {
+        double raw = 0.;
+        if( ! _hid_device->read_sensitivity( rs2_stream_to_sensor_name( stream ), raw ) )
+            return false;
+
+        if( stream == RS2_STREAM_GYRO && ! _gyro_sensitivity_uses_range_index )
+        {
+            // D400 token (0, 0.1 .. 0.4) -> option index, nearest match
+            if( _hid_device->is_token_sensitivity_read_lossy() )
+                return false;
+            for( auto && entry : gyro_sensitivity_convert )
+                if( std::fabs( entry.second - raw ) < 0.05 )
+                {
+                    option_value = entry.first;
+                    return true;
+                }
+            return false;
+        }
+        // Range index (D500 gyro and accel). Anything that is not a valid index (e.g. a legacy fractional value
+        // written by an older SDK) is reported as unavailable.
+        const auto index = std::round( raw );
+        const double max_index = stream == RS2_STREAM_ACCEL ? RS2_ACCEL_SENSITIVITY_COUNT - 1 : RS2_GYRO_SENSITIVITY_COUNT - 1;
+        if( std::fabs( raw - index ) > 1e-4 || index < 0. || index > max_index )
+            return false;
+        option_value = static_cast< float >( index );
+        return true;
+    }
+    catch( const std::exception & e )
+    {
+        LOG_DEBUG( "Failed to read IMU sensitivity from FW: " << e.what() );
+        return false;
+    }
 }
 
 iio_hid_timestamp_reader::iio_hid_timestamp_reader()

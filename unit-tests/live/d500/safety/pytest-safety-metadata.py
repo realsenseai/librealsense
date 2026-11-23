@@ -38,10 +38,12 @@ def check_safety_metadata(frame):
         check_md_value(frame, md_value)
 
 
-def test_safety_stream_metadata_received(test_context):
+def test_safety_stream_metadata_received(test_device):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.safety)
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     iterations = 0
     while iterations < 20:
@@ -51,11 +53,13 @@ def test_safety_stream_metadata_received(test_context):
     pipe.stop()
 
 
-def test_safety_counter_and_timestamp_increase(test_context):
+def test_safety_counter_and_timestamp_increase(test_device):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     fps = 30
     cfg.enable_stream(rs.stream.safety, rs.format.y8, fps)
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     iterations = 0
     reset_data()

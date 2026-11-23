@@ -179,6 +179,24 @@ namespace rs2
         }
 
         /**
+        * close only the given streams, while the sensor's other streams keep streaming
+        * supported by sensors whose open() also adds streams to an open or streaming sensor
+        * \param[in] profiles   open stream profiles to close
+        */
+        void close(const std::vector<stream_profile>& profiles) const
+        {
+            rs2_error* e = nullptr;
+
+            std::vector<const rs2_stream_profile*> profs;
+            profs.reserve(profiles.size());
+            for (auto& p : profiles)
+                profs.push_back(p.get());
+
+            rs2_close_multiple(_sensor.get(), profs.data(), static_cast<int>(profiles.size()), &e);
+            error::handle(e);
+        }
+
+        /**
         * Start passing frames into user provided callback
         * \param[in] callback   Stream callback, can be any callable object accepting rs2::frame
         */
@@ -246,13 +264,32 @@ namespace rs2
         */
         std::vector<stream_profile> get_active_streams() const
         {
+            rs2_error* e = nullptr;
+            auto list = rs2_get_active_streams(_sensor.get(), &e);
+            error::handle(e);
+            return to_profiles(list);
+        }
+
+        /**
+        * Retrieves the profiles running on the camera for this sensor; on sensors whose camera reports it, this includes
+        * streams activated on behalf of another stream
+        * \return list of stream profiles running on the camera for this sensor
+        */
+        std::vector<stream_profile> get_sensor_active_streams() const
+        {
+            rs2_error* e = nullptr;
+            auto list = rs2_get_sensor_active_streams(_sensor.get(), &e);
+            error::handle(e);
+            return to_profiles(list);
+        }
+
+    private:
+        static std::vector<stream_profile> to_profiles(rs2_stream_profile_list* raw_list)
+        {
             std::vector<stream_profile> results;
 
             rs2_error* e = nullptr;
-            std::shared_ptr<rs2_stream_profile_list> list(
-                rs2_get_active_streams(_sensor.get(), &e),
-                rs2_delete_stream_profiles_list);
-            error::handle(e);
+            std::shared_ptr<rs2_stream_profile_list> list(raw_list, rs2_delete_stream_profiles_list);
 
             auto size = rs2_get_stream_profiles_count(list.get(), &e);
             error::handle(e);
@@ -267,6 +304,7 @@ namespace rs2
             return results;
         }
 
+    public:
         /**
         * get the recommended list of filters by the sensor
         * \return   list of filters that recommended by sensor

@@ -4,6 +4,7 @@
 import pytest
 import platform
 import pyrealsense2 as rs
+from imu_sensitivity_helpers import restore_sensitivity
 import logging
 log = logging.getLogger(__name__)
 
@@ -12,14 +13,23 @@ pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_type_exclude("DDS"),  # USB-focused: DDS advertises the option through a separate transport
     pytest.mark.skipif(platform.machine() == "aarch64", reason="D455 not available on CI Jetson"),
+    pytest.mark.requires(option=rs.option.gyro_sensitivity),
 ]
+
+
+
+@pytest.fixture(autouse=True)
+def restore_fw_sensitivity(test_device):
+    dev, ctx = test_device
+    ms = dev.first_motion_sensor()
+    original = {rs.option.gyro_sensitivity: ms.get_option(rs.option.gyro_sensitivity)}
+    yield
+    restore_sensitivity(dev, ctx, original)
 
 
 def test_gyro_sensitivity_all_levels(test_device):
     dev, ctx = test_device
     motion_sensor = dev.first_motion_sensor()
-    if not motion_sensor.supports(rs.option.gyro_sensitivity):
-        pytest.skip("Gyro Sensitivity option not supported on this device/FW")
 
     for value in range(5):  # RS2_GYRO_SENSITIVITY_* enum: 0..4
         expected = float(value)

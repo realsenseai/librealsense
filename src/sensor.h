@@ -213,6 +213,12 @@ namespace librealsense
 
         std::shared_ptr< std::map< uint32_t, rs2_format > > & get_fourcc_to_rs2_format_map();
         std::shared_ptr< std::map< uint32_t, rs2_stream > > & get_fourcc_to_rs2_stream_map();
+
+        // Whether open() adds streams to an open or streaming sensor, and close_streams() removes some of them
+        bool supports_incremental_streams() const { return _incremental_streams; }
+
+    protected:
+        bool _incremental_streams = false;
     };
 
     // A sensor pointer to another "raw sensor", usually UVC/HID
@@ -241,6 +247,7 @@ namespace librealsense
 
         void open(const stream_profiles& requests) override;
         void close() override;
+        void close_streams( const stream_profiles & profiles ) override;
         void start( rs2_frame_callback_sptr callback ) override;
         void stop() override;
 
@@ -265,6 +272,15 @@ namespace librealsense
         rsutils::subscription register_options_changed_callback( options_watcher::callback && cb ) override;
         virtual void register_option_to_update( rs2_option id, std::shared_ptr< option > option );
         virtual void unregister_option_from_update( rs2_option id );
+        void register_composite_option_to_update( rs2_composite_option_id id, std::shared_ptr< composite_option_interface > option )
+        {
+            _options_watcher.register_composite_option( id, std::move( option ) );
+        }
+        // Holds the sensor alive while it is in use; expires with the sensor
+        std::weak_ptr< options_watcher > get_options_watcher()
+        {
+            return std::shared_ptr< options_watcher >( shared_from_this(), &_options_watcher );
+        }
         inline void pause_options_watcher() { _options_watcher.pause(); }
         inline void unpause_options_watcher() { _options_watcher.unpause(); }
 
@@ -276,8 +292,10 @@ namespace librealsense
     private:
         void register_processing_block_options(const processing_block& pb);
         void unregister_processing_block_options(const processing_block& pb);
+        void add_streams( const stream_profiles & requests );
+        void update_active_streams( const stream_profiles & streams );
 
-        std::mutex _synthetic_configure_lock;
+        std::recursive_mutex _synthetic_configure_lock;  // recursive: close_streams() stops and closes under it
 
         rs2_frame_callback_sptr _post_process_callback;
         std::shared_ptr<raw_sensor_base> _raw_sensor;

@@ -140,16 +140,15 @@ def check_against_expected(prefix, result, expected):
 PRESET_SETTLE_SEC = 2.0
 
 
-def stream_and_verify(safety_sensor, ctx, active_index, prefix, expected):
+def stream_and_verify(dev, safety_sensor, ctx, active_index, prefix, expected):
     """Activate a preset, let it settle, stream safety+depth, read the signal and check it."""
     safety_sensor.set_option(rs.option.safety_preset_active_index, active_index)
 
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
     # Co-enable depth so the vision-safety algo receives depth frames.
     cfg.enable_stream(rs.stream.depth)
-    # Bind the pipeline to the harness context so it attaches to the device the test selected,
-    # not the default global context (which could pick a different device on multi-device racks).
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     try:
@@ -233,5 +232,5 @@ def test_active_index_changes_safety_verdict(safety_presets):
     dev, sensor, ctx = safety_presets
 
     # Verify active preset index changes the safety verdict.
-    stream_and_verify(sensor, ctx, 0, "Preset 0", expected_signal_0)
-    stream_and_verify(sensor, ctx, 1, "Preset 1", expected_signal_1)
+    stream_and_verify(dev, sensor, ctx, 0, "Preset 0", expected_signal_0)
+    stream_and_verify(dev, sensor, ctx, 1, "Preset 1", expected_signal_1)

@@ -46,6 +46,8 @@ MAX_ENUMERATION_TIME = 20  # [sec]
 # latency in the device-changed callback. Observed on D555/PoE: ~8s after PoE cut.
 PORTS_DISABLED_TIMEOUT = 10  # [sec]
 
+POLL_INTERVAL = 0.1  # [sec] re-check interval of _wait_for / _wait_until_removed
+
 # We need both pyrealsense2 and hub. We can work without hub, but
 # without pyrealsense2 no devices at all will be returned.
 from rspy import device_hub
@@ -754,8 +756,8 @@ def _wait_until_removed( serial_numbers, timeout = PORTS_DISABLED_TIMEOUT ):
         if timeout <= 0:
             log.e( "timed out waiting for devices to be removed" )
             return False
-        timeout -= 1
-        time.sleep( 1 )
+        timeout -= POLL_INTERVAL
+        time.sleep( POLL_INTERVAL )
 
 
 def _wait_for( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
@@ -788,8 +790,8 @@ def _wait_for( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
             if did_some_waiting:
                 log.d( 'timed out waiting for a device connection' )
             return False
-        timeout -= 1
-        time.sleep( 1 )
+        timeout -= POLL_INTERVAL
+        time.sleep( POLL_INTERVAL )
         did_some_waiting = True
 
 def hw_reset( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
@@ -804,10 +806,6 @@ def hw_reset( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
     :param timeout: Maximum # of seconds to wait for the devices to come back online
     :return: True if all devices have come back online before timeout
     """
-    # we can wait for usb and dds devices to be removed, but not for mipi devices
-    removable_devs_sns = {sn for sn in serial_numbers if
-                          _device_by_sn[sn].port is not None or _device_by_sn[sn].is_dds}
-
     _wait_for(serial_numbers, timeout=timeout) # make sure devices are added before doing hw reset
     for sn in serial_numbers:
         dev = get( sn ).handle
@@ -815,18 +813,12 @@ def hw_reset( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
             dev.hardware_reset()
         except Exception as e:
             # swallow so one failing SN doesn't skip reset on the others and, more importantly,
-            # doesn't skip the post-reset settle that lets the driver re-enumerate
+            # doesn't skip the post-reset wait that lets the driver re-enumerate
             log.w( f'hardware_reset() failed for {sn}: {e}' )
     #
-
-    if removable_devs_sns:
-        _wait_until_removed( removable_devs_sns )
-        # if relevant, we need to handle case where we have both removable and non-removable devices
-    else:
-        # normally we will get here with a mipi device,
-        # we want to allow some time for the device to reinitialize as it was not disconnected
-        time.sleep(8)
-    #
+    # USB/DDS devices really drop off; for MIPI the SDK simulates the removal and, after its
+    # restart delay, the re-add -- so waiting on both events covers every connection type
+    _wait_until_removed( serial_numbers )
     return _wait_for( serial_numbers, timeout = timeout )
 
 

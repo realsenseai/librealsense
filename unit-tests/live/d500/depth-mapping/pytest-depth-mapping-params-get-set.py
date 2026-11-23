@@ -3,20 +3,16 @@
 
 import pytest
 import json
-import pyrsutils as rsutils
 from rspy.json_compare import check_equal_jsons
-from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D585"),
     pytest.mark.device_exclude("D585S"),  # D585S does not serve the depth mapping params
+    pytest.mark.device_type_exclude("GMSL"),  # Occupancy is a muxed slot over GMSL, with no controls of its own: the params XU is not reachable yet
+    pytest.mark.requires(fw="7.59.46744"),  # first FW that serves the params (with a synchronous set); older FW rejects the control
 ]
-
-
-# First FW that serves the depth mapping params (with a synchronous set); older FW rejects the control
-MIN_FW = rsutils.version("7.59.46744")
 
 
 depth_mapping_params = {
@@ -49,7 +45,6 @@ def sent_subset(params, sent):
 def depth_mapping_sensor(test_device):
     """Yield depth_mapping_sensor with the original params saved/restored around the test."""
     dev, _ = test_device
-    require_min_fw_version(dev, MIN_FW, "depth mapping params")
     depth_mapping_sensor = dev.first_depth_mapping_sensor()
     original_params = json.loads(depth_mapping_sensor.get_depth_mapping_params())
     # FW omits camera_position until the first write, and a camera can't be made unconfigured again
@@ -63,7 +58,6 @@ def depth_mapping_sensor(test_device):
 
 def test_get_depth_mapping_params(test_device):
     dev, _ = test_device
-    require_min_fw_version(dev, MIN_FW, "depth mapping params")
     params = json.loads(dev.first_depth_mapping_sensor().get_depth_mapping_params())
     log.debug("depth mapping params successfully downloaded")
     assert isinstance(params, dict)

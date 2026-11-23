@@ -13,11 +13,25 @@ include(CMake/lrs_macros.cmake)
 include(CMake/version_config.cmake)
 
 if(ENABLE_CCACHE)
+  if(CCACHE_FOUND AND NOT EXISTS "${CCACHE_FOUND}")
+      unset(CCACHE_FOUND CACHE)  # search again when the cached ccache was removed or moved
+  endif()
   find_program(CCACHE_FOUND ccache)
   if(CCACHE_FOUND)
-      set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-      set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-  endif(CCACHE_FOUND)
+      if(CMAKE_GENERATOR MATCHES "Visual Studio")
+          # VS generators ignore RULE_LAUNCH_*: MSBuild runs a ccache copy named cl.exe, one source per call
+          configure_file(${CCACHE_FOUND} ${CMAKE_BINARY_DIR}/cl.exe COPYONLY)
+          # A package-manager shim can't act as cl.exe: use the copy only if it runs the compiler it is given
+          execute_process(COMMAND ${CMAKE_COMMAND} -E env CCACHE_DISABLE=1 CCACHE_COMPILER=${CMAKE_COMMAND}
+                                  ${CMAKE_BINARY_DIR}/cl.exe --version OUTPUT_VARIABLE cl_probe ERROR_QUIET)
+          if(cl_probe MATCHES "cmake version")
+              list(APPEND CMAKE_VS_GLOBALS "CLToolExe=cl.exe" "CLToolPath=${CMAKE_BINARY_DIR}" "UseMultiToolTask=true")
+          endif()
+      else()
+          set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+          set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+      endif()
+  endif()
 endif()
 
 macro(global_set_flags)

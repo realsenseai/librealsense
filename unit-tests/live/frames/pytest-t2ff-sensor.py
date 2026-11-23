@@ -11,8 +11,10 @@ can add ~27ms to the startup time.
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 from rspy.stopwatch import Stopwatch
 import logging
+from rspy.pytest.device_helpers import require_min_fw_version, is_d585_on_gmsl
 log = logging.getLogger(__name__)
 import time
 import platform
@@ -90,7 +92,7 @@ def test_device_creation_time(module_device_setup):
 def test_first_depth_frame_delay(sensor_device):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    max_delay = 1.5 if is_d585_on_gmsl(dev) else 1  # slow first start after reset on D585 GMSL
     os_name = platform.system()
 
     log.info(f"Testing first depth frame delay on {product_name} device - {os_name} OS")
@@ -120,6 +122,8 @@ def test_first_depth_frame_delay(sensor_device):
 @pytest.mark.device_exclude("D405")
 def test_first_color_frame_delay(sensor_device):
     dev, ctx = sensor_device
+    if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
+        require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "first color frame delay" )
     product_name = dev.get_info(rs.camera_info.name)
     max_delay = 1
     os_name = platform.system()

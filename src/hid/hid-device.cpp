@@ -87,7 +87,7 @@ namespace librealsense
         {
             for(auto&& p : hid_profiles)
             {
-                set_feature_report( DEVICE_POWER_D0, _sensor_to_id[p.sensor_name], p.frequency, p.sensitivity, p.apply_sensitivity_to_accel );
+                set_feature_report( DEVICE_POWER_D0, _sensor_to_id[p.sensor_name], p.frequency, p.apply_sensitivity, p.sensitivity );
             }
             _configured_profiles = hid_profiles;
         }
@@ -233,7 +233,26 @@ namespace librealsense
             }
         }
 
-        usb_status rs_hid_device::set_feature_report( unsigned char power, int report_id, int fps, double sensitivity, bool apply_to_accel )
+        usb_status rs_hid_device::get_feature_report( const rs_usb_messenger & dev,
+                                                      int report_id,
+                                                      FEATURE_REPORT & report,
+                                                      uint32_t & transferred )
+        {
+            const auto hid_interface = get_hid_interface()->get_number();
+            transferred = 0;
+            report = {};
+            auto res = dev->control_transfer( USB_REQUEST_CODE_GET,
+                                              HID_REQUEST_GET_REPORT,
+                                              ( HID_REPORT_TYPE_FEATURE << 8 ) + report_id,
+                                              hid_interface,
+                                              (uint8_t *)&report,
+                                              sizeof( report ),
+                                              transferred,
+                                              1000 );
+            return res;  // a short read is not an error here: callers that need the full report check `transferred`
+        }
+
+        usb_status rs_hid_device::set_feature_report( unsigned char power, int report_id, int fps, bool apply_sensitivity, double sensitivity )
         {
             uint32_t transferred;
 
@@ -248,14 +267,8 @@ namespace librealsense
             if (!dev)
                 return RS2_USB_STATUS_NO_DEVICE;
 
-            auto res = dev->control_transfer(USB_REQUEST_CODE_GET,
-                HID_REQUEST_GET_REPORT,
-                value,
-                hid_interface,
-                (uint8_t*) &featureReport,
-                sizeof(featureReport),
-                transferred,
-                1000);
+            uint32_t report_size = 0;
+            auto res = get_feature_report( dev, report_id, featureReport, report_size );
 
             if(res != RS2_USB_STATUS_SUCCESS)
             {
@@ -268,9 +281,10 @@ namespace librealsense
             if(fps > 0)
                 featureReport.report = (1000 / fps);
 
-            //we want to change the sensitivity values only in gyro (and accel when explicitly set), for FW version >= 5.16
-            if( ( featureReport.reportId == REPORT_ID_GYROMETER_3D
-                  || ( apply_to_accel && featureReport.reportId == REPORT_ID_ACCELEROMETER_3D ) )
+            // Change the sensitivity only when explicitly requested (gyro or accel), for FW version >= 5.16.
+            // Otherwise the value read from FW above is sent back unchanged.
+            if( apply_sensitivity
+                && ( featureReport.reportId == REPORT_ID_GYROMETER_3D || featureReport.reportId == REPORT_ID_ACCELEROMETER_3D )
                 && _realsense_hid_report_actual_size == sizeof( REALSENSE_HID_REPORT ) )
                 featureReport.sensitivity = static_cast<unsigned short>(sensitivity);
 
@@ -290,14 +304,7 @@ namespace librealsense
                 return res;
             }
 
-            res = dev->control_transfer(USB_REQUEST_CODE_GET,
-                HID_REQUEST_GET_REPORT,
-                value,
-                hid_interface,
-                (uint8_t*) &featureReport,
-                sizeof(featureReport),
-                transferred,
-                1000);
+            res = get_feature_report( dev, report_id, featureReport, report_size );
 
             if(res != RS2_USB_STATUS_SUCCESS)
             {
@@ -311,6 +318,37 @@ namespace librealsense
                 return RS2_USB_STATUS_OTHER;
             }
             return res;
+        }
+
+        bool rs_hid_device::read_sensitivity( const std::string & sensor_name, double & value )
+        {
+            // The sensitivity field exists only in FW >= 5.16 reports
+            if( _realsense_hid_report_actual_size != sizeof( REALSENSE_HID_REPORT ) )
+                return false;
+            auto id = _sensor_to_id.find( sensor_name );
+            if( id == _sensor_to_id.end() )
+                return false;
+
+            try
+            {
+                auto hid_interface = get_hid_interface()->get_number();
+                auto dev = _usb_device->open( hid_interface );
+                if( ! dev )
+                    return false;
+
+                FEATURE_REPORT featureReport;
+                uint32_t report_size = 0;
+                if( get_feature_report( dev, id->second, featureReport, report_size ) != RS2_USB_STATUS_SUCCESS
+                    || report_size < sizeof( featureReport ) )  // short read: the sensitivity field is missing
+                    return false;
+                value = featureReport.sensitivity;
+                return true;
+            }
+            catch( const std::exception & e )
+            {
+                LOG_DEBUG( "Failed to read sensitivity: " << e.what() );
+                return false;
+            }
         }
 
         rs_usb_interface rs_hid_device::get_hid_interface()

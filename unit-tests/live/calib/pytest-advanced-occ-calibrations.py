@@ -25,6 +25,9 @@ pytestmark = [
     pytest.mark.context("nightly"),
     pytest.mark.device("D400*"),
     pytest.mark.device_exclude("D401"),
+    # D405 is short-range and fails this OCC flow on the LibCI rigs; it would also be picked first
+    # among D400 devices and push the test off the D435/D455
+    pytest.mark.device_exclude("D405"),
     pytest.mark.device_exclude("D555"),
 ]
 

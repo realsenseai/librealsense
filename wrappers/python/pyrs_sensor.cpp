@@ -55,7 +55,11 @@ void init_sensor(py::module &m) {
         .def("open", (void (rs2::sensor::*)(const std::vector<rs2::stream_profile>&) const) &rs2::sensor::open,
              "Open sensor for exclusive access, by committing to a composite configuration, specifying one or "
              "more stream profiles.", "profiles"_a, py::call_guard<py::gil_scoped_release>())
-        .def("close", &rs2::sensor::close, "Close sensor for exclusive access.", py::call_guard<py::gil_scoped_release>())
+        .def("close", (void (rs2::sensor::*)() const) &rs2::sensor::close, "Close sensor for exclusive access.", py::call_guard<py::gil_scoped_release>())
+        .def("close", (void (rs2::sensor::*)(const std::vector<rs2::stream_profile>&) const) &rs2::sensor::close,
+             "Close only the given streams, while the sensor's other streams keep streaming. Supported by sensors "
+             "whose open() also adds streams to an open or streaming sensor.", "profiles"_a,
+             py::call_guard<py::gil_scoped_release>())
         .def("start", [](const rs2::sensor& self, std::function<void(rs2::frame)> callback) {
             self.start(std::move(callback));
         }, "Start passing frames into user provided callback.", "callback"_a,py::call_guard< py::gil_scoped_release >())
@@ -68,6 +72,9 @@ void init_sensor(py::module &m) {
         .def("stop", &rs2::sensor::stop, "Stop streaming.", py::call_guard<py::gil_scoped_release>())
         .def("get_stream_profiles", &rs2::sensor::get_stream_profiles, "Retrieves the list of stream profiles supported by the sensor.")
         .def("get_active_streams", &rs2::sensor::get_active_streams, "Retrieves the list of stream profiles currently streaming on the sensor.")
+        .def("get_sensor_active_streams", &rs2::sensor::get_sensor_active_streams,
+             "Retrieves the profiles running on the camera for this sensor; on sensors whose camera reports it, this "
+             "includes streams activated on behalf of another stream.")
         .def_property_readonly("profiles", &rs2::sensor::get_stream_profiles, "The list of stream profiles supported by the sensor. Identical to calling get_stream_profiles")
         .def("get_recommended_filters", &rs2::sensor::get_recommended_filters, "Return the recommended list of filters by the sensor.")
 		.def("query_embedded_filters", &rs2::sensor::query_embedded_filters, "Return the list of embedded filters in the sensor.")
