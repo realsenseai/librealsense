@@ -100,8 +100,8 @@ namespace librealsense
     {
         std::unique_lock<std::mutex> lock(_mutex);
 
-        // The list is kept current by the device-changes callback; query again only when it has no match
-        auto res = create_device(serial, loop_through_devices);
+        // Try the cached list first to skip a full device query; query again only when nothing matches
+        std::shared_ptr<device_interface> res = create_device(serial, loop_through_devices);
         if (!res)
         {
             _device_list = _ctx->query_devices(_mask);
