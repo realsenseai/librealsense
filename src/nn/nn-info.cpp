@@ -40,6 +40,15 @@ static bool is_dense( const std::vector< int > & sizes, const std::vector< int >
 }
 
 
+static uint32_t parse_model_id( const rsutils::json & metadata )
+{
+    auto const id = metadata.find( "model_id" );
+    if( id == metadata.end() || ! id->is_number_unsigned() || id->get< uint64_t >() > UINT32_MAX )
+        return 0;
+    return id->get< uint32_t >();
+}
+
+
 std::shared_ptr< const model_description > parse_model_description( const std::string & metadata, uint32_t generation )
 {
     try
@@ -51,6 +60,7 @@ std::shared_ptr< const model_description > parse_model_description( const std::s
         auto desc = std::make_shared< model_description >();
         desc->generation = generation;
         desc->model = j.value( "model", "" );
+        desc->model_id = parse_model_id( j );
         auto const & outputs = j.at( "outputs" );
         desc->outputs.resize( outputs.size() );
         std::vector< bool > seen( outputs.size() );
@@ -91,6 +101,7 @@ std::string to_json( const stored_model & stored )
     {
         auto metadata = rsutils::json::parse( stored.metadata, nullptr, false );
         j["metadata"] = metadata.is_discarded() ? rsutils::json( stored.metadata ) : metadata;  // as stored if not JSON
+        j["model_id"] = metadata.is_object() ? parse_model_id( metadata ) : 0;  // what the frames will carry
     }
     return j.dump();
 }

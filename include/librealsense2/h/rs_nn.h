@@ -64,7 +64,7 @@ int rs2_nn_is_upload_supported( const rs2_device * device, char * reason, int re
 /**
  * Describe the NN model stored in a slot, as JSON: "present", "model_state", "generation" (CRC-32 of the metadata, as in
  * each Custom NN frame), "frame_size", "frame_height" and, when present, "metadata" (the model's own description of
- * its inputs and outputs). This is the stored model, which the camera runs from its next boot. Currently only slot 2
+ * its inputs and outputs) with "model_id", the id each Custom NN frame will carry. This is the stored model, which the camera runs from its next boot. Currently only slot 2
  * (a custom network) is described.
  * \param[in]  device       Device extendable to RS2_EXTENSION_NN_LOADER
  * \param[in]  slot         Model slot
