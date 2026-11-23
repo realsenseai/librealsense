@@ -68,10 +68,11 @@ namespace librealsense
             else if( _userptr_dma )
             {
                 // Pageable memory the kernel can pin for DMA (not CUDA host memory, which it can't pin).
-                // QBUF needs a cache-line multiple length; _length stays exact for the frame-size checks.
-                constexpr uint32_t cache_line = 64;
+                // QBUF needs a length that is a multiple of the arm64 DMA alignment (128, not the 64-byte
+                // cache line); _length stays exact for the frame-size checks.
+                constexpr uint32_t dma_align = 128;
                 const size_t page = static_cast< size_t >( sysconf( _SC_PAGESIZE ) );
-                _qbuf_length = ( _length + cache_line - 1 ) & ~( cache_line - 1 );
+                _qbuf_length = ( _length + dma_align - 1 ) & ~( dma_align - 1 );
                 const size_t alloc_len = ( size_t( _qbuf_length ) + page - 1 ) & ~( page - 1 );
                 void * p = nullptr;
                 if( posix_memalign( &p, page, alloc_len ) != 0 || ! p )
