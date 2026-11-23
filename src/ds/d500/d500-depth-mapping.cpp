@@ -338,14 +338,47 @@ namespace librealsense
         auto const name = rs2_stream_to_string( mapping->get_stream_type() );
         if( auto const depth = find_stream( requests, RS2_STREAM_DEPTH ) )
         {
-            // The rebuilt Mapping branch accepts native Depth sizes, but the shared sensor must join alone.
+            // Mapping accepts native Depth sizes at the active Mapping rate.
             if( ! is_depth_at_rate( *depth, fps ) )
                 throw wrong_api_call_sequence_exception( rsutils::string::from()
                     << "Depth must run at " << fps << " fps while " << name
                     << " is active. Select that frame rate or stop the " << name << " stream." );
-            if( requests.size() != 1 )
+            if( requests.size() == 1 )
+                return;
+
+            // D585 USB has a dedicated IR endpoint. GMSL shares its IR carrier with Mapping.
+            auto const pid = get_pid();
+            bool const d585 = pid == ds::D585_2C_PID || pid == ds::D585_3C_PID || pid == ds::D585F_PID
+                           || pid == ds::D585_2C_PROTO_PID || pid == ds::D585_3C_PROTO_PID;
+            if( d585 && ! _is_mipi_device && _fw_version >= firmware_version( "7.61.47181" ) )
+            {
+                auto const video_depth = dynamic_cast< const video_stream_profile_interface * >( depth.get() );
+                // USB Mapping admits IR at these two sizes; without sensor decimation, the
+                // shared stereo graph uses one geometry. Accept only matched 8-bit IR here.
+                if( video_depth && ( ( video_depth->get_width() == 640 && video_depth->get_height() == 360 )
+                                  || ( video_depth->get_width() == 1280 && video_depth->get_height() == 720 ) ) )
+                {
+                    auto const matching_ir = std::count_if(
+                        requests.begin(), requests.end(),
+                        [fps, video_depth]( const std::shared_ptr< stream_profile_interface > & profile )
+                        {
+                            if( ! profile
+                                || profile->get_stream_type() != RS2_STREAM_INFRARED || profile->get_format() != RS2_FORMAT_Y8
+                                || profile->get_framerate() != fps )
+                                return false;
+                            auto const ir = dynamic_cast< const video_stream_profile_interface * >( profile.get() );
+                            return ir && ir->get_width() == video_depth->get_width()
+                                      && ir->get_height() == video_depth->get_height();
+                        } );
+                    if( static_cast< size_t >( matching_ir ) == requests.size() - 1 )
+                        return;
+                }
                 throw wrong_api_call_sequence_exception( rsutils::string::from()
-                    << "While " << name << " streams, Depth can start only alone at " << fps << " fps" );
+                    << "While " << name << " streams, Depth can join 8-bit IR only at a matching 640x360 or 1280x720, "
+                    << fps << " fps" );
+            }
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                << "While " << name << " streams, Depth can start only alone at " << fps << " fps" );
         }
         else if( find_stream( requests, RS2_STREAM_COLOR ) )
             throw wrong_api_call_sequence_exception( rsutils::string::from()

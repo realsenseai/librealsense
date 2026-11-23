@@ -26,7 +26,7 @@ pytestmark = [
 
 MIN_FRAMES = { rs.stream.object_detection: 8,   # GMSL runs PD at ~15 fps
                rs.stream.occupancy: 15, rs.stream.labeled_point_cloud: 15, rs.stream.point_cloud: 10,   # PCL 1280x720 runs at 15 fps
-               rs.stream.depth: 15, rs.stream.color: 15 }
+               rs.stream.depth: 15, rs.stream.infrared: 15, rs.stream.color: 15 }
 FRAME_TIMEOUT_S = 5       # first frames of a fresh stream
 QUIET_S = 0.3             # how long a stopped stream must stay silent
 SDK_REJECT_S = 1.0        # a camera refusal takes longer
@@ -90,8 +90,9 @@ class Collector:
     def __init__(self):
         self.frames = []
     def __call__(self, f):
-        stream_type = f.get_profile().stream_type()
-        info = { 'time': time.monotonic(), 'type': stream_type, 'size': f.get_data_size() }
+        profile = f.get_profile()
+        stream_type = profile.stream_type()
+        info = { 'time': time.monotonic(), 'type': stream_type, 'index': profile.stream_index(), 'size': f.get_data_size() }
         if stream_type == rs.stream.object_detection:
             head = bytes( f.get_data() )[:ODET_HEADER]
             info.update( magic=head[:4], payload=struct.unpack_from( '<I', head, 8 )[0], number=f.get_frame_number() )
@@ -243,18 +244,15 @@ def test_occ_after_depth(device, mapping, source, allowed):
     stop( stereo )
 
 
-@pytest.mark.parametrize( 'source, with_ir, allowed', [(source, False, True) for source in DEPTH_SOURCES] + [
-    ( ( 640, 360, 15 ), False, False ),
-    ( ( 640, 360, 30 ), True, False ),
-], ids=[f"{w}x{h}" for w, h, _ in DEPTH_SOURCES] + ['rate-mismatch', 'depth+ir'] )
-def test_depth_joins_occ(device, mapping, source, with_ir, allowed):
-    """Native Depth alone can join either Mapping stream; rate mismatch and Depth+IR are SDK refusals."""
+@pytest.mark.parametrize( 'source, allowed', [(source, True) for source in DEPTH_SOURCES] + [
+    ( ( 640, 360, 15 ), False ),
+], ids=[f"{w}x{h}" for w, h, _ in DEPTH_SOURCES] + ['rate-mismatch'] )
+def test_depth_joins_occ(device, mapping, source, allowed):
+    """Native Depth can join either Mapping stream at the same rate."""
     occ, occ_profile = mapping
     stream_type = occ_profile.stream_type()
     stereo, frames = device.first_depth_sensor(), Collector()
     requests = [depth( device, *source )]
-    if with_ir:
-        requests.append( stereo_profile( device, rs.stream.infrared, rs.format.y8, *source, index=1 ) )
     frames.wait( stream_type, start( occ, occ_profile, frames ) )
     if allowed:
         since = start( stereo, requests, frames )
@@ -262,8 +260,51 @@ def test_depth_joins_occ(device, mapping, source, with_ir, allowed):
         frames.wait( stream_type, since )
         stop( stereo )   # Mapping keeps its own Depth source
     else:
-        message = "Depth can start only alone" if with_ir else r"Depth must run at 30 fps.*Select that frame rate or stop the .* stream\."
-        assert rejected( stereo, requests, frames, match=message )
+        assert rejected( stereo, requests, frames,
+                         match=r"Depth must run at 30 fps.*Select that frame rate or stop the .* stream\." )
+    frames.wait( stream_type, time.monotonic() )
+    stop( occ )
+
+
+@pytest.mark.parametrize( 'source', [( 640, 360 ), ( 1280, 720 )], ids=['640x360', '1280x720'] )
+@pytest.mark.parametrize( 'indices', [( 1, ), ( 2, ), ( 1, 2 )], ids=['ir1', 'ir2', 'ir1+ir2'] )
+def test_depth_and_ir_join_mapping(device, mapping, source, indices):
+    """D585 USB can add matching stereo profiles while Mapping is already delivering frames."""
+    occ, occ_profile = mapping
+    stream_type = occ_profile.stream_type()
+    stereo, frames = device.first_depth_sensor(), Collector()
+    requests = [depth( device, *source )] + [
+        stereo_profile( device, rs.stream.infrared, rs.format.y8, *source, index=i ) for i in indices
+    ]
+    frames.wait( stream_type, start( occ, occ_profile, frames ) )
+    if is_gmsl( device ) or 'D555' in device.get_info( rs.camera_info.name ):
+        assert rejected( stereo, requests, frames, match="Depth can start only alone" )
+    else:
+        since = start( stereo, requests, frames )
+        frames.wait( rs.stream.depth, since )
+        frames.wait( stream_type, since )
+        ir = frames.wait( rs.stream.infrared, since, count=MIN_FRAMES[rs.stream.infrared] * len( indices ) )
+        assert {frame['index'] for frame in ir} == set( indices )
+        stop( stereo )
+    frames.wait( stream_type, time.monotonic() )
+    stop( occ )
+
+
+@pytest.mark.parametrize( 'depth_size, ir_profile', [
+    ( ( 640, 360 ), ( 1280, 720, 30 ) ),
+    ( ( 640, 360 ), ( 640, 360, 15 ) ),
+    ( ( 848, 480 ), ( 848, 480, 30 ) ),
+], ids=['different-size', 'different-rate', 'unsupported-ir-size'] )
+def test_mapping_rejects_incompatible_ir(device, mapping, depth_size, ir_profile):
+    if is_gmsl( device ) or 'D555' in device.get_info( rs.camera_info.name ):
+        pytest.skip( "D585 USB stereo profile rules" )
+    occ, occ_profile = mapping
+    stream_type = occ_profile.stream_type()
+    stereo, frames = device.first_depth_sensor(), Collector()
+    requests = [depth( device, *depth_size ),
+                stereo_profile( device, rs.stream.infrared, rs.format.y8, *ir_profile, index=1 )]
+    frames.wait( stream_type, start( occ, occ_profile, frames ) )
+    assert rejected( stereo, requests, frames, match="only at a matching" )
     frames.wait( stream_type, time.monotonic() )
     stop( occ )
 
@@ -277,6 +318,7 @@ def test_colors_and_occ_2c(device, mapping):
     stereo, frames = device.first_depth_sensor(), Collector()
     frames.wait( stream_type, start( occ, occ_profile, frames ) )
     assert rejected( stereo, colors( device ), frames, match="Color cannot start while" )
+    assert rejected( stereo, [depth( device, 640, 360 )] + colors( device ), frames, match="Depth can" )
     stop( occ )
     frames.wait( rs.stream.color, start( stereo, colors( device ), frames ) )
     assert rejected( occ, occ_profile, frames, match="needs Depth at" )
