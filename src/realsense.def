@@ -35,6 +35,7 @@ EXPORTS
 
     rs2_get_stream_profiles
     rs2_get_active_streams
+    rs2_get_sensor_active_streams
     rs2_get_stream_profile
     rs2_get_stream_profiles_count
     rs2_delete_stream_profiles_list
@@ -42,6 +43,7 @@ EXPORTS
     rs2_open
     rs2_open_multiple
     rs2_close
+    rs2_close_multiple
 
     rs2_start
     rs2_start_queue
