@@ -12,7 +12,7 @@ from app.models.sensor import StreamProfile
 from app.models.stream import Extrinsics, StreamConfig
 from app.services import advanced_mode, options
 from app.services.events import Events
-from app.services.frame_sender import STOPPED, FrameSender
+from app.services.frame_sender import FrameSender
 from app.services.sensor import Sensor
 
 
@@ -112,13 +112,8 @@ class Camera:
         self._events.emit("streaming_changed", {"device_id": self.id, "sensors": [
             [r.model_dump() for r in s.active_streams()] for s in self.sensors]})
 
-    def _stopped(self, profiles: List[rs.stream_profile]) -> None:
-        """Close the sockets of the streams a stop ended, and tell every client"""
-        self._frame_sender.close(self.id, STOPPED, [(p.stream_type(), p.stream_index()) for p in profiles])
-        self._streaming_changed()
-
     def _frame_callback(self):
-        """What the SDK calls with frames, pipeline and sensor alike: sends each frame after its sensor's
+        """What the SDK calls with frames, pipeline and sensor alike: sends each watched frame after its sensor's
         enabled filters, as the legacy viewer does"""
         # Each sensor's filters by its name within the device, the way the SDK compares sensors
         filters = {s.name: s.filters for s in self.sensors}
@@ -130,6 +125,8 @@ class Camera:
             # it held would never be freed once unplugged
             # A synced set arrives as one frameset; unsynced streams (motion) and sensor streams as single frames
             for f in frames.as_frameset() if frames.is_frameset() else [frames]:
+                if not sender.watched(device_id, f):
+                    continue
                 if f.get_profile().stream_type() == rs.stream.depth:  # the filters process depth only
                     for flt, on in filters[rs.sensor.from_frame(f).get_info(rs.camera_info.name)].items():
                         if on:
@@ -150,9 +147,8 @@ class Camera:
         self._streaming_changed()
 
     def stop_stream(self) -> None:
-        profiles = self.pipeline.get_active_profile().get_streams()
         self.pipeline.stop()
-        self._stopped(profiles)
+        self._streaming_changed()
 
     # Clients are told after start and after close: an opened or stopped sensor still lists its profiles as active
 
@@ -167,9 +163,8 @@ class Camera:
         self.sensors[sensor_index].stop()
 
     def close_sensor(self, sensor_index: int) -> None:
-        profiles = self.sensors[sensor_index].active_profiles()
         self.sensors[sensor_index].close()
-        self._stopped(profiles)
+        self._streaming_changed()
 
     # ---- hardware monitor ---------------------------------
 

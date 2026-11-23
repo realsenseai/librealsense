@@ -7,7 +7,7 @@ import struct
 
 import pyrealsense2 as rs
 
-from app.services.frame_sender import DISCONNECTED, NOT_STREAMING, STOPPED, FrameSender, encode_frame
+from app.services.frame_sender import FrameSender, encode_frame
 
 
 class _Intrinsics:
@@ -71,6 +71,11 @@ class _WebSocket:
         return {"type": "websocket.disconnect"}
 
 
+class _Colorizer:
+    def get_color_table(self, depth):
+        return b""
+
+
 def test_message_is_header_then_unchanged_bytes():
     header, data = _decode(encode_frame(_Frame(7)))
     assert data == _Frame(7).data
@@ -94,20 +99,20 @@ def test_only_subscribers_of_the_stream_get_frames_and_a_slow_one_gets_the_newes
     async def scenario():
         sender = FrameSender()
         depth, color = _WebSocket(), _WebSocket()
-        serving = [asyncio.ensure_future(sender.serve(depth, "dev", rs.stream.depth, 0, lambda: True)),
-                   asyncio.ensure_future(sender.serve(color, "dev", rs.stream.color, 0, lambda: True))]
+        serving = [asyncio.ensure_future(sender.serve(depth, "dev", rs.stream.depth, 0)),
+                   asyncio.ensure_future(sender.serve(color, "dev", rs.stream.color, 0))]
         await asyncio.sleep(0)
 
         for number in (1, 2, 3):  # arrive before the sender gets to run: only the newest is sent
-            sender.send("dev", _Frame(number))
+            sender.send("dev", _Frame(number), _Colorizer())
         await asyncio.sleep(0.01)
-        sender.send("dev", _Frame(4))
+        sender.send("dev", _Frame(4), _Colorizer())
         await asyncio.sleep(0.01)
 
         depth.closed.set()
         color.closed.set()
         await asyncio.gather(*serving)
-        sender.send("dev", _Frame(5))  # nobody subscribed any more
+        sender.send("dev", _Frame(5), _Colorizer())  # nobody subscribed any more
         return depth.sent, color.sent, sender
 
     depth_sent, color_sent, sender = asyncio.run(scenario())
@@ -116,30 +121,16 @@ def test_only_subscribers_of_the_stream_get_frames_and_a_slow_one_gets_the_newes
     assert sender._subscribers == {}
 
 
-def test_a_stream_that_is_not_running_closes_at_once():
+def test_the_server_never_closes_a_socket():
+    """A socket opened before its stream runs, or kept across a stop, just gets the frames whenever there are any"""
     async def scenario():
         sender, socket = FrameSender(), _WebSocket()
-        await sender.serve(socket, "dev", rs.stream.depth, 0, lambda: False)
-        return socket.close_code, sender._subscribers
-
-    assert asyncio.run(scenario()) == (NOT_STREAMING, {})
-
-
-def test_close_ends_the_sockets_of_the_given_streams_or_of_the_whole_device():
-    async def scenario():
-        sender = FrameSender()
-        depth, color, other = _WebSocket(), _WebSocket(), _WebSocket()
-        serving = [asyncio.ensure_future(sender.serve(socket, device, stream, 0, lambda: True))
-                   for socket, device, stream in ((depth, "dev", rs.stream.depth), (color, "dev", rs.stream.color),
-                                                  (other, "dev2", rs.stream.depth))]
-        await asyncio.sleep(0)
-        sender.close("dev", STOPPED, [(rs.stream.depth, 0)])
+        serving = asyncio.ensure_future(sender.serve(socket, "dev", rs.stream.depth, 0))
+        await asyncio.sleep(0.01)  # nothing streams yet: the socket waits
+        sender.send("dev", _Frame(1), _Colorizer())
         await asyncio.sleep(0.01)
-        stopped = (depth.close_code, color.close_code)
-        sender.close("dev", DISCONNECTED)
-        await asyncio.sleep(0.01)
-        other.closed.set()
-        await asyncio.gather(*serving)
-        return stopped, color.close_code, other.close_code
+        socket.closed.set()  # the client closes it
+        await serving
+        return socket.close_code, [_decode(m)[0]["frame_number"] for m in socket.sent], sender._subscribers
 
-    assert asyncio.run(scenario()) == ((STOPPED, None), DISCONNECTED, None)
+    assert asyncio.run(scenario()) == (None, [1], {})

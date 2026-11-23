@@ -44,12 +44,9 @@ class Sensor:
             active_streams=self.active_streams(),
         )
 
-    def active_profiles(self) -> List[rs.stream_profile]:
-        """What it is opened with, by any client through either API, from open to close."""
-        return self._sensor.get_active_streams()
-
     def active_streams(self) -> List[StreamProfile]:
-        return [profile_row(p) for p in self.active_profiles()]
+        """What it is opened with, by any client through either API, from open to close."""
+        return [profile_row(p) for p in self._sensor.get_active_streams()]
 
     # ---- options ---------------------------------
 

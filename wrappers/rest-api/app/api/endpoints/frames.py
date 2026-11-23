@@ -1,10 +1,10 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-import pyrealsense2 as rs
 from fastapi import APIRouter, Depends, WebSocket
 
 from app.api.dependencies import get_realsense_manager
+from app.models.stream import StreamType
 from app.services.rs_manager import RealSenseManager
 
 router = APIRouter()
@@ -14,7 +14,7 @@ router = APIRouter()
 async def stream_frames(
     websocket: WebSocket,
     device_id: str,
-    stream_type: str,
+    stream_type: StreamType,
     stream_index: int,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
 ):
@@ -22,15 +22,5 @@ async def stream_frames(
 
     stream_type and stream_index are as in the sensor's stream profiles, e.g. depth/0 or infrared/1.
     """
-    stream = rs.stream.__members__.get(stream_type)
-    if stream is None:
-        await websocket.close()  # before accept, uvicorn answers 403 and drops code and reason
-        return
     await websocket.accept()
-    camera = rs_manager.cameras.get(device_id)
-
-    def streaming() -> bool:
-        """Whether a sensor of the device streams it, through either the sensor API or the pipeline"""
-        return camera is not None and any((p.stream_type(), p.stream_index()) == (stream, stream_index)
-                                          for s in camera.sensors for p in s.active_profiles())
-    await rs_manager.frame_sender.serve(websocket, device_id, stream, stream_index, streaming)
+    await rs_manager.frame_sender.serve(websocket, device_id, stream_type, stream_index)
