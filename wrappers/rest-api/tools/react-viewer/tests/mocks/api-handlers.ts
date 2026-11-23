@@ -23,7 +23,7 @@ export const handlers = [
 
   // Get devices list
   http.get(`${API_BASE}/devices/`, () => {
-    return HttpResponse.json(mockDeviceList)
+    return HttpResponse.json(mockDeviceList.map((d) => d.info))
   }),
 
   // Get single device
@@ -32,11 +32,13 @@ export const handlers = [
     if (!device) {
       return new HttpResponse(null, { status: 404 })
     }
-    return HttpResponse.json(device)
+    return HttpResponse.json(device.info)
   }),
 
+  http.get(`${API_BASE}/devices/:deviceId/is_metadata_enabled`, () => HttpResponse.json(true)),
+
   // Reset device
-  http.post(`${API_BASE}/devices/:deviceId/hw_reset/`, () => {
+  http.post(`${API_BASE}/devices/:deviceId/hardware_reset`, () => {
     return HttpResponse.json(true)
   }),
 
@@ -95,7 +97,8 @@ export const handlers = [
 
   // Per-sensor streaming: open / start / stop / close return no body
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorIndex/:step`, () => HttpResponse.json(null)),
-  http.get(`${API_BASE}/devices/:deviceId/extrinsics`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/devices/:deviceId/extrinsics`, () =>
+    HttpResponse.json({ rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], translation: [0.015, 0, 0] })),
 
   // Recommended firmware (none, unless a test says otherwise)
   http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),

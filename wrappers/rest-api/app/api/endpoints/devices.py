@@ -1,84 +1,63 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-import platform
 from fastapi import APIRouter, Depends
-from typing import List
+from typing import Dict, List
 
-
-from app.models.device import DeviceInfo
-from app.models.stream import StreamExtrinsics
+from app.models.stream import Extrinsics, StreamName
 from app.services.rs_manager import RealSenseManager
 from app.api.dependencies import get_camera, get_realsense_manager
 from app.services.camera import Camera
 
 router = APIRouter()
 
-
-def _device_info(camera: Camera) -> DeviceInfo:
-    metadata_enabled = None
-    if platform.system() == "Windows":
-        try:
-            metadata_enabled = camera.is_metadata_enabled()
-        except RuntimeError:
-            pass
-    return DeviceInfo(
-        device_id=camera.id,
-        name=camera.info.get("name", "Unknown Device"),
-        serial_number=camera.id,
-        firmware_version=camera.info.get("firmware_version"),
-        physical_port=camera.info.get("physical_port"),
-        usb_type=camera.info.get("usb_type_descriptor"),
-        product_id=camera.info.get("product_id"),
-        sensors=[s.name for s in camera.sensors],
-        metadata_enabled=metadata_enabled,
-    )
-
-
-@router.get("/", response_model=List[DeviceInfo])
+@router.get("/", response_model=List[Dict[str, str]])
 def get_devices(
-    force_refresh: bool = False,  # nothing to do: the SDK's devices-changed callback keeps the list current
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
     #user: dict = Depends(get_current_user)  -> enable this if security is needed
 ):
     """
-    Get a list of all connected RealSense devices.
+    Every connected RealSense device: each camera info it reports, by its SDK name.
     """
-    return [_device_info(c) for c in list(rs_manager.cameras.values())]  # a copy: the SDK callback may change it
+    return [c.info for c in list(rs_manager.cameras.values())]  # a copy: the SDK callback may change it
 
-@router.get("/{device_id}", response_model=DeviceInfo)
+@router.get("/{device_id}", response_model=Dict[str, str])
 def get_device(
-    force_refresh: bool = False,  # nothing to do, as above
     camera: Camera = Depends(get_camera),
     #user: dict = Depends(get_current_user) -> enable this if security is needed
 ):
     """
     Get details of a specific RealSense device.
     """
-    return _device_info(camera)
+    return camera.info
 
 
-@router.post("/refresh", response_model=List[DeviceInfo])
-def refresh_devices(
-    rs_manager: RealSenseManager = Depends(get_realsense_manager),
-    #user: dict = Depends(get_current_user)  -> enable this if security is needed
-):
-    """
-    Return the device list; the SDK's devices-changed callback keeps it current.
-    """
-    return get_devices(rs_manager=rs_manager)
-
-@router.get("/{device_id}/extrinsics", response_model=List[StreamExtrinsics])
-def get_extrinsics(
+@router.get("/{device_id}/is_metadata_enabled", response_model=bool)
+def is_metadata_enabled(
     camera: Camera = Depends(get_camera),
 ):
     """
-    The device's calibration between its streams: from each stream to every other, whether streaming or not.
+    Whether the device's frames carry their metadata: false only on Windows until it is enabled there.
     """
-    return camera.extrinsics()
+    return camera.is_metadata_enabled()
 
-@router.post("/{device_id}/hw_reset/", response_model=bool)
-def hw_reset_device(
+
+@router.get("/{device_id}/extrinsics", response_model=Extrinsics)
+def get_extrinsics(
+    from_stream: StreamName,
+    from_index: int,
+    to_stream: StreamName,
+    to_index: int,
+    camera: Camera = Depends(get_camera),
+):
+    """
+    The device's calibration from one stream to another, whether streaming or not: as the SDK's
+    get_extrinsics_to. Streams are rs2_stream names (any other answers 422), e.g. depth/0 to color/0.
+    """
+    return camera.extrinsics((from_stream, from_index), (to_stream, to_index))
+
+@router.post("/{device_id}/hardware_reset")
+def hardware_reset(
     camera: Camera = Depends(get_camera),
     #user: dict = Depends(get_current_user) -> enable this if security is needed
 ):
@@ -86,4 +65,3 @@ def hw_reset_device(
     Perform a hardware reset on a specific RealSense device.
     """
     camera.hardware_reset()
-    return True

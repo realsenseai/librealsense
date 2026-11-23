@@ -15,10 +15,7 @@ export function CodeExport({ settings }: CodeExportProps) {
   const [copied, setCopied] = useState(false)
   const { deviceStates } = useAppStore()
 
-  // Find the device
-  const deviceState = Object.values(deviceStates).find(
-    ds => ds.device.serial_number === settings.deviceSerial
-  )
+  const deviceState = deviceStates[settings.deviceId]
 
   if (!deviceState) {
     return (
@@ -34,8 +31,8 @@ export function CodeExport({ settings }: CodeExportProps) {
   const code = generateCodeSnippet(
     language,
     {
-      name: deviceState.device.name,
-      serial_number: deviceState.device.serial_number,
+      name: deviceState.device.info.name,
+      serial_number: deviceState.device.info.serial_number ?? 'Unknown',
     },
     streamConfigs,
     settings.optionChanges

@@ -5,7 +5,8 @@ from pydantic import AfterValidator, BaseModel, Field
 from typing import Annotated, List, Literal
 import pyrealsense2 as rs
 
-StreamType = Annotated[Literal[tuple(rs.stream.__members__)], AfterValidator(rs.stream.__members__.get)]
+StreamName = Literal[tuple(rs.stream.__members__)]  # an rs2_stream name: nothing else gets through
+StreamType = Annotated[StreamName, AfterValidator(rs.stream.__members__.get)]
 Format = Annotated[Literal[tuple(rs.format.__members__)], AfterValidator(rs.format.__members__.get)]
 
 class StreamConfig(BaseModel):
@@ -18,14 +19,6 @@ class StreamConfig(BaseModel):
     fps: int = 0
 
 class Extrinsics(BaseModel):
-    """To the stream named by stream_type (an rs2_stream name, as in StreamProfile) and stream_index."""
-    stream_type: str
-    stream_index: int
-    rotation: List[float]  # 3x3, column-major, as rs2_extrinsics
+    """From one stream to another, as rs2_extrinsics"""
+    rotation: List[float]  # 3x3, column-major
     translation: List[float]  # meters
-
-class StreamExtrinsics(BaseModel):
-    """From one stream to every other stream of its device it is calibrated with."""
-    stream_type: str
-    stream_index: int
-    to: List[Extrinsics]

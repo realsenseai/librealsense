@@ -13,19 +13,6 @@ def control(value, minimum, maximum) -> AdvancedControl:
     return AdvancedControl(current_value=value, min_value=minimum, max_value=maximum, integer=isinstance(value, int))
 
 
-def status(dev) -> Dict[str, bool]:
-    """Whether the device has advanced mode, and whether it is currently on.
-
-    The wrapper nulls itself out for a device without advanced mode, so a raise here is
-    what "unsupported" looks like.
-    """
-    am = rs.rs400_advanced_mode(dev)
-    try:
-        return {"supported": True, "enabled": bool(am.is_enabled())}
-    except RuntimeError:
-        return {"supported": False, "enabled": False}
-
-
 def toggle(dev, enable: bool) -> None:
     """Turn advanced mode on or off. The device restarts, so it must be re-resolved after."""
     rs.rs400_advanced_mode(dev).toggle_advanced_mode(enable)

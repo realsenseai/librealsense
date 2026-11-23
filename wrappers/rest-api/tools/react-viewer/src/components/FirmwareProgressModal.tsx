@@ -59,7 +59,7 @@ export function FirmwareProgressModal({
         <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-6 max-w-md w-full mx-4">
           <div className="mb-4">
             <h2 className="text-xl font-bold text-white">Firmware Update</h2>
-            <p className="text-sm text-gray-400 mt-1">{device.name}</p>
+            <p className="text-sm text-gray-400 mt-1">{device.info.name}</p>
             {fileName && (
               <p className="text-xs text-gray-500 mt-1 truncate" title={fileName}>From file: {fileName}</p>
             )}
@@ -104,9 +104,9 @@ export function FirmwareProgressModal({
             </div>
           </div>
 
-          {!firmware.last_error && device.firmware_version && (
+          {!firmware.last_error && device.info.firmware_version && (
             <div className="mb-6 p-3 bg-gray-800 rounded text-xs text-gray-300">
-              <div>Current: <span className="text-white">{device.firmware_version}</span></div>
+              <div>Current: <span className="text-white">{device.info.firmware_version}</span></div>
             </div>
           )}
 

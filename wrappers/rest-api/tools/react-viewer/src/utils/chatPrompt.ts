@@ -7,7 +7,7 @@ import type { ControlGroup, DeviceState, SensorInfo, StreamConfig } from '../api
  * Proposed settings from AI response
  */
 export interface ProposedSettings {
-  deviceSerial: string
+  deviceId: string
   streamConfigs?: StreamConfig[]
   optionChanges?: Array<{
     sensorIndex?: number  // as the REST API addresses a sensor; names need not be unique
@@ -43,7 +43,7 @@ When proposing settings changes, include them in a JSON block that can be parsed
 
 \`\`\`settings
 {
-  "deviceSerial": "device_serial_number",
+  "deviceId": "device_id",
   "streamAction": "start|stop",
   "streamConfigs": [
     {
@@ -104,13 +104,13 @@ When proposing settings changes, include them in a JSON block that can be parsed
 function buildDeviceContext(deviceStates: Record<string, DeviceState>): string {
   const deviceDescriptions: string[] = []
   
-  for (const [serial, state] of Object.entries(deviceStates)) {
+  for (const [deviceId, state] of Object.entries(deviceStates)) {
     const { device, sensors, controls, streamConfigs } = state
     
-    let desc = `### ${device.name} (Serial: ${serial})
+    let desc = `### ${device.info.name} (ID: ${deviceId})
 - Status: ${isStreaming(state) ? 'STREAMING' : 'STOPPED'}
-- Firmware: ${device.firmware_version || 'Unknown'}
-- USB Type: ${device.usb_type || 'Unknown'}
+- Firmware: ${device.info.firmware_version || 'Unknown'}
+- USB Type: ${device.info.usb_type_descriptor || 'Unknown'}
 
 **Sensors:**
 ${formatSensors(sensors)}
@@ -205,10 +205,10 @@ export function parseProposedSettings(content: string): ProposedSettings | undef
     const parsed = JSON.parse(settingsJson)
     
     // Validate required fields
-    if (!parsed.deviceSerial) return undefined
+    if (!parsed.deviceId) return undefined
     
     return {
-      deviceSerial: parsed.deviceSerial,
+      deviceId: parsed.deviceId,
       streamConfigs: parsed.streamConfigs,
       optionChanges: parsed.optionChanges,
       streamAction: parsed.streamAction,

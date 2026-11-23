@@ -3,6 +3,7 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import { useAppStore } from '../store'
+import { apiClient } from '../api/client'
 import type { DeviceState, Extrinsics, SupportedStreamProfile } from '../api/types'
 import { buildCloud, deprojectionRays, gridIndex, MESH, POINT } from '../utils/pointCloud'
 import type { Frame } from '../api/frames'
@@ -43,7 +44,6 @@ interface CloudSource {
   deviceId: string
   depth: SupportedStreamProfile
   color?: SupportedStreamProfile
-  depthToColor?: Extrinsics
 }
 
 function cloudSource(deviceStates: Record<string, DeviceState>): CloudSource | null {
@@ -53,9 +53,7 @@ function cloudSource(deviceStates: Record<string, DeviceState>): CloudSource | n
     const depth = profiles.find(p => p.stream_type === 'depth')
     if (!depth) continue
     const color = profiles.find(p => p.stream_type === 'color')
-    const fromDepth = ds.extrinsics?.find(e => e.stream_type === 'depth' && e.stream_index === depth.stream_index)
-    const depthToColor = color && fromDepth?.to.find(t => t.stream_type === 'color' && t.stream_index === color.stream_index)
-    return { deviceId: ds.device.device_id, depth, color, depthToColor }
+    return { deviceId: ds.device.device_id, depth, color }
   }
   return null
 }
@@ -137,7 +135,16 @@ interface PointCloudProps extends CloudSource {
   onPoints: (points: Points | null) => void // the same object while the resolution stays
 }
 
-function PointCloud({ deviceId, depth, color, depthToColor, shading, active, onPoints }: PointCloudProps) {
+function PointCloud({ deviceId, depth, color, shading, active, onPoints }: PointCloudProps) {
+  // Calibration, so asked once per pair of streams; the cloud is drawn untextured until it comes
+  const [depthToColor, setDepthToColor] = useState<Extrinsics>()
+  useEffect(() => {
+    setDepthToColor(undefined)
+    if (!color) return
+    let stale = false
+    apiClient.getExtrinsics(deviceId, depth, color).then((e) => stale || setDepthToColor(e)).catch(() => {})
+    return () => { stale = true }
+  }, [deviceId, depth.stream_index, color?.stream_index])
   // Per-pixel attributes rewritten in place every frame, like the C++ viewer's upload_points, shared by
   // the mesh (with the pixel grid's triangles, built once per resolution) and the points
   const geometries = useMemo(() => ({ mesh: new THREE.BufferGeometry(), points: new THREE.BufferGeometry() }), [])

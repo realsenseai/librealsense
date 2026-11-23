@@ -12,10 +12,7 @@ interface SettingsPreviewProps {
 export function SettingsPreview({ settings }: SettingsPreviewProps) {
   const { applyProposedSettings, dismissProposedSettings, deviceStates } = useAppStore()
 
-  // Find the device
-  const device = Object.values(deviceStates).find(
-    ds => ds.device.serial_number === settings.deviceSerial
-  )
+  const device = deviceStates[settings.deviceId]
 
   const hasStreamChanges = settings.streamConfigs && settings.streamConfigs.length > 0
   const hasOptionChanges = settings.optionChanges && settings.optionChanges.length > 0
@@ -44,7 +41,7 @@ export function SettingsPreview({ settings }: SettingsPreviewProps) {
           </span>
         </div>
         <span className="text-xs text-gray-400">
-          {device?.device.name || settings.deviceSerial}
+          {device?.device.info.name || settings.deviceId}
         </span>
       </div>
 

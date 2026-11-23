@@ -20,7 +20,7 @@ function App() {
   
   // Check if any device is loading
   const isAnyDeviceLoading = activeDevices.some(ds => ds.isLoading)
-  const loadingDeviceName = activeDevices.find(ds => ds.isLoading)?.device.name
+  const loadingDeviceName = activeDevices.find(ds => ds.isLoading)?.device.info.name
 
   useEffect(() => {
     connectEvents() // once: strict mode's second mount finds it open

@@ -100,8 +100,8 @@ describe('StreamViewer', () => {
 
   describe('Multi-device Support', () => {
     it('shows streams from multiple active streaming devices', () => {
-      const device1 = createMockDevice({ device_id: 'device-1', name: 'D435 Camera 1' })
-      const device2 = createMockDevice({ device_id: 'device-2', name: 'D455 Camera 2' })
+      const device1 = createMockDevice({ device_id: 'device-1', info: { name: 'D435 Camera 1' } })
+      const device2 = createMockDevice({ device_id: 'device-2', info: { name: 'D455 Camera 2' } })
       
       const config1 = createMockStreamConfig({ stream_type: 'depth', enable: true })
       const config2 = createMockStreamConfig({ stream_type: 'depth', enable: true })

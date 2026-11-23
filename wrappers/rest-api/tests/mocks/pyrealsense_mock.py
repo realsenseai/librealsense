@@ -331,7 +331,10 @@ class stream_profile:
         return self._default
 
     def get_extrinsics_to(self, other):
-        raise RuntimeError("no calibration")
+        """Calibrated between video streams, as on a D400; not to the motion ones here"""
+        if {stream.accel, stream.gyro} & {self._stream_type, other._stream_type}:
+            raise RuntimeError("no calibration")
+        return type("extrinsics", (), {"rotation": [1, 0, 0, 0, 1, 0, 0, 0, 1], "translation": [0.015, 0, 0]})()
 
     def is_video_stream_profile(self):
         return isinstance(self, video_stream_profile)
@@ -623,15 +626,13 @@ class debug_protocol(device):
     send_and_receive_raw_data mirrors the real SDK raw path: on success it echoes
     the sent opcode back in the first 4 bytes of the response (little-endian
     uint32).  Pass fw_error_code to simulate a firmware error (the response opcode
-    will differ from the sent opcode), or short_hwm_response=True to simulate a
-    truncated response.
+    will differ from the sent opcode).
     """
 
     def __init__(self, serial_number="1234", name="Test Device",
-                 fw_error_code=None, short_hwm_response=False):
+                 fw_error_code=None):
         super().__init__(serial_number=serial_number, name=name)
         self._fw_error_code = fw_error_code
-        self._short_response = short_hwm_response
 
     def build_command(self, opcode, param1=0, param2=0, param3=0, param4=0, data=None):
         import struct
@@ -640,8 +641,6 @@ class debug_protocol(device):
 
     def send_and_receive_raw_data(self, input_data):
         import struct
-        if self._short_response:
-            return [0x00]
         if self._fw_error_code is not None:
             return list(struct.pack("<I", self._fw_error_code))
         # Success: echo back the opcode from bytes [0-3] of the command buffer.

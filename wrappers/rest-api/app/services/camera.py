@@ -2,14 +2,14 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import pyrealsense2 as rs
 
 from app.models.hwm import HwmRequest
 from app.models.option import AdvancedControl, OptionInfo
 from app.models.sensor import StreamProfile
-from app.models.stream import Extrinsics, StreamConfig, StreamExtrinsics
+from app.models.stream import Extrinsics, StreamConfig
 from app.services import advanced_mode, options
 from app.services.events import Events
 from app.services.frame_sender import STOPPED, FrameSender
@@ -58,24 +58,13 @@ class Camera:
         """The devices-changed callback reports it leaving and coming back, as in the legacy viewer"""
         self.dev.hardware_reset()
 
-    def extrinsics(self) -> List[StreamExtrinsics]:
-        """From each of its streams to every other; calibration, so they hold whatever streams."""
-        streams = {(p.stream_type(), p.stream_index()): p  # per stream, not per resolution
-                   for sensor in self.dev.sensors for p in sensor.get_stream_profiles()}
-        result = []
-        for p in streams.values():
-            to = []
-            for other in streams.values():
-                if other is p:
-                    continue
-                try:
-                    e = p.get_extrinsics_to(other)
-                except RuntimeError:  # no calibration between them
-                    continue
-                to.append(Extrinsics(stream_type=other.stream_type().name, stream_index=other.stream_index(),
-                                     rotation=list(e.rotation), translation=list(e.translation)))
-            result.append(StreamExtrinsics(stream_type=p.stream_type().name, stream_index=p.stream_index(), to=to))
-        return result
+    def extrinsics(self, source: Tuple[str, int], target: Tuple[str, int]) -> Extrinsics:
+        """From one of its streams to another, as the SDK's get_extrinsics_to; calibration, so whatever streams.
+        A stream it lacks 404s; a pair the SDK has no calibration for is its own refusal, 400"""
+        profiles = {(p.stream_type().name, p.stream_index()): p  # per stream, not per resolution
+                    for sensor in self.dev.sensors for p in sensor.get_stream_profiles()}
+        e = profiles[source].get_extrinsics_to(profiles[target])
+        return Extrinsics(rotation=list(e.rotation), translation=list(e.translation))
 
     # ---- colorizer ---------------------------------
 

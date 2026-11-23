@@ -23,7 +23,7 @@ def test_get_device_by_id(setup_mock_managers):
     assert response.status_code == 200
 
     device = response.json()
-    assert device["device_id"] == "device1"
+    assert device["serial_number"] == "device1"
     assert device["name"] == "Test Device 1"
 
     assert client.get("/api/v1/devices/nonexistent").status_code == 404

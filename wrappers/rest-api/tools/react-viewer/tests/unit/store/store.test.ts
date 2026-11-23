@@ -21,10 +21,9 @@ describe('AppStore', () => {
     function enumerateWith(firmwareVersion: string) {
       const device = createMockDevice({
         device_id: 'fw-1',
-        serial_number: 'fw-1',
-        firmware_version: firmwareVersion,
+        info: { serial_number: 'fw-1', firmware_version: firmwareVersion },
       })
-      server.use(http.get('/api/v1/devices/', () => HttpResponse.json([device])))
+      server.use(http.get('/api/v1/devices/', () => HttpResponse.json([device.info])))
       return device
     }
 
@@ -151,7 +150,7 @@ describe('AppStore', () => {
           sensors: [createMockSensor()],
           controls: { [key]: { section: 'Controls', name: '', options: [option] } },
         }) },
-        pendingSettings: { deviceSerial: mockDevice.serial_number,
+        pendingSettings: { deviceId: mockDevice.device_id,
           optionChanges: [{ sensorId: 'Stereo Module', optionId: 'Laser Power', value: 200 }] },
       })
       const fields: unknown[] = []
@@ -252,30 +251,24 @@ describe('AppStore', () => {
   })
 
   describe('fetchDevices', () => {
-    const presentDevice = createMockDevice({ device_id: 'present-1', serial_number: 'present-1' })
-    const goneDevice = createMockDevice({ device_id: 'gone-1', serial_number: 'gone-1' })
-
-    function mockDevicesEndpoint(list: ReturnType<typeof createMockDevice>[]) {
-      server.use(
-        http.get('/api/v1/devices/', () => HttpResponse.json(list))
-      )
-    }
+    const presentDevice = createMockDevice({ device_id: 'present-1', info: { serial_number: 'present-1' } })
+    const goneDevice = createMockDevice({ device_id: 'gone-1', info: { serial_number: 'gone-1' } })
 
     it('never drops a caller: every fetch reaches the backend', async () => {
-      const seen: (string | null)[] = []
+      let seen = 0
       server.use(
-        http.get('/api/v1/devices/', async ({ request }) => {
-          seen.push(new URL(request.url).searchParams.get('force_refresh'))
+        http.get('/api/v1/devices/', async () => {
+          seen += 1
           await new Promise((resolve) => setTimeout(resolve, 20))
-          return HttpResponse.json([presentDevice])
+          return HttpResponse.json([presentDevice.info])
         })
       )
 
-      const cached = useAppStore.getState().fetchDevices(false)
-      await useAppStore.getState().fetchDevices(true)
-      await cached
+      const first = useAppStore.getState().fetchDevices()
+      await useAppStore.getState().fetchDevices()
+      await first
 
-      expect(seen).toEqual([null, 'true'])
+      expect(seen).toBe(2)
       expect(useAppStore.getState().devices.map((d) => d.device_id)).toEqual(['present-1'])
     })
 
@@ -287,9 +280,9 @@ describe('AppStore', () => {
           if (call === 1) {
             // First request is slow and returns a list the second one supersedes.
             await new Promise((resolve) => setTimeout(resolve, 40))
-            return HttpResponse.json([goneDevice])
+            return HttpResponse.json([goneDevice.info])
           }
-          return HttpResponse.json([presentDevice])
+          return HttpResponse.json([presentDevice.info])
         })
       )
 
@@ -343,7 +336,7 @@ describe('AppStore', () => {
         written = `${params.sensorIndex}/${params.optionId}`
         return HttpResponse.json(null)
       }))
-      useAppStore.setState({ pendingSettings: { deviceSerial: mockDevice.serial_number,
+      useAppStore.setState({ pendingSettings: { deviceId: mockDevice.device_id,
         optionChanges: [{ sensorIndex: 1, sensorId: 'no such name', optionId: 'exposure', value: 5 }] } })
 
       await useAppStore.getState().applyProposedSettings()

@@ -24,7 +24,7 @@ function depthSensorModule(page: Page): Locator {
  */
 async function openDeviceCard(page: Page, device: DeviceInfo): Promise<void> {
   const deviceCard = page.locator('[data-testid="device-card"]')
-    .filter({ hasText: device.serial_number })
+    .filter({ hasText: device.info.serial_number })
   // Drive the toggle, not the card: an active card has no click handler, so clicking it
   // delivers the click to whatever control sits at its centre.
   const toggle = deviceCard.locator('button[title$="device"]')
@@ -81,9 +81,9 @@ test.describe('@real-device Real Device Tests', () => {
     await page.goto('/')
 
     // Generous: the card only renders once the socket is up, measured at ~16s on a cold start
-    const card = page.locator('[data-testid="device-card"]').filter({ hasText: device.serial_number })
+    const card = page.locator('[data-testid="device-card"]').filter({ hasText: device.info.serial_number })
     await expect(card).toBeVisible({ timeout: 40000 })
-    await expect(card).toContainText(device.firmware_version!)
+    await expect(card).toContainText(device.info.firmware_version)
   })
 
   test('displays depth frames', async ({ page, device }) => {

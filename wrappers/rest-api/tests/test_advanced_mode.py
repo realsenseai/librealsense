@@ -146,13 +146,3 @@ def test_set_unknown_field_raises(device_for):
 def test_set_unknown_group_raises(device_for):
     with pytest.raises(KeyError):  # answered 404
         advanced_mode.set_control(device_for(_FakeAM()), "nope", "deepSeaSecondPeakThreshold", 1)
-
-
-def test_status_reports_supported_and_enabled(device_for):
-    assert advanced_mode.status(device_for(_FakeAM())) == {"supported": True, "enabled": True}
-    assert advanced_mode.status(device_for(_FakeAM(enabled=False))) == {
-        "supported": True, "enabled": False
-    }
-    assert advanced_mode.status(device_for(_Unsupported())) == {
-        "supported": False, "enabled": False
-    }
