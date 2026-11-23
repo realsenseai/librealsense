@@ -63,6 +63,7 @@ def check_fps_ladder(sensor, exposure, label, matches, tolerance_at_5fps=0.05):
         tested += 1
         exposure_us = set_exposure_half_frame_time(sensor, requested_fps) if exposure == "manual" else None
         fps_helper.TIME_TO_COUNT_FRAMES = count_time
+        fps_helper.TIME_FOR_STEADY_STATE = 2.5 if requested_fps == 5 else 1.2  # D405 color takes over 2 s to its first 5 fps frame
         fps = fps_helper.measure_fps({sensor: [profile]}).get(profile.stream_name(), 0)
         log.info(f"Exposure: {f'{exposure_us / 1000:.1f} [msec]' if exposure_us else exposure}, "
                  f"requested fps: {requested_fps:.1f} [Hz], actual fps: {fps:.1f} [Hz]")
