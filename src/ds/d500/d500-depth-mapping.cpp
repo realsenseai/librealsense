@@ -1018,7 +1018,10 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << requests.size() << " profiles were requested");
 
         _owner->mapping_allowed_or_throw(requests);
-        _owner->select_mapping_stream(requests);
+        // The selection and the commit inside open() are one transaction; an open sensor reports its own error
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
+        if( ! is_opened() )
+            _owner->select_mapping_stream(requests);
         synthetic_sensor::open(requests);
     }
 
