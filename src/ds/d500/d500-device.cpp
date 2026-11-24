@@ -864,7 +864,10 @@ namespace librealsense
         }
         catch( const std::exception & e )
         {
-            LOG_DEBUG( "Control " << id << " not published: " << e.what() );
+            if( id == RS2_OPTION_COUNT )  // an SDK-internal control, no option
+                LOG_DEBUG( "XU control " << int( control ) << " not published: " << e.what() );
+            else
+                LOG_DEBUG( "Control " << id << " not published: " << e.what() );
             return false;
         }
     }
