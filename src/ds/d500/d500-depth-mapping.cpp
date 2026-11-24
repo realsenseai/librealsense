@@ -332,6 +332,12 @@ namespace librealsense
         auto mapping = find_stream( requests, RS2_STREAM_OCCUPANCY );
         if( ! mapping )
             mapping = find_stream( requests, RS2_STREAM_LABELED_POINT_CLOUD );
+        if( ! mapping )
+        {
+            auto const cloud = find_stream( requests, RS2_STREAM_POINT_CLOUD );
+            if( cloud && cloud->get_format() == RS2_FORMAT_XYZRGB32F )
+                mapping = cloud;
+        }
         if( _is_safety_layout || ! mapping )
             return;
         auto const running = get_sensor( _depth_device_idx ).get_active_streams();
@@ -356,6 +362,12 @@ namespace librealsense
         auto mapping = find_stream( active, RS2_STREAM_OCCUPANCY );
         if( ! mapping )
             mapping = find_stream( active, RS2_STREAM_LABELED_POINT_CLOUD );
+        if( ! mapping )
+        {
+            auto const cloud = find_stream( active, RS2_STREAM_POINT_CLOUD );
+            if( cloud && cloud->get_format() == RS2_FORMAT_XYZRGB32F )
+                mapping = cloud;
+        }
         if( ! mapping )
             return;
         uint32_t const fps = mapping->get_framerate();
@@ -555,8 +567,8 @@ namespace librealsense
                 {
                     const auto select = dev.get_xu_range( ds::mapping_xu, ds::STREAM_SELECT, 1 );
                     const auto format = dev.get_xu_range( ds::mapping_xu, ds::PCL_FORMAT, 1 );
-                    _mapping_selectors = !select.max.empty() && select.max[0] >= 3 && !format.max.empty();
-                    _mapping_xyzrgb = _mapping_selectors && format.max[0] >= 1;
+                    _supports_stream_selection = !select.max.empty() && select.max[0] >= 3 && !format.max.empty();
+                    _mapping_xyzrgb = _supports_stream_selection && format.max[0] >= 1;
                 } );
             }
             catch( const std::exception & error )
@@ -976,7 +988,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             = { { { RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY } },
                 { { RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY } },
                 [this]() -> std::shared_ptr< processing_block > {
-                    if( _mapping_selectors )
+                    if( _supports_stream_selection )
                         return std::make_shared< mapping_payload_relabel_block >( RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY );
                     return std::make_shared< identity_processing_block >();
                 } };
@@ -986,7 +998,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             = { { { RS2_FORMAT_Y8, RS2_STREAM_LABELED_POINT_CLOUD } },
                 { { RS2_FORMAT_Y8, RS2_STREAM_LABELED_POINT_CLOUD } },
                 [this]() -> std::shared_ptr< processing_block > {
-                    if( _mapping_selectors )
+                    if( _supports_stream_selection )
                         return std::make_shared< mapping_payload_relabel_block >( RS2_FORMAT_Y8, RS2_STREAM_LABELED_POINT_CLOUD );
                     return std::make_shared< identity_processing_block >();
                 } };
@@ -1080,7 +1092,6 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
 
     void d500_depth_mapping_sensor::open(const stream_profiles& requests)
     {
-        std::lock_guard< std::mutex > lock( _owner->_mapping_session_mutex );
         // D585S keeps its own Mapping stream rules
         if( ! _owner->_is_safety_layout && requests.size() > 1 )
             throw invalid_value_exception(rsutils::string::from()
@@ -1088,68 +1099,43 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << requests.size() << " profiles were requested");
 
         _owner->mapping_allowed_or_throw(requests);
-        if( ! _owner->_mapping_selectors || requests.empty() )
-        {
-            synthetic_sensor::open( requests );
-            return;
-        }
-        auto raw = _owner->_raw_depth_mapping_ep;
-        raw->invoke_if_closed( []() {} );
-        const auto & profile = requests.front();
-        const uint8_t select = profile->get_stream_type() == RS2_STREAM_POINT_CLOUD ? 1 :
-            profile->get_stream_type() == RS2_STREAM_LABELED_POINT_CLOUD ? 2 : 3;
-        const uint8_t format = profile->get_format() == RS2_FORMAT_XYZRGB32F ? 1 : 0;
-        raw->invoke_powered( [&]( platform::uvc_device & dev )
-        {
-            std::lock_guard< platform::uvc_device > device_lock( dev );
-            uint8_t previous_select = 0, previous_format = 0;
-            if( ! dev.get_xu( ds::mapping_xu, ds::STREAM_SELECT, &previous_select, 1 ) ||
-                ! dev.get_xu( ds::mapping_xu, ds::PCL_FORMAT, &previous_format, 1 ) )
-                throw io_exception( "Cannot read USB Mapping selection before open" );
-            try
+        // Selection and COMMIT share both the sensor configuration and device control locks.
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
+        // Reject before synthetic_sensor::open replaces the active converters.
+        if( is_opened() )
+            throw wrong_api_call_sequence_exception( "The Depth Mapping sensor is already open" );
+        if( _owner->_supports_stream_selection && ! requests.empty() )
+            _owner->_raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
             {
-                if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &select, 1 ) ||
-                    ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &format, 1 ) )
-                    throw io_exception( "Firmware rejected USB Mapping stream or point-cloud format" );
+                std::lock_guard< platform::uvc_device > device_lock( dev );
+                _owner->select_mapping_stream( requests );
                 synthetic_sensor::open( requests );
-            }
-            catch( ... )
-            {
-                if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &previous_select, 1 ) ||
-                    ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &previous_format, 1 ) )
-                    LOG_ERROR( "Cannot restore USB Mapping selection after failed open" );
-                throw;
-            }
-        } );
+            } );
+        else
+            synthetic_sensor::open( requests );
     }
 
-    void d500_depth_mapping_sensor::close()
+    void d500_depth_mapping::select_mapping_stream( const stream_profiles & requests ) const
     {
-        std::lock_guard< std::mutex > lock( _owner->_mapping_session_mutex );
-        if( !_owner->_mapping_selectors )
-        {
-            synthetic_sensor::close();
+        static const std::map< rs2_stream, uint8_t > stream_select = { { RS2_STREAM_POINT_CLOUD, ds::MAPPING_STREAM_PCL },
+                                                                      { RS2_STREAM_LABELED_POINT_CLOUD, ds::MAPPING_STREAM_LPCL },
+                                                                      { RS2_STREAM_OCCUPANCY, ds::MAPPING_STREAM_OG } };
+        if( ! _supports_stream_selection || requests.empty() )
             return;
-        }
-        // Keep the USB interfaces claimed through close and selector restore.
-        // Releasing power between them lets the kernel re-probe the Mapping
-        // interface while the previous firmware graph is still retiring.
-        _owner->_raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
+        rs2_stream const type = requests.front()->get_stream_type();
+        auto const it = stream_select.find( type );
+        if( it == stream_select.end() )
+            return;
+        LOG_DEBUG( "Mapping XU stream select " << int( it->second ) << " for " << rs2_stream_to_string( type ) );
+        // Writable copies: on Windows the KS SET buffer is in/out, and a read-only one faults
+        uint8_t select = it->second;
+        uint8_t format = requests.front()->get_format() == RS2_FORMAT_XYZRGB32F ? 1 : ds::MAPPING_PCL_FORMAT_XYZ;
+        _raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
         {
-            synthetic_sensor::close();
-            std::lock_guard< platform::uvc_device > device_lock( dev );
-            const uint8_t automatic = 0;
-            try
-            {
-                bool restored = dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 );
-                restored = dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) && restored;
-                if( ! restored )
-                    LOG_WARNING( "Cannot restore automatic USB Mapping selection after close" );
-            }
-            catch( const std::exception & error )
-            {
-                LOG_WARNING( "Cannot restore automatic USB Mapping selection after close: " << error.what() );
-            }
+            if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &select, sizeof( select ) )
+                || ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &format, sizeof( format ) ) )
+                throw io_exception( rsutils::string::from()
+                                    << "Failed to select " << rs2_stream_to_string( type ) << " on the Mapping XU" );
         } );
     }
 

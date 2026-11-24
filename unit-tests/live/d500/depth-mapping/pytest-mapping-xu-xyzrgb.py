@@ -120,6 +120,28 @@ def test_mapping_shared_endpoint_switch_and_reopen(mapping):
     capture(mapping, first, count=6)
 
 
+def test_failed_second_open_preserves_first_mapping(mapping):
+    first = select(mapping, rs.stream.point_cloud, rs.format.xyzrgb32f, 640, 480, 15)
+    second = select(mapping, rs.stream.point_cloud, rs.format.xyz32f, 640, 480, 30)
+    frames = []
+    mapping.open(first)
+    try:
+        with pytest.raises(RuntimeError):
+            mapping.open(second)
+        mapping.start(lambda frame: frames.append(frame) if len(frames) < 6 else None)
+        try:
+            deadline = time.monotonic() + 8
+            while len(frames) < 6 and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert len(frames) == 6
+            assert all(frame.get_profile().format() == rs.format.xyzrgb32f for frame in frames)
+            assert all(frame.get_data_size() == 640 * 480 * 16 for frame in frames)
+        finally:
+            mapping.stop()
+    finally:
+        mapping.close()
+
+
 @pytest.mark.parametrize("width,height", [(640, 480), (1280, 720)])
 def test_xyzrgb_depth_peer_stop_restart(mapping, test_device, width, height):
     device, _ = test_device
