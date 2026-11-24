@@ -1139,9 +1139,17 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             synthetic_sensor::close();
             std::lock_guard< platform::uvc_device > device_lock( dev );
             const uint8_t automatic = 0;
-            if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 ) ||
-                ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) )
-                throw io_exception( "Cannot restore automatic USB Mapping selection after close" );
+            try
+            {
+                bool restored = dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &automatic, 1 );
+                restored = dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &automatic, 1 ) && restored;
+                if( ! restored )
+                    LOG_WARNING( "Cannot restore automatic USB Mapping selection after close" );
+            }
+            catch( const std::exception & error )
+            {
+                LOG_WARNING( "Cannot restore automatic USB Mapping selection after close: " << error.what() );
+            }
         } );
     }
 
