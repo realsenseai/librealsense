@@ -1094,7 +1094,7 @@ namespace librealsense
             {
                 for(size_t i = 0; i < buffers; ++i)
                 {
-                    _buffers.push_back(std::make_shared<buffer>(_fd, _dev.buf_type, _use_memory_map, i));
+                    _buffers.push_back(std::make_shared<buffer>(_fd, _dev.buf_type, _use_memory_map, i, _userptr_dma));
                 }
             }
             else

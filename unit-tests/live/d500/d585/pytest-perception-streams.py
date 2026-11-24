@@ -182,7 +182,6 @@ def test_standalone_lifecycle(device, stream):
 @pytest.mark.device_exclude( "D555" )
 def test_mapping_stream_switch(device):
     """One Mapping sensor switches Point Cloud -> Labeled Point Cloud -> Occupancy -> Point Cloud, each with valid frames."""
-    skip_d585_on_gmsl( device, REASON )
     require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "labeled point cloud" )
     frames = Collector()
     for stream_type in ( rs.stream.point_cloud, rs.stream.labeled_point_cloud, rs.stream.occupancy, rs.stream.point_cloud ):

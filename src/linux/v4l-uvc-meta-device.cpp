@@ -21,6 +21,7 @@ namespace librealsense
             v4l_uvc_device(info,use_memory_map),
             _md_fd(-1),
             _md_name(info.metadata_node_id),
+            _md_use_memory_map(use_memory_map),
             _md_capabilities_assigned(false)
         {
         }
@@ -69,7 +70,7 @@ namespace librealsense
                 return;
             }
             req_io_buff(_md_fd, num, _name,
-                        _use_memory_map ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR,
+                        _md_use_memory_map ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR,
                         _md_type);
         }
 
@@ -84,7 +85,7 @@ namespace librealsense
                     // D457 development - added for mipi device, for IR because no metadata there
                     if (_md_fd == -1)
                         continue;
-                    _md_buffers.push_back(std::make_shared<buffer>(_md_fd, _md_type, _use_memory_map, i));
+                    _md_buffers.push_back(std::make_shared<buffer>(_md_fd, _md_type, _md_use_memory_map, i));
                 }
             }
             else
@@ -251,7 +252,7 @@ namespace librealsense
 
                 v4l2_buffer buf{};
                 buf.type = _md_type;
-                buf.memory = _use_memory_map ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR;
+                buf.memory = _md_use_memory_map ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR;
 
                 // W/O multiplexing this will create a blocking call for metadata node
                 if(xioctl(_md_fd, VIDIOC_DQBUF, &buf) < 0)

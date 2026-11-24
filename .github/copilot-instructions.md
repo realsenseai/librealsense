@@ -13,7 +13,7 @@ Detailed how-to guides for common tasks are maintained as agent skills under `.c
 | `.claude/skills/testing/SKILL.md` | Running, filtering, and debugging unit tests |
 | `.claude/skills/pytest-infra/SKILL.md` | Writing a new pytest test, modifying pytest/hub infrastructure |
 | `.claude/skills/pr-create/SKILL.md` | Opening a pull request, pushing commits to it, updating its description |
-| `.claude/skills/pr-review/SKILL.md` | Replying to review comments on a pull request |
+| `.claude/skills/pr-review/SKILL.md` | Reviewing a pull request, replying to review comments on one |
 
 If a skill exists for the task at hand, follow its instructions precisely. New skills may be added to `.claude/skills/` over time — check its contents before assuming none applies.
 

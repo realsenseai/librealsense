@@ -22,8 +22,8 @@ namespace librealsense
 {
     namespace platform
     {
-        buffer::buffer(int fd, v4l2_buf_type type, bool use_memory_map, uint32_t index)
-            : _type(type), _use_memory_map(use_memory_map), _index(index)
+        buffer::buffer(int fd, v4l2_buf_type type, bool use_memory_map, uint32_t index, bool userptr_dma)
+            : _type(type), _use_memory_map(use_memory_map), _index(index), _userptr_dma(userptr_dma && ! use_memory_map)
         {
             v4l2_buffer buf = {};
             struct v4l2_plane planes[VIDEO_MAX_PLANES] = {};
@@ -48,6 +48,7 @@ namespace librealsense
                 md_extra = 0;
             }
             _length = _original_length + md_extra;
+            _qbuf_length = _length;
 
             if (use_memory_map)
             {
@@ -61,6 +62,26 @@ namespace librealsense
                 // points directly at it can be read by GPU kernels with no host-to-device copy. No-op
                 // off integrated GPUs; on failure the GPU path simply falls back to copying.
                 if( rs_v4l2_zc_register( _start, _original_length ) )
+                    _zc_registered = true;
+#endif
+            }
+            else if( _userptr_dma )
+            {
+                // Pageable memory the kernel can pin for DMA (not CUDA host memory, which it can't pin).
+                // QBUF needs a length that is a multiple of the arm64 DMA alignment (128, not the 64-byte
+                // cache line); _length stays exact for the frame-size checks.
+                constexpr uint32_t dma_align = 128;
+                const size_t page = static_cast< size_t >( sysconf( _SC_PAGESIZE ) );
+                _qbuf_length = ( _length + dma_align - 1 ) & ~( dma_align - 1 );
+                const size_t alloc_len = ( size_t( _qbuf_length ) + page - 1 ) & ~( page - 1 );
+                void * p = nullptr;
+                if( posix_memalign( &p, page, alloc_len ) != 0 || ! p )
+                    throw linux_backend_exception( "posix_memalign for USERPTR DMA buffer failed!" );
+                _start = static_cast< uint8_t * >( p );
+                memset( _start, 0, alloc_len );
+#ifdef RS2_USE_CUDA_ZEROCOPY
+                // Map it for the GPU too, like the MMAP path does, so a zero-copy frame stays GPU-resident.
+                if( rs_v4l2_zc_register( _start, alloc_len ) )
                     _zc_registered = true;
 #endif
             }
@@ -86,7 +107,7 @@ namespace librealsense
             buf.type = _type;
             buf.memory = _use_memory_map ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR;
             buf.index = _index;
-            buf.length = _length;
+            buf.length = _qbuf_length;
             if (_type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
                 buf.m.planes = planes;
                 buf.length = 1;
@@ -111,6 +132,14 @@ namespace librealsense
 #endif
                if(munmap(_start, _original_length) < 0)
                    LOG_DEBUG_V4L("munmap failed on buffer Dtor");
+            }
+            else if( _userptr_dma )
+            {
+#ifdef RS2_USE_CUDA_ZEROCOPY
+               if( _zc_registered )
+                   rs_v4l2_zc_unregister( _start );
+#endif
+               free( _start );
             }
             else
             {
@@ -141,7 +170,7 @@ namespace librealsense
 
             if (_must_enqueue || force)
             {
-                if (!_use_memory_map)
+                if (!_use_memory_map && !_userptr_dma)  // MIPI metadata comes from its own node, not the buffer tail
                 {
                     auto metadata_offset = get_full_length() - MAX_META_DATA_SIZE;
                     memset((uint8_t *)(get_frame_start()) + metadata_offset, 0, MAX_META_DATA_SIZE);

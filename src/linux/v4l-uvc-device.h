@@ -145,6 +145,7 @@ namespace librealsense
                 struct v4l2_cropcap cropcap;
             } _dev;
             bool _use_memory_map;
+            bool _userptr_dma = false;          // USERPTR video buffers are DMA targets (MIPI); see buffer
             int _max_fd = 0;                    // specifies the maximal pipe number the polling process will monitor
             std::vector<int>  _fds;             // list the file descriptors to be monitored during frames polling
             buffers_mgr     _buf_dispatch;      // Holder for partial (MD only) frames that shall be preserved between 'select' calls when polling v4l buffers

@@ -160,3 +160,85 @@ def test_capture_zero_copy_covers_depth(test_device):
         log.info("zero-copy capture ACTIVE for both depth and color")
     finally:
         pipe.stop()
+
+
+def _native_profile(dev, stream, formats):
+    """A raw (unconverted) profile of the stream at FPS, so its frames point at the capture buffer.
+    Prefers 1280x720, else the largest. None if the device has none."""
+    found = []
+    for s in dev.query_sensors():
+        for p in s.get_stream_profiles():
+            if p.stream_type() != stream or p.format() not in formats or p.fps() != FPS:
+                continue
+            if stream == rs.stream.infrared and p.stream_index() > 1:
+                continue
+            v = p.as_video_stream_profile()
+            found.append(((v.width(), v.height()) == (1280, 720), v.width() * v.height(), p))
+    return max(found, key=lambda f: f[:2])[2] if found else None
+
+
+# Every GMSL node type: depth, IR (on a D585 the IR node also carries the multiplexed streams) and color
+@pytest.mark.device_type("GMSL")
+@pytest.mark.device_each("D585")
+@pytest.mark.parametrize("stream,formats", [
+    (rs.stream.depth, (rs.format.z16,)),
+    (rs.stream.infrared, (rs.format.y8,)),
+    (rs.stream.color, (rs.format.yuyv, rs.format.uyvy)),
+], ids=["depth", "ir", "color"])
+def test_gmsl_zero_copy_frames_are_cached(test_device, stream, formats):
+    """RSDEV-16739: a zero-copy frame points at the capture buffer, so on GMSL that buffer must be
+    CPU-cached. The Tegra VI driver's own MMAP buffers are mapped uncached, and reading a frame from
+    them is ~10x slower than from ordinary memory, which made CPU consumers (e.g. point cloud) drop
+    frames. The MIPI backend captures into its own cached USERPTR buffers instead.
+
+    Compares the time to copy the frame out against copying the same amount of ordinary, not
+    recently touched memory."""
+    import time
+    dev, ctx = test_device
+    if not hasattr(rs.frame, "get_gpu_data_or_upload"):
+        pytest.skip("pyrealsense2 built without the GPU-frame API")
+    profile = _native_profile(dev, stream, formats)
+    if not profile:
+        pytest.skip("no raw {} profile at {} fps".format(stream, FPS))
+    v = profile.as_video_stream_profile()
+
+    pipe = rs.pipeline(ctx)
+    cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
+    cfg.enable_stream(stream, profile.stream_index(), v.width(), v.height(), profile.format(), FPS)
+    try:
+        pipe.start(cfg)
+    except RuntimeError as e:
+        pytest.skip("cannot stream {}: {}".format(profile, e))
+    try:
+        for _ in range(WARMUP):
+            pipe.wait_for_frames()
+        frame_ms, ordinary_ms = [], []
+        pool = np.ones(64 << 20, dtype=np.uint8)  # bigger than the CPU caches
+        offset = 0
+        for _ in range(20):
+            frame = pipe.wait_for_frames().first_or_default(stream)
+            if not frame:
+                continue
+            gpu_data = frame.get_gpu_data_or_upload()
+            if gpu_data is None:
+                pytest.skip("no CUDA / RS2_USE_CUDA_ZEROCOPY build")
+            if gpu_data[1]:
+                pytest.skip("{} frame is not zero-copy on this build/platform".format(stream))
+            data = np.asanyarray(frame.get_data()).view(np.uint8).reshape(-1)
+            t = time.perf_counter()
+            data.copy()
+            frame_ms.append((time.perf_counter() - t) * 1000)
+            offset = (offset + data.size) % (pool.size - data.size)
+            t = time.perf_counter()
+            pool[offset:offset + data.size].copy()
+            ordinary_ms.append((time.perf_counter() - t) * 1000)
+        frame = data = None  # release the last frame before stop()
+        assert len(frame_ms) >= 10, "too few {} frames received".format(stream)
+        frame_med, ordinary_med = float(np.median(frame_ms)), float(np.median(ordinary_ms))
+        log.info("%s: copy of a zero-copy frame: %.3f ms, of ordinary memory: %.3f ms", profile, frame_med, ordinary_med)
+        assert frame_med < 4 * ordinary_med, \
+            "reading a zero-copy {} frame took {:.2f} ms vs {:.2f} ms for ordinary memory: the capture " \
+            "buffer is not CPU-cached".format(stream, frame_med, ordinary_med)
+    finally:
+        pipe.stop()

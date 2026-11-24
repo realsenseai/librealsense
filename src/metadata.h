@@ -32,6 +32,7 @@ namespace librealsense
     // Intel Configuration:
     // version 2: gpioInputData added to md_configuration (with its flag)
     // version 3: sub_preset_info added to md_configuration (with its flag)
+    // version 5: ae_policy added to md_configuration (depth/IR) and md_rgb_configuration (RGB), with its flag
     const int META_DATA_INTEL_CONFIGURATION_VERSION   = 0x3; 
     const int META_DATA_INTEL_STAT_VERSION            = 0x1;
     const int META_DATA_INTEL_CAPTURE_TIMING_VERSION  = 0x1;
@@ -230,7 +231,8 @@ namespace librealsense
         trigger_attribute               = (1u << 7),
         calibration_count_attribute     = (1u << 8),
         gpio_input_data_attribute       = (1u << 9),
-        sub_preset_info_attribute       = (1u << 10)
+        sub_preset_info_attribute       = (1u << 10),
+        ae_policy_attribute             = (1u << 11)
     };
 
     /**\brief md_stat_attributes - bit mask to find active attributes,
@@ -527,8 +529,12 @@ namespace librealsense
         uint16_t            calibration_count;
         uint8_t             gpioInputData;
         uint32_t            sub_preset_info;
-        uint8_t             source_index;   //  Version 4+: which of several sources multiplexed on one stream
+        union
+        {
+            uint8_t         source_index;   //  Version 4+, RGB: which of several sources multiplexed on one stream
                                             //  produced the frame (D5x dual RGB: 0 = left, 1 = right)
+            uint8_t         ae_policy;      //  Version 5+, depth/IR: applied AE policy (rs2_colored_ir_auto_exposure_mode)
+        };
 
         typedef enum sub_preset_bit_mask
         {
@@ -550,6 +556,14 @@ namespace librealsense
     };
 
     REGISTER_MD_TYPE(md_configuration, md_type::META_DATA_INTEL_CONFIGURATION_ID)
+
+    /**\brief RGB md_configuration, version 5+: one byte longer, carrying the applied AE policy after source_index.*/
+    struct md_rgb_configuration : md_configuration
+    {
+        uint8_t             rgb_ae_policy;
+    };
+
+    REGISTER_MD_TYPE(md_rgb_configuration, md_type::META_DATA_INTEL_CONFIGURATION_ID)
 
     /**\brief md_intel_stat
      *  Corresponds to FW's STMetaDataIntelStat object*/

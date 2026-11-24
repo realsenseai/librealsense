@@ -503,7 +503,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     if test.name == "test-fw-update" and custom_fw_d585_path:
         opts.append('--custom-fw-d585')
         opts.append(custom_fw_d585_path)
-    if test.name == 'test-fw-update' and sns and len( sns ) == 1:
+    if test.name in ( 'test-fw-update', 'test-live-memory-sensor-option' ) and sns and len( sns ) == 1:
         opts.append( '--serial' )
         opts.append( next( iter( sns ) ) )
     try:

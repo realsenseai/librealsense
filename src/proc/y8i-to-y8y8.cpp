@@ -4,11 +4,13 @@
 #include "y8i-to-y8y8.h"
 
 #include <src/stream.h>
-#include <src/image.h>
+#if defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+#endif
 
 #ifdef RS2_USE_CUDA
 #include "cuda/cuda-conversion.cuh"
-#include "rsutils/accelerators/gpu.h"
+#include "cuda-host-split.h"
 #endif
 
 namespace librealsense
@@ -18,15 +20,34 @@ namespace librealsense
     {
         auto count = width * height;
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+        if( use_gpu_for_host_split() )
         {
             rscuda::split_frame_y8_y8_from_y8i_cuda(dest, count, reinterpret_cast<const y8i_pixel*>(source));
             return;
         }
 #endif
-        split_frame(dest, count, reinterpret_cast<const y8i_pixel*>(source),
-            [](const y8i_pixel & p) -> uint8_t { return p.l; },
-            [](const y8i_pixel & p) -> uint8_t { return p.r; });
+        if( ! dest )
+            return;
+        uint8_t * left = dest[0];
+        uint8_t * right = dest[1];
+#if defined(__SSE2__) || defined(_M_X64)
+        // Each 16-bit lane holds one left/right pair, with the left sample in the low byte.
+        const auto low_byte = _mm_set1_epi16( 0xff );
+        for( ; count >= 16; count -= 16, source += 32, left += 16, right += 16 )
+        {
+            const auto first = _mm_loadu_si128( reinterpret_cast< const __m128i * >( source ) );
+            const auto second = _mm_loadu_si128( reinterpret_cast< const __m128i * >( source + 16 ) );
+            _mm_storeu_si128( reinterpret_cast< __m128i * >( left ),
+                              _mm_packus_epi16( _mm_and_si128( first, low_byte ), _mm_and_si128( second, low_byte ) ) );
+            _mm_storeu_si128( reinterpret_cast< __m128i * >( right ),
+                              _mm_packus_epi16( _mm_srli_epi16( first, 8 ), _mm_srli_epi16( second, 8 ) ) );
+        }
+#endif
+        for( ; count > 0; --count )
+        {
+            *left++ = *source++;
+            *right++ = *source++;
+        }
     }
 
     y8i_to_y8y8::y8i_to_y8y8(int left_idx, int right_idx) :
