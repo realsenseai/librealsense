@@ -178,8 +178,11 @@ namespace librealsense
             // Formats PNG can't represent losslessly (YUYV-class packed formats):
             // zstd the raw pixels; the format string carries the layout for external consumers.
             compress_zstd(pixels, size, _frame_buf);
-            msg.format(rsutils::string::from() << rs2_format_to_string(format) << "; zstd; "
-                                               << width << "x" << height << " step=" << stride);
+            if( format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264 )  // entropy-coded: no rows, so no geometry to describe
+                msg.format( rsutils::string::from() << rs2_format_to_string( format ) << "; zstd; size=" << size );
+            else
+                msg.format(rsutils::string::from() << rs2_format_to_string(format) << "; zstd; "
+                                                   << width << "x" << height << " step=" << stride);
         }
         msg.data(std::move(_frame_buf));
 
