@@ -29,10 +29,12 @@ namespace librealsense
         friend class d500_object_detection_sensor;
 
         void register_metadata( std::shared_ptr< uvc_sensor > raw_od_ep );
-        void register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep );
+        void register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep,
+                                         std::shared_ptr< global_time_option > global_time );
 
     protected:
         std::shared_ptr< stream_interface > _object_detection_stream;
+        std::shared_ptr< stream_interface > _custom_nn_stream;
         uint8_t _object_detection_device_idx = 0;
     };
 

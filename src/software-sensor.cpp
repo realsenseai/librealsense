@@ -289,8 +289,10 @@ frame_interface * software_sensor::allocate_new_video_frame( video_stream_profil
                                                              int bpp,
                                                              frame_additional_data && data )
 {
-    auto frame = allocate_new_frame( profile->get_stream_type() == RS2_STREAM_DEPTH ? RS2_EXTENSION_DEPTH_FRAME
-                                                                                    : RS2_EXTENSION_VIDEO_FRAME,
+    auto const stream = profile->get_stream_type();
+    auto frame = allocate_new_frame( stream == RS2_STREAM_DEPTH       ? RS2_EXTENSION_DEPTH_FRAME
+                                     : stream == RS2_STREAM_CUSTOM_NN ? RS2_EXTENSION_CUSTOM_NN_FRAME
+                                                                      : RS2_EXTENSION_VIDEO_FRAME,
                                      profile,
                                      std::move( data ) );
     if( frame )
@@ -301,6 +303,7 @@ frame_interface * software_sensor::allocate_new_video_frame( video_stream_profil
             throw std::runtime_error("Frame is not video frame");
 
         vid_frame->assign( profile->get_width(), profile->get_height(), stride, bpp * 8 );
+        vid_frame->set_data_size( size_t( stride ) * profile->get_height() );  // the pixels are in a continuation
     }
     return frame;
 }

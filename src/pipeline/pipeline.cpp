@@ -20,7 +20,8 @@ namespace librealsense
             _ctx(ctx),
             _dispatcher(10, "pipeline"),
             _hub( device_hub::make( ctx, RS2_PRODUCT_LINE_ANY_INTEL )),
-            _synced_streams({ RS2_STREAM_COLOR, RS2_STREAM_DEPTH, RS2_STREAM_INFRARED, RS2_STREAM_FISHEYE })
+            // Custom NN carries the timestamp of the Color frame it ran on, so it is synced to pair with it
+            _synced_streams({ RS2_STREAM_COLOR, RS2_STREAM_DEPTH, RS2_STREAM_INFRARED, RS2_STREAM_FISHEYE, RS2_STREAM_CUSTOM_NN })
         {}
 
         pipeline::~pipeline()
