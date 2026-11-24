@@ -85,11 +85,8 @@ function choose_kernel_branch {
 		"6.11")
 			echo hwe-6.11
 			;;
-		"6.14")
+		"6.14"|"7.0")
 			echo hwe-6.14
-			;;
-		"7.0")
-			echo hwe-7.0
 			;;
 		*)
 			#error message shall be redirected to stderr to be printed properly
