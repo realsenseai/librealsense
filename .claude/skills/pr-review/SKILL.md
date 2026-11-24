@@ -1,15 +1,31 @@
 ---
 name: pr-review
-description: Reply to human or bot review comments on a librealsense pull request. Use before responding to PR review threads.
+description: Review a librealsense pull request (ticket scope, minimal changes, what to flag) and reply to human or bot review comments on one. Use before reviewing a PR or responding to PR review threads.
 ---
 
 # PR Review Workflow
 
 ## When to Use This Skill
 
-Replying to review comments (human or bot) on a `realsenseai/librealsense` pull request.
+Reviewing a `realsenseai/librealsense` pull request, or replying to review comments (human or bot) on one.
 
 For opening a PR, pushing commits to one, or updating its description, see the `pr-create` skill (`.claude/skills/pr-create/SKILL.md`).
+
+## Reviewing a Pull Request
+
+**Ticket.** The tracking ticket named in the PR title or description (see `pr-create`) defines the scope. Check that the description matches the ticket and that each ticket ask or acceptance criterion is covered. A team PR with no ticket gets a comment asking for one.
+
+**Scope.** Changes must be minimal and self-contained (see "Code Change Discipline" in `.github/copilot-instructions.md`). Flag, with file:line:
+- Changes no ticket ask needs.
+- Rewrites or restructuring of existing logic where a smaller change meets the ask.
+- File or identifier renames the ticket doesn't require.
+- Formatting-only churn (hunks that vanish when whitespace is ignored).
+- New dependencies (`CMakeLists.txt`, `CMake/`, `third-party/`, `find_package` / `FetchContent`, `requirements*.txt`).
+- Public API changes (`include/librealsense2/`, `src/realsense.def`, wrappers) — these must follow the `add-api` skill.
+
+**What to flag.** Real bugs, performance problems, dead code and unused constants, and new tests that CI never builds or runs (check the gating CMake option, context marker and `.github/workflows/`).
+
+**Comments.** One point per comment. Verify the premise in the code before calling something a bug. Read the surrounding code at the head commit, not just the diff.
 
 ## Responding to Review Comments
 
