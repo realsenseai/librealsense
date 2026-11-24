@@ -40,6 +40,7 @@ static const char * class_label( int class_id )
 
 int main( int /*argc*/, char * /*argv*/[] ) try
 {
+    rs2::rum::set_app_name( "rs-object-detection" );
     rs2::pipeline pipe;
     rs2::config   cfg;
 

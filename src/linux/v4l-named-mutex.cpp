@@ -116,6 +116,7 @@ namespace librealsense
 
         void named_mutex::lock()
         {
+            std::lock_guard< std::mutex > guard( _fd_mtx );
             if( _lock_counter.fetch_add( 1 ) == 0 )
             {
                 try
@@ -159,6 +160,7 @@ namespace librealsense
 
         void named_mutex::unlock()
         {
+            std::lock_guard< std::mutex > guard( _fd_mtx );
             if( _lock_counter.fetch_add( -1 ) == 1 )
             {
                 struct flock fl;
@@ -167,17 +169,17 @@ namespace librealsense
                 fl.l_start = 0;
                 fl.l_len = 0;
                 fl.l_type = F_UNLCK;
-                auto ret = fcntl( _fildes, F_OFD_SETLKW, &fl );
-
-                // Closing the fd releases the OFD lock even if the explicit unlock failed, so close before throwing
+                // Don't throw: unlock() runs in lock_guard destructors, where an exception terminates the process.
+                // Closing the fd releases the OFD lock even if the explicit unlock failed
+                if( 0 != fcntl( _fildes, F_OFD_SETLKW, &fl ) )
+                    LOG_ERROR( "named_mutex: unlocking '" << _device_path << "' failed, errno " << errno );
                 close_fd();
-                if( 0 != ret )
-                    throw linux_backend_exception( rsutils::string::from() << __FUNCTION__ << ": unlocking failed" );
             }
         }
 
         bool named_mutex::try_lock()
         {
+            std::lock_guard< std::mutex > guard( _fd_mtx );
             if( _lock_counter.fetch_add( 1 ) == 0 )
             {
                 try

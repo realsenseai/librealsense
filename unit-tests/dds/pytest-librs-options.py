@@ -160,4 +160,4 @@ else:
         with pytest.raises( RuntimeError, match=re.escape( 'option is read-only: R/O Option' ) ):
             s.set_option_value( ro, 'Blah' )
 
-    # Serialization of DDS devices now implemented using advanced_mode interface, tested under live-options-presets UT
+    # Serialization of DDS devices now implemented using advanced_mode interface, tested under live/options/pytest-advanced-mode.py

@@ -24,6 +24,7 @@ using namespace std;
 
 int main(int argc, char** argv) try
 {
+    rs2::rum::set_app_name( "rs-convert" );
     // Parse command line arguments
     using cli = rs2::cli;
 

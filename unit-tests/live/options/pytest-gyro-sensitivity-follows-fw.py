@@ -8,6 +8,8 @@ from imu_sensitivity_helpers import restore_sensitivity, stream_imu_once
 import logging
 log = logging.getLogger(__name__)
 
+OPTIONS = [rs.option.gyro_sensitivity, rs.option.accel_sensitivity]
+
 # On USB (HID) the SDK must follow the FW sensitivity and write it only when the user sets the option.
 # Note: the value set by one application stays in FW and is seen by the next one.
 pytestmark = [
@@ -15,9 +17,8 @@ pytestmark = [
     pytest.mark.device_type_exclude("DDS", "GMSL"),
     pytest.mark.skipif(platform.machine() == "aarch64", reason="D455 not available on CI Jetson"),
     pytest.mark.skipif(platform.system() != "Linux", reason="FW sensitivity read-back is implemented on Linux backends only"),
+    pytest.mark.requires(option=OPTIONS),  # either one; a test of the other one skips
 ]
-
-OPTIONS = [rs.option.gyro_sensitivity, rs.option.accel_sensitivity]
 
 
 def _motion_sensor_of_same_device(ctx, serial):

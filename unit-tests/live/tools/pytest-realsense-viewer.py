@@ -1,24 +1,17 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 Intel Corporation. All Rights Reserved.
 
-import os, platform, re, shutil, subprocess, sys
-import logging
 import pytest
-from rspy import repo
-
-log = logging.getLogger(__name__)
-
-ansi_escape = re.compile( rb'\x1b\[[0-9;]*m' )
-frame_prefix = re.compile( rb'^\[\d{4}\] ', re.MULTILINE )
+import pyrealsense2 as rs
+from rspy.pytest.device_helpers import parse_fw_version
+from viewer_helper import run_viewer_tests
 
 # the tests in the realsense-viewer-tests executable are defined along the tester file itself at
 # tools/realsense-viewer/tests/. Using the --auto flag allows us to run all tests one by one.
 # If we want to run a specific test / test group, we can use the -r flag
 
 pytestmark = [
-    pytest.mark.device_each("D400*"),
-    # D500 is currently disabled until all tests pass there
-    #pytest.mark.device_each("D500*"),
+    pytest.mark.device_each("D400*", "D500*"),
     pytest.mark.context("nightly"),
     pytest.mark.context("gui"),
     # Override the 200s default from conftest.py: mem_leak_depth_start_stop is a ~2.5 min
@@ -31,76 +24,32 @@ pytestmark = [
 ]
 
 
-def _run_viewer_tests( test_filter=None ):
-    viewer_tests = repo.find_built_exe('tools/realsense-viewer', 'realsense-viewer-tests')
-    assert viewer_tests, "realsense-viewer-tests not found"
-
-    cmd = []
-    env = None
-
-    # On headless Linux (no $DISPLAY), wraps the executable with xvfb-run for a virtual display.
-    if platform.system() == 'Linux' and not os.environ.get( 'DISPLAY' ):
-        xvfb = shutil.which( 'xvfb-run' )
-        if not xvfb:
-            pytest.skip( 'No DISPLAY and xvfb-run not found; install xvfb (apt install xvfb)' )
-        log.debug( 'no DISPLAY set; using xvfb-run with software rendering' )
-        cmd += [xvfb, '-a']
-        env = dict( os.environ, LIBGL_ALWAYS_SOFTWARE='1' )
-
-    # On some Windows machines OpenGL is not available, so we use Mesa's software renderer to provide it
-    # On those machines we expect Mesa's OpenGL implementation dll files under C:\mesa
-    # URL: https://github.com/pal1000/mesa-dist-win/releases
-    if platform.system() == 'Windows':
-        mesa_dir = r'C:\mesa'
-        exe_dir = os.path.dirname( viewer_tests )
-        for dll in ['opengl32.dll', 'libgallium_wgl.dll']:
-            src = os.path.join( mesa_dir, dll )
-            dst = os.path.join( exe_dir, dll )
-            if os.path.isfile( src ) and not os.path.isfile( dst ):
-                log.debug( 'copying Mesa %s to %s', dll, exe_dir )
-                shutil.copy2( src, dst )
-
-    cmd += [viewer_tests, '--auto']
-    if test_filter:
-        cmd += ['-r', test_filter]
-    log.debug( 'running: %s', ' '.join( cmd ) )
-    # Cap the child below the per-test pytest.mark.timeout(400) above so the subprocess
-    # is reaped here rather than leaked when the outer test thread is killed.
-    child_timeout = 340
-    p = subprocess.Popen( cmd,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          env=env )
-    def emit_stdout( stdout_bytes ):
-        # Strip ANSI color codes + imgui test-engine frame-count prefix, then send each
-        # line through the logger so the per-test outcomes (e.g. "Test: 'streaming' ...",
-        # "Tests Result: OK (N/N tests passed)") appear in the CI log even on passing
-        # runs — pytest's default stdout capture would otherwise hide them.
-        cleaned = frame_prefix.sub( b'', ansi_escape.sub( b'', stdout_bytes ) )
-        for line in cleaned.decode( 'utf-8', errors='replace' ).splitlines():
-            log.info( line )
-
-    def emit_stderr( stderr_bytes ):
-        # Filter Mesa glCopyTexImage2D warnings that are irrelevant with software rendering.
-        for line in stderr_bytes.split( b'\n' ):
-            if line and b'glCopyTexImage2D' not in line:
-                log.warning( line.decode( 'utf-8', errors='replace' ) )
-
-    try:
-        stdout, stderr = p.communicate( timeout=child_timeout )
-    except subprocess.TimeoutExpired:
-        p.kill()
-        stdout, stderr = p.communicate()
-        emit_stdout( stdout )
-        emit_stderr( stderr )
-        pytest.fail( f'realsense-viewer-tests did not complete within {child_timeout}s' )
-
-    emit_stdout( stdout )
-    emit_stderr( stderr )
-    if p.returncode != 0:
-        log.error( 'realsense-viewer-tests exited with code %s', p.returncode )
-    assert p.returncode == 0, f'realsense-viewer-tests exited with code {p.returncode}'
+# Fail on D500; to be restored once fixed
+D500_SKIPPED_TESTS = ['select_resolution_and_stream', 'stream_all_sensors',
+                      'stream_each_sensor_individually', 'mem_leak_depth_start_stop']
+_D500_EXTRA = ['restore_factory', 'advanced_write_back', 'set_exposure', 'global_search', 'post_processing_value_persists']
+# Per device: (name, connection type or None for any) -> more tests to skip
+D500_DEVICE_SKIPPED_TESTS = {
+    ('D555', None): ['global_search'],
+    ('D585S', None): _D500_EXTRA,
+    ('D585 Prototype', 'USB'): ['hardware_reset'] + _D500_EXTRA,
+}
+# Older D585 FW makes the viewer pop up an ICR schema error that blocks the restore-factory test (see #16064)
+D585_RESTORE_FACTORY_MIN_FW = '7.62'
 
 
-def test_realsense_viewer_gui(module_device_setup):
-    _run_viewer_tests()
+def test_realsense_viewer_gui(module_device_setup, test_device):
+    dev, _ = test_device
+    if dev.get_info( rs.camera_info.product_line ) == 'D500':
+        name, conn = dev.get_info( rs.camera_info.name ), dev.get_info( rs.camera_info.connection_type )
+        skipped = list( D500_SKIPPED_TESTS )
+        for ( n, c ), tests in D500_DEVICE_SKIPPED_TESTS.items():
+            if n in name and c in ( None, conn ):
+                skipped += tests
+        if 'D585' in name and 'D585S' not in name:
+            fw = dev.get_info( rs.camera_info.firmware_version )
+            if parse_fw_version( fw ) < parse_fw_version( D585_RESTORE_FACTORY_MIN_FW ):
+                skipped.append( 'restore_factory' )
+        run_viewer_tests( ','.join( '-' + t for t in skipped ) )  # '-' excludes a test
+    else:
+        run_viewer_tests()

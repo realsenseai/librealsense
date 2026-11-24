@@ -22,6 +22,7 @@ struct instructions_printer
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-gl" );
     // The following toggle is going to control
     // if we will use CPU or GPU for depth data processing
     bool use_gpu_processing = true;

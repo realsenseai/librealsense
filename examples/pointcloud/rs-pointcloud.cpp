@@ -11,6 +11,7 @@ void register_glfw_callbacks(window& app, glfw_state& app_state);
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-pointcloud" );
     // Create a simple OpenGL window for rendering:
     window app(1280, 720, "RealSense Pointcloud Example");
     // Construct an object to manage view state

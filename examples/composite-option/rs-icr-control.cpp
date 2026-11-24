@@ -99,6 +99,7 @@ namespace
 int main()
 try
 {
+    rs2::rum::set_app_name( "rs-icr-control" );
     rs2::context ctx;
     auto devices = ctx.query_devices();
     std::cout << "Found " << devices.size() << " device(s)\n";

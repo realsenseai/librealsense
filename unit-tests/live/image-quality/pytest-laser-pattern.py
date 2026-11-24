@@ -27,6 +27,7 @@ pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
     pytest.mark.timeout(120),
+    pytest.mark.requires(option=rs.option.emitter_enabled),
 ]
 
 NUM_FRAMES = 15  # frames averaged per measurement, to average out sensor read noise
@@ -97,11 +98,6 @@ def draw_debug(off_img, on_img, diff_mask, dots):
 def test_laser_pattern_visible(test_device_wrapped):
     dev, ctx = test_device_wrapped
     product_name = dev.get_info(rs.camera_info.name)
-    pre_sensor = dev.first_depth_sensor()
-
-    if not pre_sensor.supports(rs.option.emitter_enabled):
-        pytest.skip(f"{product_name} does not support emitter_enabled")
-
     cfg = rs.config()
     # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
     # connected device; without enable_device(sn) the pipeline picks the first match.

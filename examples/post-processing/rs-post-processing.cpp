@@ -54,6 +54,7 @@ void update_data(rs2::frame_queue& data, rs2::frame& depth, rs2::points& points,
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-post-processing" );
     // Create a simple OpenGL window for rendering:
     window app(1280, 720, "RealSense Post Processing Example");
     // Setup Dear ImGui context

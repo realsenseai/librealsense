@@ -4,8 +4,6 @@
 import time
 import pytest
 import pyrealsense2 as rs
-import pyrsutils as rsutils
-from rspy.pytest.device_helpers import require_min_fw_version
 from rspy.timer import Timer
 import logging
 log = logging.getLogger(__name__)
@@ -13,6 +11,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D555", "D585"),
     pytest.mark.device_exclude("D585S"),
+    pytest.mark.requires(fw="7.62"),  # the 8-parameter Improved Close Range control
 ]
 
 OFF, DOWNSCALE_HDR, HIGH_RES = 0, 1, 2
@@ -50,7 +49,6 @@ def _set_fields(embedded_filter, option_id, **fields):
 def icr(test_device):
     """Yields (embedded filter, option id, range, depth sensor); restores the writable fields on exit."""
     dev, ctx = test_device
-    require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "Improved Close Range 8-parameter control")
     depth_sensor = dev.first_depth_sensor()
     embedded_filter = _find_icr_filter(depth_sensor)
     if embedded_filter is None:

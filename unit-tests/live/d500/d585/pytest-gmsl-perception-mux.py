@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each( "D585" ),
     pytest.mark.device_type( "GMSL" ),   # the MUX exists only over GMSL
+    pytest.mark.requires( sensor="Perception" ),   # none with a driver/FW without the RSVL MUX
 ]
 
 MIN_PD_FRAMES = 8                     # lifecycle minimum
@@ -36,8 +37,6 @@ MUX_CONTROL, MUX_SET_ENABLE, MUX_GET_STATE = 0xC0, 1, 2
 @pytest.fixture
 def device(test_device):
     dev, _ = test_device
-    if sensor( dev, 'Perception' ) is None:
-        pytest.skip( "No Perception sensor: driver/FW without the RSVL MUX" )
     yield dev
     for s in dev.query_sensors():        # never hand the next test an open sensor
         for close in ( s.stop, s.close ):

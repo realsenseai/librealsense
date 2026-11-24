@@ -8,9 +8,7 @@
 import pytest
 import time
 import pyrealsense2 as rs
-import pyrsutils as rsutils
 from pytest_check import check
-from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -19,16 +17,16 @@ pytestmark = [
     pytest.mark.device_each( "D585" ),
     pytest.mark.device_exclude( "D585S" ),
     pytest.mark.context( "nightly" ),
+    pytest.mark.requires( fw="7.61.47150", sensor="Depth Mapping Camera" ),  # older FW publishes the PCL profiles but delivers no frames
 ]
 
 MAPPING_SENSOR_NAME = "Depth Mapping Camera"
 FRAMES_TO_CHECK = 10
 TIMEOUT = 5  # [sec]
-MIN_FW = rsutils.version( "7.61.47150" )  # older FW publishes the PCL profiles but delivers no frames
 
 
 def mapping_sensor( dev ):
-    return next( ( s for s in dev.query_sensors() if s.get_info( rs.camera_info.name ) == MAPPING_SENSOR_NAME ), None )
+    return next( s for s in dev.query_sensors() if s.get_info( rs.camera_info.name ) == MAPPING_SENSOR_NAME )
 
 
 def pcl_profile( sensor ):
@@ -38,10 +36,7 @@ def pcl_profile( sensor ):
 @pytest.fixture
 def pcl( test_device ):
     dev, _ = test_device
-    require_min_fw_version( dev, MIN_FW, "device point cloud" )
     sensor = mapping_sensor( dev )
-    if not sensor:
-        pytest.skip( "no Depth Mapping sensor" )
     profile = pcl_profile( sensor )
     if not profile:
         pytest.skip( "FW exposes no PCL profile" )

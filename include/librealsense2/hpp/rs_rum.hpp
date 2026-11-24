@@ -48,6 +48,14 @@ namespace rs2
             error::handle(e);
             return enabled != 0;
         }
+
+        // Name the application in the RUM report; the last name set wins.
+        inline void set_app_name(const std::string& name)
+        {
+            rs2_error* e = nullptr;
+            rs2_rum_set_app_name(name.c_str(), &e);
+            error::handle(e);
+        }
     }
 }
 

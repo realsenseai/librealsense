@@ -19,6 +19,7 @@ std::vector<sensor_action> create_sensor_actions();
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-sensor-control" );
     //In this example we will go through a flow of selecting a device, then selecting one of its sensors,
     // and finally run some operations on that sensor
 

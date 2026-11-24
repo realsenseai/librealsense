@@ -610,7 +610,9 @@ void log_callback_end( uint32_t fps,
         if( get_format_conversion() == format_conversion::raw )
             throw wrong_api_call_sequence_exception( "'raw' format-conversion is not meant for streaming" );
 
-        std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
+        if( is_opened() && _raw_sensor->supports_incremental_streams() )
+            return add_streams( requests );
 
         _formats_converter.prepare_to_convert( requests );
 
@@ -644,7 +646,7 @@ void log_callback_end( uint32_t fps,
 
     void synthetic_sensor::close()
     {
-        std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
         record_rum_stream_duration();  // closing while still streaming would otherwise drop the interval
         _raw_sensor->close();
 
@@ -657,9 +659,92 @@ void log_callback_end( uint32_t fps,
         _post_process_callback.reset();
     }
 
+    static stream_profiles::iterator find_same_profile( stream_profiles & profiles,
+                                                        const std::shared_ptr< stream_profile_interface > & profile )
+    {
+        return std::find_if( profiles.begin(), profiles.end(),
+                             [&]( const std::shared_ptr< stream_profile_interface > & sp )
+                             { return to_profile( sp.get() ) == to_profile( profile.get() ); } );
+    }
+
+    void synthetic_sensor::add_streams( const stream_profiles & requests )
+    {
+        auto active = get_active_streams();
+        for( auto & request : requests )
+            if( find_same_profile( active, request ) != active.end() )
+                throw wrong_api_call_sequence_exception( rsutils::string::from() << request << " is already open" );
+
+        // Requests served by raw profiles that already stream only add converters
+        auto const sources = _formats_converter.add_to_convert( requests );
+        try
+        {
+            if( ! sources.empty() )
+                _raw_sensor->open( sources );
+        }
+        catch( ... )
+        {
+            _formats_converter.remove_from_convert( requests );
+            throw;
+        }
+
+        active.insert( active.end(), requests.begin(), requests.end() );
+        update_active_streams( active );
+        rum::hooks::on_open( get_device(), requests );
+    }
+
+    void synthetic_sensor::close_streams( const stream_profiles & profiles )
+    {
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
+        if( ! _raw_sensor->supports_incremental_streams() )
+            return sensor_interface::close_streams( profiles );
+
+        auto remaining = get_active_streams();
+        stream_profiles closing;
+        for( auto & profile : profiles )
+        {
+            auto it = find_same_profile( remaining, profile );
+            if( it == remaining.end() )
+                throw invalid_value_exception( rsutils::string::from() << profile << " is not open" );
+            closing.push_back( *it );
+            remaining.erase( it );
+        }
+
+        if( remaining.empty() )  // under the lock, so no stream is added meanwhile
+        {
+            if( is_streaming() )
+                stop();
+            return close();
+        }
+
+        // A raw profile closes only when none of the remaining streams uses it
+        auto const unused = _formats_converter.remove_from_convert( closing );
+        try
+        {
+            if( ! unused.empty() )
+                _raw_sensor->close_streams( unused );
+        }
+        catch( ... )
+        {
+            _formats_converter.add_to_convert( closing );
+            throw;
+        }
+        update_active_streams( remaining );
+    }
+
+    void synthetic_sensor::update_active_streams( const stream_profiles & streams )
+    {
+        // Bills the time streamed so far to the streams that were active, then starts a new interval
+        bool const streaming = is_streaming();
+        if( streaming )
+            record_rum_stream_duration();
+        set_active_streams( streams );
+        if( streaming )
+            _rum_timer.restart( get_device() );
+    }
+
     void synthetic_sensor::start( rs2_frame_callback_sptr callback )
     {
-        std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
 
         // Set the post-processing callback as the user callback.
         // This callback might be modified by other object.
@@ -685,7 +770,7 @@ void log_callback_end( uint32_t fps,
 
     void synthetic_sensor::stop()
     {
-        std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
 
         record_rum_stream_duration();
 

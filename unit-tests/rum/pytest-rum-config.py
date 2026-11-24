@@ -65,9 +65,10 @@ def test_report_is_valid_json_with_expected_fields( rum_report ):
     assert report.get( "sdk", {} ).get( "backend" )
     assert report.get( "system", {} ).get( "os" )
     assert report.get( "system", {} ).get( "arch" )
-    # devices is a keyed object (streams/options/filters nested under each); notifications top-level.
+    # devices is a keyed object (streams/options/filters nested under each); notifications and apps top-level.
     assert isinstance( report.get( "devices" ), dict )
     assert isinstance( report.get( "notifications" ), list )
+    assert isinstance( report.get( "apps" ), dict )
 
 
 def test_source_id_is_stable_across_calls( rum_report ):

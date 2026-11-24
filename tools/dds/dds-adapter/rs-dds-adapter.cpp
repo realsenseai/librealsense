@@ -131,6 +131,7 @@ static json load_settings( json const & local_settings )
 int main( int argc, char * argv[] )
 try
 {
+    rs2::rum::set_app_name( "rs-dds-adapter" );
     using cli = rs2::cli_no_dds;  // no --eth, --no-eth, --eth-only, --domain-id
     cli::value< dds_domain_id > domain_arg( "domain-id", "0-232", 0, "Select domain ID to publish on" );
     cli cmd( "librealsense rs-dds-adapter tool: use USB devices as network devices" );

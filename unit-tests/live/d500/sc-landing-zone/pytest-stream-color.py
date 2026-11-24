@@ -18,10 +18,12 @@ FRAMES_TO_COLLECT = 3
 
 @pytest.mark.parametrize("res", [(640, 360), (1280, 720)], ids=lambda r: f"{r[0]}x{r[1]}")
 @pytest.mark.parametrize("fps", [5, 15, 30])
-def test_color_streaming(test_context, res, fps):
+def test_color_streaming(test_device, res, fps):
+    dev, ctx = test_device
     cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.color, 0, res[0], res[1], rs.format.m420, fps)
-    pipe = rs.pipeline(test_context)
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     iterations = 0
     while iterations < FRAMES_TO_COLLECT:

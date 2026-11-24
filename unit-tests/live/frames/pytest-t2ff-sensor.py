@@ -14,7 +14,7 @@ import pyrealsense2 as rs
 import pyrsutils as rsutils
 from rspy.stopwatch import Stopwatch
 import logging
-from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.pytest.device_helpers import require_min_fw_version, is_d585_on_gmsl
 log = logging.getLogger(__name__)
 import time
 import platform
@@ -92,7 +92,7 @@ def test_device_creation_time(module_device_setup):
 def test_first_depth_frame_delay(sensor_device):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    max_delay = 1.5 if is_d585_on_gmsl(dev) else 1  # slow first start after reset on D585 GMSL
     os_name = platform.system()
 
     log.info(f"Testing first depth frame delay on {product_name} device - {os_name} OS")
@@ -116,21 +116,21 @@ def test_first_depth_frame_delay(sensor_device):
         time.sleep(1)
 
 
-# D421/D401/D405 do not have a color sensor support.
+# D421/D430 have no color; D401/D405 stream color from the depth sensor.
 @pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D401")
-@pytest.mark.device_exclude("D405")
+@pytest.mark.device_exclude("D430")
 def test_first_color_frame_delay(sensor_device):
     dev, ctx = sensor_device
     if "D585" in dev.get_info( rs.camera_info.name ) and dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "first color frame delay" )
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    color_from_depth = any(m in product_name for m in ('D401', 'D405'))
+    max_delay = 2 if color_from_depth else 1  # D401/D405 color powers up the RGB ISP on start
     os_name = platform.system()
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
 
-    cs = dev.first_color_sensor()
+    cs = dev.first_depth_sensor() if color_from_depth else dev.first_color_sensor()
     cp = next(p for p in cs.profiles
               if p.fps() == 30
               and p.stream_type() == rs.stream.color

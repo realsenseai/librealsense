@@ -27,6 +27,7 @@ string datetime_string()
 
 int main(int argc, char* argv[]) try
 {
+    rs2::rum::set_app_name( "rs-fw-logger" );
     int default_polling_interval_ms = 100;
     using cli = rs2::cli_no_dds;
     cli cmd( "librealsense rs-fw-logger example tool" );

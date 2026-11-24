@@ -62,15 +62,14 @@ public:
 
     void set_update_interval( std::chrono::milliseconds update_interval ) { _update_interval = update_interval; }
 
-    inline void pause() { _paused.store(true); }
-    inline void unpause() { _paused.store(false);
-                          _stopping.notify_all();}
+    // Under the lock, so the updater cannot miss a change between checking the flag and blocking on it
+    inline void pause() { std::lock_guard< std::mutex > lock( _mutex ); _paused = true; }
+    inline void unpause() { { std::lock_guard< std::mutex > lock( _mutex ); _paused = false; } _stopping.notify_all(); }
 
 protected:
     bool should_start() const;
     bool should_stop() const;
     void start();
-    void stop();
     void thread_loop();
     options_and_values update_options();
     composite_options_and_values update_composite_options();
@@ -87,7 +86,6 @@ protected:
     std::condition_variable _stopping;
     std::atomic_bool _destructing;
     std::atomic_bool _paused;
-    std::atomic_bool _running{ false };
 };
 
 

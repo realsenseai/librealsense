@@ -66,6 +66,7 @@ rs2::stream_profile get_depth_profile(rs2::depth_sensor depth_sensor, int nomina
 int main( int argc, char * argv[] )
 try
 {
+    rs2::rum::set_app_name( "rs-embedded-filters" );
     std::cout << "RealSense Embedded Filters Example" << std::endl;
     std::cout << "=========================================" << std::endl;
 
