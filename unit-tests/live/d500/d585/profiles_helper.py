@@ -184,3 +184,14 @@ def compare_and_assert(module_device_setup, required, expected_color_streams):
                         f"found {len(color_full)} (color indices present: {sorted(color_indices)})")
 
     assert not failures, f"{name} profile requirements not met:\n" + "\n".join(failures)
+
+
+def profile(sensor, stream_type, index, fmt, width=1280, height=720, fps=30):
+    """The one stream profile of `sensor` matching stream, index, format, resolution and fps; skips when the device
+    does not publish it (the profile-requirements test reports that)."""
+    for p in sensor.get_stream_profiles():
+        vp = p.as_video_stream_profile()
+        if vp and p.stream_type() == stream_type and p.stream_index() == index and p.format() == fmt \
+                and vp.width() == width and vp.height() == height and p.fps() == fps:
+            return p
+    pytest.skip( f"Device publishes no {stream_type} {index} {width}x{height}@{fps} {fmt}" )

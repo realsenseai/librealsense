@@ -9,6 +9,7 @@
 
 import pytest
 import pyrealsense2 as rs
+from profiles_helper import profile
 import threading
 import time
 import logging
@@ -35,15 +36,6 @@ def depth_sensor(test_device):
         sensor.close()   # the sensor outlives the test - never hand it to the next one still open
     except RuntimeError:
         pass             # not open, which is the normal path
-
-
-def profile(sensor, stream_type, index, fmt):
-    for p in sensor.get_stream_profiles():
-        vp = p.as_video_stream_profile()
-        if vp and p.stream_type() == stream_type and p.stream_index() == index and p.format() == fmt \
-                and vp.width() == W and vp.height() == H and p.fps() == FPS:
-            return p
-    pytest.skip( f"Device publishes no {stream_type} {index} {W}x{H}@{FPS} {fmt}" )
 
 
 def color(sensor, index, fmt=rs.format.rgb8):
