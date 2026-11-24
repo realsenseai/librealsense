@@ -104,16 +104,27 @@ namespace librealsense
         return layout.bytes_per_channel == 2 ? "mono16" : "mono8";
     }
 
+    // Compressed formats carry a variable-length payload; stride * height is only an upper bound for them
+    static size_t video_payload_size( const video_frame * f )
+    {
+        auto format = f->get_stream()->get_format();
+        if( format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264 )
+            return f->get_frame_data_size();
+        return size_t( f->get_stride() ) * f->get_height();
+    }
+
     void ros2_writer::write_compressed_video_frame(const stream_identifier& stream_id,
                                                    const nanoseconds& timestamp,
                                                    frame_interface* frame)
     {
         const uint8_t* pixels;
         uint32_t width, height, stride;
+        size_t size;
         rs2_format format;
         if (auto vid_frame = As<video_frame>(frame))
         {
             pixels = vid_frame->get_frame_data();
+            size = video_payload_size( vid_frame );
             width = vid_frame->get_width();
             height = vid_frame->get_height();
             stride = vid_frame->get_stride();
@@ -127,6 +138,7 @@ namespace librealsense
             pixels = frame->get_frame_data();
             width = stride = data_size;
             height = 1;
+            size = data_size;
             format = frame->get_stream()->get_format();
         }
         else
@@ -165,9 +177,12 @@ namespace librealsense
         {
             // Formats PNG can't represent losslessly (YUYV-class packed formats):
             // zstd the raw pixels; the format string carries the layout for external consumers.
-            compress_zstd(pixels, size_t(stride) * height, _frame_buf);
-            msg.format(rsutils::string::from() << rs2_format_to_string(format) << "; zstd; "
-                                               << width << "x" << height << " step=" << stride);
+            compress_zstd(pixels, size, _frame_buf);
+            if( format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264 )  // entropy-coded: no rows, so no geometry to describe
+                msg.format( rsutils::string::from() << rs2_format_to_string( format ) << "; zstd; size=" << size );
+            else
+                msg.format(rsutils::string::from() << rs2_format_to_string(format) << "; zstd; "
+                                                   << width << "x" << height << " step=" << stride);
         }
         msg.data(std::move(_frame_buf));
 
@@ -246,7 +261,7 @@ namespace librealsense
             convert(vid_frame->get_stream()->get_format(), encoding);
             img.encoding(std::move(encoding));
 
-            auto data_size = vid_frame->get_stride() * vid_frame->get_height();
+            auto data_size = video_payload_size( vid_frame );
             auto raw = vid_frame->get_frame_data();
             img.data(std::vector<uint8_t>(raw, raw + data_size));
 
