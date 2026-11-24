@@ -232,10 +232,11 @@ def resolve_device_each_serials(metafunc):
     all_serials = []
     passes = _build_sn_filter(all_markers, cli_includes, cli_excludes)
     exclude_patterns = _exclude_patterns(all_markers, split_cli_patterns(cli_excludes))
+    extras_excluded_types = {m.args[0].upper() for m in all_markers if m.name == 'extras_type_exclude' and m.args}
 
     def add_with_extras(sn, with_base=True):
         """a camera with extra configurations gets an instance per configuration (the same camera) after its base one"""
-        for serial in ([sn] if with_base else []) + d585_config.extra_instances(sn, exclude_patterns):
+        for serial in ([sn] if with_base else []) + d585_config.extra_instances(sn, exclude_patterns, extras_excluded_types):
             if serial not in all_serials:
                 all_serials.append(serial)
 

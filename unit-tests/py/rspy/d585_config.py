@@ -40,12 +40,12 @@ def real_serial( serial ):
     return split( serial )[0] if isinstance( serial, str ) else serial
 
 
-def extra_instances( serial, exclude_patterns ):
+def extra_instances( serial, exclude_patterns, exclude_types=() ):
     """:return: the extra test instances of a camera -- one in dual RGB, unless an exclude pattern (device_exclude marker or
-    --exclude-device) covers its dual RGB name"""
+    --exclude-device) covers its dual RGB name, or the camera's connection type is in exclude_types"""
     from rspy import devices
     device = devices.get( serial )
-    if not device or not can_toggle( device ):
+    if not device or not can_toggle( device ) or ( device.connection_type or '' ).upper() in exclude_types:
         return []
     name = dual_rgb_name( device ).upper()
     return [] if any( p.strip( '*' ).upper() in name for p in exclude_patterns ) else [serial + SUFFIX]

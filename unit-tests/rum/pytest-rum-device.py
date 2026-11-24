@@ -7,7 +7,8 @@ import pyrealsense2 as rs
 
 # device_each supplies the camera; the ENABLE_STATS gate lives in the rum_report fixture (conftest),
 # which skips when the build can't produce a report.
-pytestmark = [ pytest.mark.device_each( "D400*" ), pytest.mark.device_each( "D500*" ) ]
+pytestmark = [ pytest.mark.device_each( "D400*" ), pytest.mark.device_each( "D500*" ),
+               pytest.mark.extras_type_exclude( "GMSL" ) ]   # the USB dual RGB and GMSL dedicated sensor runs cover it
 
 
 def streamable_depth_profile( sensor ):

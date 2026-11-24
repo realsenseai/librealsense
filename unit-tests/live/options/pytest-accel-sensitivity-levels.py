@@ -10,6 +10,7 @@ import logging
 log = logging.getLogger(__name__)
 
 pytestmark = [
+    pytest.mark.extras_type_exclude("GMSL"),   # the USB dual RGB and GMSL dedicated sensor runs cover it
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D585S"),  # no accel range control on the safety SKU
     pytest.mark.device_type_exclude("DDS"),  # USB/GMSL-focused: DDS advertises the option through a separate transport

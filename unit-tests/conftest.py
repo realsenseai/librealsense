@@ -360,6 +360,10 @@ def pytest_configure(config):
         "markers", "device_type_exclude(type): skip test if device connection type matches (e.g., GMSL, USB, DDS)"
     )
     config.addinivalue_line(
+        "markers", "extras_type_exclude(type): skip the extra configuration runs (e.g. D585 dual RGB) of cameras with this "
+                   "connection type; the base run stays"
+    )
+    config.addinivalue_line(
         "markers", "requires(fw=, option=, sensor=): module-level, when every test needs it; skips a camera that "
                    "lacks the FW / option / sensor before powering it"
     )

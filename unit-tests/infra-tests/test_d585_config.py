@@ -36,6 +36,7 @@ class FakeDevice:
         self.serial_number, self._name, self.handle = sn, name, FakeHandle( mode )
 
     name = property( lambda self: self._name )
+    connection_type = 'USB'
 
 
 fake_device = FakeDevice
@@ -110,6 +111,13 @@ def test_every_switchable_camera_gets_a_dual_rgb_instance_unless_an_exclude_patt
     assert d585_config.extra_instances( '541', ['Dual RGB'] ) == []        # device_exclude marker or --exclude-device
     assert d585_config.extra_instances( '541', ['D585S'] ) == ['541-dual-rgb']
     assert d585_config.extra_instances( '353', [] ) == [] and d585_config.extra_instances( '207', [] ) == []
+
+
+def test_no_dual_rgb_instance_on_a_connection_type_that_is_excluded( lab ):
+    lab['541'].connection_type = 'GMSL'
+    assert d585_config.extra_instances( '541', [], {'GMSL'} ) == []
+    assert d585_config.extra_instances( '541', [], {'USB'} ) == ['541-dual-rgb']
+    assert d585_config.extra_instances( '541', [] ) == ['541-dual-rgb']
 
 
 def test_every_switched_camera_is_restored_at_session_end( monkeypatch, lab ):

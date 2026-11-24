@@ -21,6 +21,8 @@ BLACK_PIXEL_THRESHOLD = 0.5  # Fail if more than 50% pixels are zero
 FRAMES_TO_CHECK = 30
 
 pytestmark = [
+    pytest.mark.device_exclude("D585 Dual RGB"),   # dual RGB locks the laser controls while depth streams; the test sets them after start
+    pytest.mark.device_exclude("D585 Proto Dual RGB"),
     pytest.mark.context("image-quality"),
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),

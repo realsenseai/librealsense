@@ -23,6 +23,8 @@ from iq_helper import save_failure_snapshot
 log = logging.getLogger(__name__)
 
 pytestmark = [
+    pytest.mark.device_exclude("D585 Dual RGB"),   # dual RGB locks the emitter while depth streams; the test toggles it on a stream
+    pytest.mark.device_exclude("D585 Proto Dual RGB"),
     pytest.mark.context("image-quality"),
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
