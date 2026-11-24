@@ -127,6 +127,9 @@ def pipeline_first_color_frame_delay(pipeline_device, restart):
     assert frame_delay < max_delay, \
         f"Color frame delay {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
 
+    if is_dds_dev(dev):
+        time.sleep(1)  # let the DDS stream close before the next start
+
 
 # D421/D430 have no color
 @pytest.mark.device_exclude("D421")
