@@ -13,8 +13,8 @@
 #include <rsutils/string/from.h>
 
 #include <librealsense2/h/rs_composite_option.h>
-#include <librealsense2/h/rs_icr_control.h>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
+#include <librealsense2/h/rs_icr_control.h>
 
 #include <cstddef>
 #include <algorithm>
@@ -53,36 +53,34 @@ static std::shared_ptr< video_stream_profile_interface > find_depth_profile( con
 
 static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
 {
-    for( auto & filter : depth_sensor.get_supported_embedded_filters() )
-        if( filter->supports_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) )
+    try
+    {
+        for( auto & filter : depth_sensor.get_supported_embedded_filters() )
         {
-            rs2_decimation_filter_dpp_config cfg;
-            std::vector< uint8_t > raw;
-            try
+            if( filter->supports_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) )
             {
-                raw = filter->get_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ).get_raw();
+                auto const raw = filter->get_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ).get_raw();
+                rs2_decimation_filter_dpp_config cfg;
+                if( raw.size() != sizeof( cfg ) )
+                    return false;
+                std::memcpy( &cfg, raw.data(), sizeof( cfg ) );
+                return cfg.enabled != 0;
             }
-            catch( const std::exception & e )
-            {
-                LOG_WARNING( "Decimation state unavailable, treating it as disabled: " << e.what() );
-                return false;
-            }
-            if( raw.size() != sizeof( cfg ) )
-                return false;
-            std::memcpy( &cfg, raw.data(), sizeof( cfg ) );
-            return cfg.enabled != 0;
+            if( filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_DECIMATION )
+                return filter->supports_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED )
+                    && filter->get_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED ).query() != 0;
         }
-        // DDS exposes Decimation as scalar options
-        else if( filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_DECIMATION )
-            return filter->supports_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED )
-                && filter->get_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED ).query() != 0;
+    }
+    catch( const std::exception & e )
+    {
+        LOG_WARNING( "Decimation state unavailable, treating it as disabled: " << e.what() );
+    }
     return false;
 }
 
 // FW rejects unsupported ICR profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
 // needs a replug) - so the SDK checks the ICR profile limits first: the explicit profile exclusions, FPS up to 30,
-// and integral Secondary dimensions of at least 128 pixels wide for Downscale (480x270 x4 is out as 270 is not
-// divisible by 4, 424x240 x4 as its Secondary is 106 wide).
+// and integral Secondary dimensions of at least 128 pixels wide for Downscale.
 static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
                                   const sensor_interface & depth_sensor )
 {
@@ -106,17 +104,19 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
     if( cfg.mode != RS2_ICR_MODE_DOWNSCALE_HDR )
         return;
     uint32_t const ratio = cfg.downscale_ratio == 2 ? 4 : 2;
-    if( ratio == 4 && embedded_decimation_enabled( depth_sensor ) )
-        throw invalid_value_exception(
-            "Improved Close Range Depth Downscale x4 cannot be combined with the embedded Decimation filter" );
-    if( w % ratio != 0 || h % ratio != 0 )
+
+    // ICR runs before Decimation, so check the producer dimensions before the x2 reduction.
+    uint32_t const decimation_factor = embedded_decimation_enabled( depth_sensor ) ? 2 : 1;
+    uint32_t const producer_width = w * decimation_factor;
+    uint32_t const producer_height = h * decimation_factor;
+    if( producer_width % ratio != 0 || producer_height % ratio != 0 )
         throw invalid_value_exception( rsutils::string::from()
             << "Improved Close Range Depth Downscale x" << ratio << " requires Depth dimensions divisible by " << ratio
-            << ", but Depth is " << w << "x" << h );
-    if( w / ratio < 128 )
+            << ", but the ICR input is " << producer_width << "x" << producer_height );
+    if( producer_width / ratio < 128 )
         throw invalid_value_exception( rsutils::string::from()
             << "Improved Close Range Depth Downscale x" << ratio << " requires Depth at least " << 128 * ratio
-            << " pixels wide, but Depth is " << w << "x" << h );
+            << " pixels wide, but the ICR input is " << producer_width << "x" << producer_height );
 }
 
 // Rejects out-of-range values locally, and rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
