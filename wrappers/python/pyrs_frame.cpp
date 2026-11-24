@@ -3,6 +3,7 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 
 #include "pyrealsense2.h"
 #include <librealsense2/rs.hpp>
+#include <pybind11/numpy.h>
 
 #include <cstdint>
 #include <rsutils/string/from.h>
@@ -172,6 +173,7 @@ void init_frame(py::module &m) {
         .def(BIND_DOWNCAST(frame, pose_frame))
         .def(BIND_DOWNCAST(frame, perception_frame))
         .def(BIND_DOWNCAST(frame, object_detection_frame))
+        .def(BIND_DOWNCAST(frame, custom_nn_frame))
         .def(BIND_DOWNCAST(frame, gpu_frame))
         .def("get_gpu_data_or_upload", [](const rs2::frame& self) -> py::object {
             bool copied = false;
@@ -368,6 +370,50 @@ void init_frame(py::module &m) {
         .def("get_detection_count", &rs2::object_detection_frame::get_detection_count, "Get the number of detected objects in this frame")
         .def("get_detection", &rs2::object_detection_frame::get_detection, "index"_a, "Get a specific detection by index");
 
+    py::class_<rs2::nn_tensor> nn_tensor(m, "nn_tensor", "One output tensor of a Custom NN frame.");
+    nn_tensor.def_property_readonly("name", &rs2::nn_tensor::name, "Output name from the model description; empty when not available")
+        .def_property_readonly("dtype", &rs2::nn_tensor::dtype, "Element type")
+        .def_property_readonly("output_index", &rs2::nn_tensor::output_index, "Index of the output in the model description")
+        .def_property_readonly("shape", &rs2::nn_tensor::shape, "Dimensions; the element count when the description is not available")
+        .def_property_readonly("layout", &rs2::nn_tensor::layout, "Order of the dimensions after a leading N, e.g. NHWC; empty when not available")
+        .def_property_readonly("dequant_scale", &rs2::nn_tensor::dequant_scale, "The raw value divided by it gives the real value; 0 when not available")
+        .def_property_readonly("data", [](const rs2::nn_tensor& self) {
+            static const char* formats[] = { "h", "H", "b", "B", "f" };
+            size_t const item = self.dtype() == RS2_NN_DTYPE_F32 ? 4 : self.dtype() <= RS2_NN_DTYPE_U16 ? 2 : 1;
+            return BufData(const_cast<void*>(self.data()), item, formats[self.dtype()], self.size() / item);
+        }, "Raw tensor data, flat", py::keep_alive<0, 1>())
+        .def("as_float", [](const rs2::nn_tensor& self) {
+            auto values = self.as_float();
+            auto const dims = self.shape();
+            std::vector<py::ssize_t> shape(dims.begin(), dims.end());
+            py::array_t<float> result(shape);
+            std::copy(values.begin(), values.end(), result.mutable_data());
+            return result;
+        }, "The values as a float NumPy array shaped by shape: each raw value divided by dequant_scale (by 1 when not available)")
+        .def("__repr__", [](const rs2::nn_tensor& self) {
+            std::ostringstream oss;
+            oss << "<pyrealsense2.nn_tensor " << self.output_index() << " '" << self.name() << "' " << rs2_nn_dtype_to_string(self.dtype()) << " [";
+            for (auto d : self.shape())
+                oss << " " << d;
+            oss << " ]>";
+            return oss.str();
+        });
+
+    py::class_<rs2::custom_nn_frame, rs2::video_frame> custom_nn_frame(m, "custom_nn_frame", "Extends video_frame class with the output tensors of a custom neural network.");
+    custom_nn_frame.def(py::init<rs2::frame>())
+        .def("tensor_count", &rs2::custom_nn_frame::tensor_count, "Number of output tensors; 0 when the frame has an error status")
+        .def("tensor", (rs2::nn_tensor(rs2::custom_nn_frame::*)(int) const) &rs2::custom_nn_frame::tensor, "index"_a, "Get a tensor by index")
+        .def("tensor", (rs2::nn_tensor(rs2::custom_nn_frame::*)(const std::string&) const) &rs2::custom_nn_frame::tensor, "name"_a, "Get a tensor by its output name")
+        .def("tensors", &rs2::custom_nn_frame::tensors, "All output tensors")
+        .def("status", &rs2::custom_nn_frame::status, "0 when the frame carries tensors, otherwise the camera's error status")
+        .def("description_mismatch", &rs2::custom_nn_frame::description_mismatch, "True when a tensor is exposed raw "
+             "(no name, layout or scale): the camera's description of its model is missing or another model's, or the "
+             "tensor doesn't match its output")
+        .def("status_message", &rs2::custom_nn_frame::status_message, "What the status means and what to do about it; empty when OK")
+        .def("generation", &rs2::custom_nn_frame::generation, "Generation of the model that made the frame (CRC-32 of its metadata); 0 when none was loaded")
+        .def("model_id", &rs2::custom_nn_frame::model_id, "Id of the model that made the frame, from its package; 0 when it has none")
+        .def("source_frame_id", &rs2::custom_nn_frame::source_frame_id, "The camera's number of the RGB frame the network ran on, counted from the Custom NN start; not the Color frame counter");
+
     py::class_<rs2::gpu_frame, rs2::frame> gpu_frame(m, "gpu_frame", "Extends the frame class for a GPU-resident (zero-copy) frame on "
         "integrated-GPU CUDA builds. Reach it with frame.as(gpu_frame); the cast is null unless the frame is GPU-resident.");
     gpu_frame.def(py::init<rs2::frame>())
@@ -401,6 +447,7 @@ void init_frame(py::module &m) {
         .def("get_pose_frame", &rs2::frameset::get_pose_frame, "Retrieve the pose frame", "index"_a = 0)
         .def("get_labeled_point_cloud_frame", &rs2::frameset::get_labeled_point_cloud_frame, "Retrieve the labeled point cloud frame, if no frame is found, return an empty frame instance.")
         .def("get_object_detection_frame", &rs2::frameset::get_object_detection_frame, "Retrieve the object detection frame, if no frame is found, return an empty frame instance.", "index"_a = 0)
+        .def("get_custom_nn_frame", &rs2::frameset::get_custom_nn_frame, "Retrieve the Custom NN frame, if no frame is found, return an empty frame instance.")
         .def("__iter__", [](rs2::frameset& self) {
             return py::make_iterator(self.begin(), self.end());
         }, py::keep_alive<0, 1>())

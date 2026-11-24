@@ -61,6 +61,18 @@ void rs2_nn_upload_cpp( const rs2_device * device, const void * file, int file_s
  */
 int rs2_nn_is_upload_supported( const rs2_device * device, char * reason, int reason_size, rs2_error ** error );
 
+/**
+ * Describe the NN model stored in a slot, as JSON: "present", "model_state", "generation" (CRC-32 of the metadata, as in
+ * each Custom NN frame), "frame_size", "frame_height" and, when present, "metadata" (the model's own description of
+ * its inputs and outputs) with "model_id", the id each Custom NN frame will carry. This is the stored model, which the camera runs from its next boot. Currently only slot 2
+ * (a custom network) is described.
+ * \param[in]  device       Device extendable to RS2_EXTENSION_NN_LOADER
+ * \param[in]  slot         Model slot
+ * \param[out] error        If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+ * \return                  The JSON text; release with rs2_delete_raw_data
+ */
+const rs2_raw_data_buffer * rs2_nn_get_model_info( const rs2_device * device, int slot, rs2_error ** error );
+
 #ifdef __cplusplus
 }
 #endif

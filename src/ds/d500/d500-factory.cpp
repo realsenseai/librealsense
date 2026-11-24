@@ -173,7 +173,7 @@ namespace librealsense
 
             std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream,
                                                                            _color_stream_1, _color_stream_2,
-                                                                           _object_detection_stream };
+                                                                           _object_detection_stream, _custom_nn_stream };
             d500_depth_mapping::add_streams_if_active( streams );
             add_motion_streams( _ds_motion_common, streams );
             return create_default_matcher( streams );
@@ -214,6 +214,7 @@ namespace librealsense
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, accel_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_OBJECT_DETECTION, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_CUSTOM_NN, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
             d500_depth_mapping::add_profile_tag_if_active( tags );
 
             return tags;
@@ -255,7 +256,7 @@ namespace librealsense
         {
 
             std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream, _color_stream,
-                                                                           _object_detection_stream };
+                                                                           _object_detection_stream, _custom_nn_stream };
             d500_depth_mapping::add_streams_if_active( streams );
             add_motion_streams( _ds_motion_common, streams );
             return create_default_matcher( streams );
@@ -275,6 +276,7 @@ namespace librealsense
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, gyro_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, accel_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_OBJECT_DETECTION, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_CUSTOM_NN, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
             d500_depth_mapping::add_profile_tag_if_active( tags );
 
             return tags;
@@ -313,7 +315,7 @@ namespace librealsense
         {
 
             std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream, _color_stream,
-                                                                           _object_detection_stream };
+                                                                           _object_detection_stream, _custom_nn_stream };
             d500_depth_mapping::add_streams_if_active( streams );
             add_motion_streams( _ds_motion_common, streams );
             return create_default_matcher( streams );
@@ -329,6 +331,7 @@ namespace librealsense
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_OBJECT_DETECTION, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_CUSTOM_NN, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
             d500_depth_mapping::add_profile_tag_if_active( tags );
 
             return tags;
@@ -481,7 +484,7 @@ namespace librealsense
         {
 
             std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream, _color_stream,
-                                                                           _object_detection_stream };
+                                                                           _object_detection_stream, _custom_nn_stream };
             d500_depth_mapping::add_streams_if_active( streams );
             add_motion_streams( _ds_motion_common, streams );
             return create_default_matcher( streams );
@@ -497,6 +500,7 @@ namespace librealsense
             tags.push_back( { RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
             tags.push_back( { RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
             tags.push_back({ RS2_STREAM_OBJECT_DETECTION, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_CUSTOM_NN, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
             d500_depth_mapping::add_profile_tag_if_active( tags );
 
             return tags;

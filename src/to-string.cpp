@@ -64,6 +64,7 @@ const char * get_string( rs2_stream value )
     CASE( LABELED_POINT_CLOUD )
     CASE( OBJECT_DETECTION )
     CASE( POINT_CLOUD )
+    CASE( CUSTOM_NN )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -91,6 +92,7 @@ char const * get_abbr_string( rs2_stream value)
     case RS2_STREAM_LABELED_POINT_CLOUD: return "LPC";
     case RS2_STREAM_OBJECT_DETECTION: return "OD";
     case RS2_STREAM_POINT_CLOUD: return "PC";
+    case RS2_STREAM_CUSTOM_NN: return "CNN";
     default:
         assert( !is_valid( value ) );
         return "?";
@@ -488,6 +490,7 @@ const char * get_string( rs2_extension value )
     CASE( PERCEPTION_PROFILE )
     CASE( GPU_FRAME )
     CASE( NN_LOADER )
+    CASE( CUSTOM_NN_FRAME )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -691,6 +694,23 @@ const char * get_string( rs2_nn_target value )
     {
         CASE( FLASH )
         CASE( DDR )
+    default:
+        assert( ! is_valid( value ) );
+        return UNKNOWN_VALUE;
+    }
+#undef CASE
+}
+
+const char * get_string( rs2_nn_dtype value )
+{
+#define CASE( X ) STRCASE( NN_DTYPE, X )
+    switch( value )
+    {
+        CASE( S16 )
+        CASE( U16 )
+        CASE( S8 )
+        CASE( U8 )
+        CASE( F32 )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -968,6 +988,10 @@ std::string const & get_string( rs2_frame_metadata_value value )
         CASE( SEGMENTATION_MODE )
         CASE( SEGMENTATION_CLASSES )
         CASE( PCL_OCCLUSION_REMOVAL )
+        CASE( SOURCE_FRAME_ID )
+        CASE( NN_MODEL_GENERATION )
+        CASE( NN_STATUS )
+        CASE( NN_MODEL_ID )
         CASE( NUMBER_OF_3D_VERTICES )
         CASE( SAFETY_PRESET_ERROR_TYPE )
         CASE( SAFETY_PRESET_ERROR_PARAM_1 )
@@ -1168,4 +1192,5 @@ const char * rs2_gyro_sensitivity_to_string( rs2_gyro_sensitivity mode ){return 
 const char * rs2_accel_sensitivity_to_string( rs2_accel_sensitivity mode ){return librealsense::get_string( mode );}
 const char * rs2_eth_link_priority_to_string( rs2_eth_link_priority priority ){return librealsense::get_string( priority );}
 const char * rs2_nn_target_to_string( rs2_nn_target target ) { return librealsense::get_string( target ); }
+const char * rs2_nn_dtype_to_string( rs2_nn_dtype dtype ) { return librealsense::get_string( dtype ); }
 const char * rs2_composite_option_id_to_string( rs2_composite_option_id id ) { return librealsense::get_string( id ).c_str(); }

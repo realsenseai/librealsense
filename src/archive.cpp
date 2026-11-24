@@ -13,6 +13,7 @@
 #include <src/labeled-points.h>
 #include <src/perception-frame.h>
 #include <src/object-detection-frame.h>
+#include <src/nn/custom-nn-frame.h>
 
 
 namespace librealsense
@@ -53,6 +54,9 @@ namespace librealsense
 
         case RS2_EXTENSION_OBJECT_DETECTION_FRAME:
                 return std::make_shared< frame_archive< object_detection_frame > >( in_max_frame_queue_size, parsers );
+
+        case RS2_EXTENSION_CUSTOM_NN_FRAME:
+            return std::make_shared< frame_archive< custom_nn_frame > >( in_max_frame_queue_size, parsers );
 
         default:
             throw std::runtime_error("Requested frame type is not supported!");

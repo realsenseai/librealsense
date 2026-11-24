@@ -11,4 +11,8 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/nn-transport.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/nn-transport-hwm.h"
         "${CMAKE_CURRENT_LIST_DIR}/nn-transport-hwm.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/custom-nn-frame.h"
+        "${CMAKE_CURRENT_LIST_DIR}/custom-nn-frame.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/nn-info.h"
+        "${CMAKE_CURRENT_LIST_DIR}/nn-info.cpp"
 )

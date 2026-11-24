@@ -73,6 +73,7 @@
 #include "points.h"
 #include "labeled-points.h"
 #include "object-detection-frame.h"
+#include "nn/custom-nn-frame.h"
 #include "perception-frame.h"
 #include "eth-config-device.h"
 #include "nn/nn-loader.h"
@@ -2236,6 +2237,7 @@ int rs2_is_frame_extendable_to(const rs2_frame* f, rs2_extension extension_type,
     case RS2_EXTENSION_LABELED_POINTS         : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::labeled_points) != nullptr;
     case RS2_EXTENSION_PERCEPTION_FRAME       : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::perception_frame) != nullptr;
     case RS2_EXTENSION_OBJECT_DETECTION_FRAME : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::object_detection_frame) != nullptr;
+    case RS2_EXTENSION_CUSTOM_NN_FRAME        : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::custom_nn_frame) != nullptr;
     case RS2_EXTENSION_GPU_FRAME              :
         // A frame is extendable to gpu_frame only when its pixels truly reside in GPU-accessible
         // (zero-copy) memory, i.e. a CUDA device pointer aliasing the frame data resolves. This
@@ -4006,6 +4008,14 @@ int rs2_nn_is_upload_supported( const rs2_device * device, char * reason, int re
 }
 HANDLE_EXCEPTIONS_AND_RETURN( 0, device, reason_size )
 
+const rs2_raw_data_buffer * rs2_nn_get_model_info( const rs2_device * device, int slot, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( device );
+    auto info = VALIDATE_INTERFACE( device->device, librealsense::nn_loader_interface )->get_model_info( slot );
+    return new rs2_raw_data_buffer{ std::vector< uint8_t >( info.begin(), info.end() ) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN( nullptr, device, slot )
+
 const rs2_raw_data_buffer* rs2_create_flash_backup_cpp(const rs2_device* device, rs2_update_progress_callback* callback, rs2_error** error) BEGIN_API_CALL
 {
     // Take ownership of the callback ASAP or else memory leaks could result if we throw! (the caller usually does a
@@ -5466,3 +5476,39 @@ void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, 
     detection->center_of_mass_valid = entry.com_valid ? 1 : 0;
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(detection))
+
+int rs2_custom_nn_frame_get_tensor_count(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    return int( VALIDATE_INTERFACE((frame_interface*)frame, librealsense::custom_nn_frame)->get_tensor_count() );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0, frame)
+
+void rs2_custom_nn_frame_get_tensor(const rs2_frame* frame, int index, rs2_nn_tensor* tensor, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    VALIDATE_NOT_NULL(tensor);
+    *tensor = VALIDATE_INTERFACE((frame_interface*)frame, librealsense::custom_nn_frame)->get_tensor( index );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(tensor))
+
+int rs2_custom_nn_frame_get_status(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    return VALIDATE_INTERFACE((frame_interface*)frame, librealsense::custom_nn_frame)->get_status();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0, frame)
+
+int rs2_custom_nn_frame_get_description_mismatch(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    return VALIDATE_INTERFACE((frame_interface*)frame, librealsense::custom_nn_frame)->get_description_mismatch();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0, frame)
+
+const char* rs2_custom_nn_frame_get_status_message(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    return VALIDATE_INTERFACE((frame_interface*)frame, librealsense::custom_nn_frame)->get_status_message();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, frame)

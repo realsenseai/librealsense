@@ -61,5 +61,9 @@ void init_nn( py::module & m )
                   return std::make_tuple( supported, reason );
               },
               "Whether the device supports NN model upload (product, firmware, not locked). Returns (supported, reason).",
-              py::call_guard< py::gil_scoped_release >() );
+              py::call_guard< py::gil_scoped_release >() )
+        .def( "get_model_info", &rs2::nn_loader::get_model_info,
+              "The NN model stored in a slot, as a JSON string: present, model_state, generation, frame_size, "
+              "frame_height, the model's metadata and model_id. Slot 2 holds a custom network; it runs from the camera's next boot.",
+              "slot"_a = 2, py::call_guard< py::gil_scoped_release >() );
 }

@@ -13,11 +13,14 @@
 #include "stream.h"
 #include "platform/platform-utils.h"
 #include <src/platform/uvc-option.h>
+#include <src/nn/custom-nn-frame.h>
+#include <src/nn/nn-transport-hwm.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
 
 #include <map>
+#include <thread>
 #include <vector>
 
 namespace librealsense
@@ -39,10 +42,64 @@ namespace librealsense
             { uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), 83, false },
             { 2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ), 2347, true } };
 
+    // A custom network's output shares the OD pin as GREY 1024 x H, H from the installed model
+    constexpr uint32_t custom_nn_width = 1024;
+    constexpr const char * custom_nn_stream_name = "Custom NN";
+
+    // Describes the Custom NN frames and passes on only those that parse, so tensors can be trusted downstream. Each
+    // is stamped with the capture time of the Color frame the network ran on, converted as Color's is, so the two match
+    // by timestamp.
+    class custom_nn_validator : public processing_block
+    {
+    public:
+        custom_nn_validator( d500_object_detection * owner,
+                             std::weak_ptr< time_diff_keeper > tf_keeper,
+                             std::shared_ptr< global_time_option > global_time )
+            : processing_block( "Custom NN validator" )
+        {
+            auto on_frame = [this, owner, tf_keeper, global_time]( rs2::frame f, const rs2::frame_source & source )
+            {
+                auto nn = dynamic_cast< custom_nn_frame * >( (frame_interface *)f.get() );
+                if( ! nn || ! nn->is_valid() )
+                    return;  // logged by the parser
+                rs2_metadata_type generation = 0;
+                nn->find_metadata( RS2_FRAME_METADATA_NN_MODEL_GENERATION, &generation );
+                nn->set_description( owner->get_custom_nn_description( uint32_t( generation ) ) );
+                if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
+                    LOG_ERROR( nn->get_status_message() );
+
+                // The UVC sensor stamped the frame before its payload was read
+                rs2_metadata_type hw_us = 0;
+                nn->find_metadata( RS2_FRAME_METADATA_FRAME_TIMESTAMP, &hw_us );
+                double ts = hw_us / 1000.;
+                auto domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
+                auto keeper = tf_keeper.lock();
+                if( keeper && global_time->is_true() )
+                {
+                    bool ready = false;
+                    auto const global = keeper->get_system_hw_time( ts, ready );
+                    if( ready )
+                    {
+                        ts = global;
+                        domain = RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME;
+                    }
+                }
+                nn->set_timestamp( ts );
+                nn->set_timestamp_domain( domain );
+                source.frame_ready( f );
+            };
+            set_processing_callback( std::make_shared< rs2::frame_processor_callback< decltype( on_frame ) > >( on_frame ) );
+        }
+
+    private:
+        std::atomic_bool _load_failed_logged{ false };
+    };
+
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
+        , _custom_nn_stream( new stream( RS2_STREAM_CUSTOM_NN ) )
     {
         // Over GMSL the stream is multiplexed on the depth sensor's IR node, and the camera takes it by rate alone;
         // over USB it has its own interface. Sensors outlive the device's HW monitor, so a close at teardown skips
@@ -111,6 +168,12 @@ namespace librealsense
 
         if( ! xu_host )
             xu_host = raw_od_ep;
+        raw_od_ep->set_stream_id_resolver(
+            []( const std::vector< platform::stream_profile > &, const platform::stream_profile & p, rs2_stream & type, std::vector< int > & )
+            {
+                if( p.width == custom_nn_width )
+                    type = RS2_STREAM_CUSTOM_NN;
+            } );
         xu_host->register_xu( ds::inference_xu ); // ensure the XU is initialized every time we power the camera
 
         auto od_ep = std::make_shared< d500_object_detection_sensor >( this,
@@ -132,7 +195,7 @@ namespace librealsense
         od_ep->register_info( RS2_CAMERA_INFO_PHYSICAL_PORT, physical_port );
 
         register_metadata( raw_od_ep );
-        register_processing_blocks( od_ep );
+        register_processing_blocks( od_ep, enable_global_time_option );
 
         return od_ep;
     }
@@ -143,12 +206,63 @@ namespace librealsense
                                       make_uvc_header_parser( &platform::uvc_header::timestamp ) );
     }
 
-    void d500_object_detection::register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep )
+    void d500_object_detection::register_processing_blocks( std::shared_ptr< d500_object_detection_sensor > od_ep,
+                                                            std::shared_ptr< global_time_option > global_time )
     {
         processing_block_factory od_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                             { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                             []() { return std::make_shared< identity_processing_block >(); } };
         od_ep->register_processing_block( od_pbf );
+        processing_block_factory custom_nn_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
+                                                   { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
+                                                   [this, keeper = std::weak_ptr< time_diff_keeper >( _tf_keeper ), global_time]()
+                                                   { return std::make_shared< custom_nn_validator >( this, keeper, global_time ); } };
+        od_ep->register_processing_block( custom_nn_pbf );
+    }
+
+    // A frame of a model other than the described one reads NN_INFO again, once per generation, off the frame thread
+    std::shared_ptr< const nn::model_description > d500_object_detection::get_custom_nn_description( uint32_t generation )
+    {
+        std::lock_guard< std::mutex > lock( _custom_nn_mutex );
+        if( generation && generation != _custom_nn_reread_generation
+            && ( ! _custom_nn_description || _custom_nn_description->generation != generation ) )
+        {
+            _custom_nn_reread_generation = generation;
+            std::weak_ptr< device_interface > device = shared_from_this();
+            std::thread( [this, device, generation]
+                         {
+                             if( auto alive = device.lock() )
+                                 read_custom_nn_description( generation );
+                         } ).detach();
+        }
+        return _custom_nn_description;
+    }
+
+    // NN_INFO describes the stored model, which the camera runs from its next boot; frames of another model stay raw
+    void d500_object_detection::read_custom_nn_description( uint32_t frame_generation )
+    {
+        std::shared_ptr< const nn::model_description > description;
+        try
+        {
+            auto stored = nn_transport_hwm( _hw_monitor ).read_info( nn::CUSTOM_SLOT );
+            if( stored.block.present )
+                description = nn::parse_model_description( stored.metadata, stored.block.generation );
+            else
+                LOG_WARNING( "No Custom NN model is installed" );
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "Custom NN tensors are not described: " << e.what() );
+        }
+        if( description )
+            for( auto const & out : description->outputs )
+                if( ! out.dense )
+                    LOG_ERROR( "Custom NN output '" << out.name << "' is not laid out densely; its tensor is exposed raw" );
+        if( frame_generation && ( ! description || description->generation != frame_generation ) )
+            LOG_WARNING( "The camera runs a Custom NN model other than the installed one; its tensors are exposed raw "
+                         "until the camera is reset" );
+        std::lock_guard< std::mutex > lock( _custom_nn_mutex );
+        _custom_nn_description = std::move( description );
     }
 
     void d500_object_detection_sensor::open( const stream_profiles & requests )
@@ -157,6 +271,14 @@ namespace librealsense
         if( depth_sensor.supports_option( RS2_OPTION_DUAL_RGB_RECTIFICATION )
             && depth_sensor.get_option( RS2_OPTION_DUAL_RGB_RECTIFICATION ).query() != 0.f )
             throw wrong_api_call_sequence_exception( "Object detection is not supported while dual RGB rectification is on" );
+
+        // Both are frame sizes of one pin
+        auto is = [&]( rs2_stream s )
+        { return std::any_of( requests.begin(), requests.end(), [s]( std::shared_ptr< stream_profile_interface > const & p ) { return p->get_stream_type() == s; } ); };
+        if( is( RS2_STREAM_CUSTOM_NN ) && is( RS2_STREAM_OBJECT_DETECTION ) )
+            throw wrong_api_call_sequence_exception( "Custom NN and Object Detection can't stream together" );
+        if( is( RS2_STREAM_CUSTOM_NN ) )
+            _owner->read_custom_nn_description();
 
         synthetic_sensor::open( requests );
     }
@@ -182,6 +304,11 @@ namespace librealsense
             {
                 assign_stream( _owner->_object_detection_stream, p );
                 p->set_name( perception_sensor::STREAM_NAME );
+            }
+            else if( p->get_stream_type() == RS2_STREAM_CUSTOM_NN )
+            {
+                assign_stream( _owner->_custom_nn_stream, p );
+                p->set_name( custom_nn_stream_name );
             }
         }
         return results;

@@ -30,10 +30,16 @@ public:
     void send_table( uint16_t table_id, uint32_t param1, uint32_t param3, const std::vector< uint8_t > & table,
                      const progress_callback & progress );
 
+    // The model stored in a slot (NN_INFO); throws on any device error
+    nn::stored_model read_info( int slot );
+
     // Return 0, or the device error code
     virtual int32_t send_chunk( uint16_t table_id, uint32_t param1, uint32_t param3, uint32_t param4,
                                 const uint8_t * data, size_t size ) = 0;
     virtual int32_t read_status( nn::status & status ) = 0;
+    // Appends one chunk of a table read; returns 0, or the device error code
+    virtual int32_t read_chunk( uint16_t table_id, uint32_t param1, uint32_t param3, uint32_t param4,
+                                std::vector< uint8_t > & table ) = 0;
 
 private:
     nn::status get_status();

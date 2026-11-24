@@ -20,6 +20,8 @@ public:
     int32_t send_chunk( uint16_t table_id, uint32_t param1, uint32_t param3, uint32_t param4,
                         const uint8_t * data, size_t size ) override;
     int32_t read_status( nn::status & status ) override;
+    int32_t read_chunk( uint16_t table_id, uint32_t param1, uint32_t param3, uint32_t param4,
+                        std::vector< uint8_t > & table ) override;
 
 private:
     std::shared_ptr< hw_monitor > _hwm;

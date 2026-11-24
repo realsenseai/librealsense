@@ -167,6 +167,10 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_SEGMENTATION_MODE                    , /**< OG / LPCL: 0 - segmentation not applied, otherwise the mode applied */
     RS2_FRAME_METADATA_SEGMENTATION_CLASSES                 , /**< OG / LPCL: bitmask of the segmentation classes applied */
     RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL                , /**< Point cloud: 0 - occlusion removal off, 1 - on */
+    RS2_FRAME_METADATA_SOURCE_FRAME_ID                      , /**< Custom NN: the camera's number of the RGB frame the network ran on, counted from the Custom NN start; not the Color frame counter */
+    RS2_FRAME_METADATA_NN_MODEL_GENERATION                  , /**< Custom NN: generation (CRC-32 of the metadata) of the model that made the frame; 0 when none was loaded */
+    RS2_FRAME_METADATA_NN_STATUS                            , /**< Custom NN: inference status, 0 - OK, 4 - model load failed, 5 - inference failed */
+    RS2_FRAME_METADATA_NN_MODEL_ID                          , /**< Custom NN: id of the model that made the frame, from its package; 0 when it has none */
     RS2_FRAME_METADATA_COUNT
 } rs2_frame_metadata_value;
 const char* rs2_frame_metadata_to_string(rs2_frame_metadata_value metadata);
@@ -567,6 +571,49 @@ unsigned int rs2_get_frame_object_detection_count(const rs2_frame* frame, rs2_er
 * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
 */
 void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, rs2_object_detection* detection, rs2_error** error);
+
+/**
+* When called on Custom NN frame type, returns the number of output tensors in the frame; 0 for a frame with an error status
+* \param[in] frame       Custom NN frame
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                Number of tensors
+*/
+int rs2_custom_nn_frame_get_tensor_count(const rs2_frame* frame, rs2_error** error);
+
+/**
+* When called on Custom NN frame type, describes one output tensor. The pointers in the result point into the frame and stay
+* valid while the frame is held.
+* \param[in] frame       Custom NN frame
+* \param[in] index       Tensor index, from 0 to the tensor count
+* \param[out] tensor     Receives the tensor
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_custom_nn_frame_get_tensor(const rs2_frame* frame, int index, rs2_nn_tensor* tensor, rs2_error** error);
+
+/**
+* When called on Custom NN frame type, returns the inference status (RS2_FRAME_METADATA_NN_STATUS)
+* \param[in] frame       Custom NN frame
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                0 when the frame carries tensors, otherwise the camera's error status
+*/
+int rs2_custom_nn_frame_get_status(const rs2_frame* frame, rs2_error** error);
+
+/**
+* When called on Custom NN frame type, tells whether a tensor is exposed raw (no name, layout or scale): the camera's
+* description of its model is missing or describes another model, or the tensor doesn't match its output
+* \param[in] frame       Custom NN frame
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                Non-zero when a tensor is exposed raw
+*/
+int rs2_custom_nn_frame_get_description_mismatch(const rs2_frame* frame, rs2_error** error);
+
+/**
+* When called on Custom NN frame type, explains its status
+* \param[in] frame       Custom NN frame
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                What the status means and what to do about it; empty when the status is OK
+*/
+const char* rs2_custom_nn_frame_get_status_message(const rs2_frame* frame, rs2_error** error);
 
 
 #ifdef __cplusplus

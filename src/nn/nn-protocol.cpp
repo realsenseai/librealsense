@@ -27,27 +27,54 @@ std::vector< uint8_t > build_table( uint16_t table_id, const uint8_t * file, siz
 }
 
 
-status parse_status( const std::vector< uint8_t > & reply )
+// The table's payload size, after checking its header and CRC; at least min_size
+static uint32_t check_table( const std::vector< uint8_t > & reply, uint16_t table_id, size_t min_size, const char * what )
 {
-    status result;
-    if( reply.size() < TABLE_HEADER_SIZE + sizeof( result ) )
+    if( reply.size() < TABLE_HEADER_SIZE + min_size )
     {
-        throw invalid_value_exception( rsutils::string::from() << "NN status table too short: " << reply.size() << " bytes" );
+        throw invalid_value_exception( rsutils::string::from() << what << " table too short: " << reply.size() << " bytes" );
     }
-        
+
     auto header = reinterpret_cast< const table_header * >( reply.data() );
     auto const data = reply.data() + TABLE_HEADER_SIZE;
     auto table_size = header->get_table_size();
-    
-    if( header->get_table_type() != STATUS_TABLE_ID 
-        || table_size < sizeof( result )
+
+    if( header->get_table_type() != table_id
+        || table_size < min_size
         || table_size > reply.size() - TABLE_HEADER_SIZE
         || header->get_crc32() != rsutils::number::calc_crc32( data, table_size ) )
     {
-        throw invalid_value_exception( "invalid NN status table" );
+        throw invalid_value_exception( rsutils::string::from() << "invalid " << what << " table" );
     }
-    
-    std::memcpy( &result, data, sizeof( result ) );
+    return table_size;
+}
+
+
+status parse_status( const std::vector< uint8_t > & reply )
+{
+    status result;
+    check_table( reply, STATUS_TABLE_ID, sizeof( result ), "NN status" );
+    std::memcpy( &result, reply.data() + TABLE_HEADER_SIZE, sizeof( result ) );
+    return result;
+}
+
+
+stored_model parse_info( const std::vector< uint8_t > & reply )
+{
+    stored_model result;
+    auto const table_size = check_table( reply, INFO_TABLE_ID, sizeof( result.block ), "NN info" );
+    auto const data = reply.data() + TABLE_HEADER_SIZE;
+    std::memcpy( &result.block, data, sizeof( result.block ) );
+    auto const & block = result.block;
+    // The block may grow in later versions: the metadata follows its own size
+    if( block.size < sizeof( block ) || size_t( block.size ) + block.metadata_size > table_size )
+        throw invalid_value_exception( rsutils::string::from() << "invalid NN info: block " << block.size << " bytes and "
+                                                               << block.metadata_size << " bytes of metadata in "
+                                                               << table_size );
+    auto const metadata = data + block.size;
+    if( block.present && rsutils::number::calc_crc32( metadata, block.metadata_size ) != block.generation )
+        throw invalid_value_exception( "invalid NN info: the metadata doesn't match the model generation" );
+    result.metadata.assign( reinterpret_cast< const char * >( metadata ), block.metadata_size );
     return result;
 }
 
@@ -89,6 +116,100 @@ void throw_error( int32_t code )
     if( code == -1 || code == -4 || code == -12 || code == -19 || code == -34 )
         throw not_implemented_exception( msg );
     throw invalid_value_exception( msg );
+}
+
+
+size_t dtype_size( rs2_nn_dtype dtype )
+{
+    switch( dtype )
+    {
+    case RS2_NN_DTYPE_S8:
+    case RS2_NN_DTYPE_U8: return 1;
+    case RS2_NN_DTYPE_S16:
+    case RS2_NN_DTYPE_U16: return 2;
+    case RS2_NN_DTYPE_F32: return 4;
+    default: return 0;
+    }
+}
+
+
+static size_t round_up( size_t size, size_t alignment ) { return ( size + alignment - 1 ) / alignment * alignment; }
+
+
+custom_nn_frame_layout parse_custom_nn_frame( const uint8_t * data, size_t size )
+{
+    auto fail = []( std::string const & why ) { throw invalid_value_exception( "Invalid Custom NN frame: " + why ); };
+    if( size < sizeof( custom_nn_frame_header_v1 ) + sizeof( custom_nn_payload_header ) )
+        fail( rsutils::string::from() << size << " bytes" );
+
+    custom_nn_frame_layout layout;
+    auto & header = layout.header;
+    std::memcpy( &header, data, sizeof( header ) );
+    if( header.magic != CUSTOM_NN_MAGIC )
+        fail( rsutils::string::from() << "magic 0x" << std::hex << header.magic );
+    bool const packed = header.version == CUSTOM_NN_VERSION_PACKED;
+    if( packed )
+    {
+        custom_nn_frame_header_v1 v1;
+        std::memcpy( &v1, data, sizeof( v1 ) );
+        header = { v1.magic, v1.version, v1.flags, v1.payload_size, 0, v1.generation, v1.crc32 };
+    }
+    else if( header.version != CUSTOM_NN_VERSION )
+        fail( rsutils::string::from() << "unsupported version 0x" << std::hex << header.version );
+
+    // Version 3 keeps both headers in the first 64 bytes
+    size_t const header_size = packed ? sizeof( custom_nn_frame_header_v1 ) : sizeof( header );
+    size_t const headers_end = packed ? header_size + sizeof( layout.payload ) : CUSTOM_NN_ALIGNMENT;
+    if( size < headers_end )
+        fail( rsutils::string::from() << size << " bytes" );
+    std::memcpy( &layout.payload, data + header_size, sizeof( layout.payload ) );
+
+    size_t const end = header_size + size_t( header.payload_size );
+    if( end < headers_end || end > size )
+        fail( rsutils::string::from() << "payload size " << header.payload_size << " in a frame of " << size << " bytes" );
+    auto const crc = rsutils::number::calc_crc32( data + header_size, header.payload_size );
+    if( crc != header.crc32 )
+        fail( rsutils::string::from() << "CRC 0x" << std::hex << crc << ", expected 0x" << header.crc32 );
+
+    if( ( header.flags & CUSTOM_NN_ERROR_FLAG ) || layout.payload.status != uint8_t( custom_nn_status::ok ) )
+        return layout;
+
+    size_t const alignment = packed ? 1 : CUSTOM_NN_ALIGNMENT;
+    size_t const tensor_header_size = packed ? sizeof( custom_nn_tensor_header ) : CUSTOM_NN_ALIGNMENT;
+    size_t offset = headers_end;
+    for( int i = 0; i < layout.payload.tensor_count; ++i )
+    {
+        if( offset + tensor_header_size > end )
+            fail( rsutils::string::from() << "tensor " << i << " header past the payload" );
+        custom_nn_tensor_header th;
+        std::memcpy( &th, data + offset, sizeof( th ) );
+        custom_nn_tensor t{ th.output_index, rs2_nn_dtype( th.dtype ), offset + tensor_header_size, th.byte_size };
+        size_t const element = th.dtype < RS2_NN_DTYPE_COUNT ? dtype_size( t.dtype ) : 0;
+        if( ! element || t.size % element )
+            fail( rsutils::string::from() << "tensor " << i << " dtype " << int( th.dtype ) << " with " << t.size << " bytes" );
+        if( t.offset + t.size > end )
+            fail( rsutils::string::from() << "tensor " << i << " of " << t.size << " bytes past the payload" );
+        layout.tensors.push_back( t );
+        offset = t.offset + round_up( t.size, alignment );
+    }
+    return layout;
+}
+
+
+const char * custom_nn_status_message( uint8_t status, uint32_t generation )
+{
+    switch( custom_nn_status( status ) )
+    {
+    case custom_nn_status::ok: return "";
+    case custom_nn_status::load_failed:
+        return generation ? "The Custom NN model didn't load. Upload it again."
+                          : "A new Custom NN model is installed; reset the camera to use it.";
+    case custom_nn_status::dsp_error: return "Inference failed on this frame.";
+    case custom_nn_status::no_metadata: return "The camera has no Custom NN model description.";
+    case custom_nn_status::too_large: return "The Custom NN output didn't fit the frame.";
+    case custom_nn_status::tensor_invalid: return "The Custom NN output was invalid.";
+    default: return "The camera couldn't run the Custom NN model on this frame.";
+    }
 }
 
 }  // namespace nn
