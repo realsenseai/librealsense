@@ -7,6 +7,7 @@
 
 import pytest
 import pyrealsense2 as rs
+from profiles_helper import profile
 
 
 pytestmark = [
@@ -14,17 +15,7 @@ pytestmark = [
     pytest.mark.context( "nightly" ),
 ]
 
-W, H, FPS = 1280, 720, 30
 OPT = rs.option.emitter_on_off
-
-
-def profile(sensor, stream_type, index, fmt):
-    for p in sensor.get_stream_profiles():
-        vp = p.as_video_stream_profile()
-        if vp and p.stream_type() == stream_type and p.stream_index() == index and p.format() == fmt \
-                and vp.width() == W and vp.height() == H and p.fps() == FPS:
-            return p
-    pytest.skip( f"Device publishes no {stream_type} {index} {W}x{H}@{FPS} {fmt}" )
 
 
 # The lock checks depth and infrared separately
