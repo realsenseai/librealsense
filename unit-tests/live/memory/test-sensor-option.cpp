@@ -14,6 +14,9 @@ TEST_CASE( "sensor get_option memory leak", "[live]" )
     auto devices = find_devices_by_product_line_or_exit(RS2_PRODUCT_LINE_D400);
     for( auto dev : devices )
     {
+        // The runner resets only the device it targets; other devices may keep state left by previous tests.
+        if( ! test::serial.empty() && test::serial != dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) )
+            continue;
         LOG_DEBUG( "running on " << dev.get_info( RS2_CAMERA_INFO_NAME ) );
         auto depth_sens = dev.first< rs2::depth_sensor >();
         // float option_value(depth_sens.get_option(RS2_OPTION_EXPOSURE));
@@ -24,7 +27,9 @@ TEST_CASE( "sensor get_option memory leak", "[live]" )
         }
         float option_value( depth_sens.get_option( RS2_OPTION_ENABLE_AUTO_EXPOSURE ) );
 
-        REQUIRE( (option_value) ); // Using the value of option_value, if memory error exist, causes valgrind to output: "Conditional jump or move depends on uninitialised value(s)"
+        // Branching on the value makes valgrind report "Conditional jump or move depends on uninitialised value(s)" if there is a memory error.
+        // Auto-exposure can legitimately be on or off, so only verify the value is boolean.
+        CHECK( ( option_value == 0.f || option_value == 1.f ) );
     }
 }
 
