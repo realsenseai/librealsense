@@ -1181,25 +1181,19 @@ namespace librealsense
             register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
         register_info(RS2_CAMERA_INFO_IMU_TYPE, _imu_type);
 
+        register_info(RS2_CAMERA_INFO_CONNECTION_TYPE, _is_mipi_device ? "GMSL" : "USB");
         if (usb_modality)
-        {
-            register_info(RS2_CAMERA_INFO_CONNECTION_TYPE, "USB");
             register_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR, usb_type_str);
-        }
-        else
+        else if (mipi_driver_version.is_valid())
         {
-            register_info(RS2_CAMERA_INFO_CONNECTION_TYPE, "GMSL");
-            if (mipi_driver_version.is_valid())
-            {
-                register_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION, mipi_driver_version.to_string());
+            register_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION, mipi_driver_version.to_string());
 
-                // Log driver version only once across all devices
-                static bool logged = false;
-                if (!logged)
-                {
-                    LOG_INFO("MIPI driver version detected: " << mipi_driver_version.to_string());
-                    logged = true;
-                }
+            // Log driver version only once across all devices
+            static bool logged = false;
+            if (!logged)
+            {
+                LOG_INFO("MIPI driver version detected: " << mipi_driver_version.to_string());
+                logged = true;
             }
         }
 
