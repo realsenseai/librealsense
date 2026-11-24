@@ -24,6 +24,7 @@ DECIMATION = rs.composite_option_id.decimation_filter_dpp
 MAX_FPS = 30
 MIN_WIDTH = 128  # the Downscale Secondary must be at least this wide
 ICR_APPLIED_BIT = 1 << 5  # observed in embedded_filters metadata
+DECIMATED_SIZE = (640, 360)  # with Decimation on, FW streams only this Depth size (from 1280x720)
 
 # mode -> (ICR mode, downscale_ratio, ratio both Depth dimensions must be divisible by)
 MODES = {
@@ -203,6 +204,8 @@ def test_supported_profiles_accepted(filters, mode, decimation_factor):
     for p in supported:
         v = p.as_video_stream_profile()
         key = (v.width(), v.height())
+        if decimation_factor == 2 and key != DECIMATED_SIZE:
+            continue
         if key not in by_resolution or p.fps() > by_resolution[key].fps():
             by_resolution[key] = p
     for profile in by_resolution.values():
@@ -256,7 +259,7 @@ def test_downscale_x4_with_decimation_stream_smoke(filters):
             frame = queue.wait_for_frame(5000)
             video = frame.as_video_frame()
             assert frame.get_profile().format() == rs.format.z16
-            assert (video.width(), video.height()) == (640, 360)
+            assert (video.get_width(), video.get_height()) == (640, 360)
             assert frame.get_data_size() == 640 * 360 * 2
             frame_numbers.append(frame.get_frame_number())
         assert all(b > a for a, b in zip(frame_numbers, frame_numbers[1:])), f"frame numbers not increasing: {frame_numbers}"
