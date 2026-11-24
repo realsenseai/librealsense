@@ -12,17 +12,17 @@ set_security_flags_for_executable() # examples are executables so we want positi
 set( DEPENDENCIES ${LRS_TARGET} )
 if(BUILD_GRAPHICAL_EXAMPLES)
     include(${PROJECT_SOURCE_DIR}/CMake/opengl_config.cmake)
+    # Link OpenGL, and libdl on Linux
+    if(WIN32)
+        list( APPEND DEPENDENCIES OpenGL::GL)
+    else()
+        list( APPEND DEPENDENCIES OpenGL::GL dl)
+    endif()
 else()
     if(ANDROID_NDK_TOOLCHAIN_INCLUDED)
         find_library(log-lib log)
         list( APPEND DEPENDENCIES log )
     endif()
-endif()
-# Check the platform and conditionally link OpenGL and libdl (for linux)
-if(WIN32)
-    list( APPEND DEPENDENCIES OpenGL::GL)
-else()
-    list( APPEND DEPENDENCIES OpenGL::GL dl)
 endif()
 
 # Add all imgui cpp source files and store the list in the IMGUI_SOURCES variable
