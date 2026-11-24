@@ -286,14 +286,9 @@ namespace librealsense
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_dev, physical_port );
         _depth_mapping_idx = add_sensor(mapping_ep);
         _depth_mapping_active = true;
-        if( ! _is_safety_layout )
+        if( ! _is_safety_layout && ! _is_mipi_device )
             add_stream_combination_validator( [this]( const stream_profiles & requests )
                                               { depth_sensor_allowed_or_throw( requests ); } );
-    }
-
-    static bool is_depth_at_rate( const stream_profile_interface & p, uint32_t fps )
-    {
-        return p.get_stream_type() == RS2_STREAM_DEPTH && p.get_framerate() == fps;
     }
 
     static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
@@ -308,22 +303,11 @@ namespace librealsense
         auto mapping = find_stream( requests, RS2_STREAM_OCCUPANCY );
         if( ! mapping )
             mapping = find_stream( requests, RS2_STREAM_LABELED_POINT_CLOUD );
-        if( _is_safety_layout || ! mapping )
-            return;
-        auto const running = get_sensor( _depth_device_idx ).get_active_streams();
-        uint32_t const fps = mapping->get_framerate();
-        auto const name = rs2_stream_to_string( mapping->get_stream_type() );
-        if( running.empty() )
-            return;
-        // A rebuilt Mapping branch normalizes any negotiated native Depth view at the Mapping rate.
-        if( std::none_of( running.begin(), running.end(),
-                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_depth_at_rate( *p, fps ); } ) )
+        // Over USB the camera keeps 2C colors open next to Occupancy/LPCL but stops delivering them
+        if( mapping && ! _is_safety_layout && ! _is_mipi_device
+            && find_stream( get_sensor( _depth_device_idx ).get_active_streams(), RS2_STREAM_COLOR ) )
             throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << name << " needs Depth at " << fps << " fps, while the depth sensor streams" );
-        // Keep the USB 2C Color restriction for both Mapping outputs: colors can be left open without frames.
-        if( ! _is_mipi_device && find_stream( running, RS2_STREAM_COLOR ) )
-            throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << name << " cannot start while the depth sensor streams color" );
+                << rs2_stream_to_string( mapping->get_stream_type() ) << " cannot start while the depth sensor streams color" );
     }
 
     void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
@@ -332,24 +316,9 @@ namespace librealsense
         auto mapping = find_stream( active, RS2_STREAM_OCCUPANCY );
         if( ! mapping )
             mapping = find_stream( active, RS2_STREAM_LABELED_POINT_CLOUD );
-        if( ! mapping )
-            return;
-        uint32_t const fps = mapping->get_framerate();
-        auto const name = rs2_stream_to_string( mapping->get_stream_type() );
-        if( auto const depth = find_stream( requests, RS2_STREAM_DEPTH ) )
-        {
-            // The rebuilt Mapping branch accepts native Depth sizes, but the shared sensor must join alone.
-            if( ! is_depth_at_rate( *depth, fps ) )
-                throw wrong_api_call_sequence_exception( rsutils::string::from()
-                    << "Depth must run at " << fps << " fps while " << name
-                    << " is active. Select that frame rate or stop the " << name << " stream." );
-            if( requests.size() != 1 )
-                throw wrong_api_call_sequence_exception( rsutils::string::from()
-                    << "While " << name << " streams, Depth can start only alone at " << fps << " fps" );
-        }
-        else if( find_stream( requests, RS2_STREAM_COLOR ) )
+        if( mapping && find_stream( requests, RS2_STREAM_COLOR ) )
             throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << "Color cannot start while " << name << " streams" );
+                << "Color cannot start while " << rs2_stream_to_string( mapping->get_stream_type() ) << " streams" );
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
