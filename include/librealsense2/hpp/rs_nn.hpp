@@ -35,7 +35,8 @@ namespace rs2
          * while it installs a model, uploaded by any process. If the upload does not complete, wait a minute before
          * resetting or reconnecting the camera: it may still be writing the model. Currently only
          * RS2_NN_TARGET_FLASH and activate = true are supported, to slot 0 (Object Detection weights) or slot 2 (a
-         * custom network: a code + weights package).
+         * custom network: a code + weights package). A full firmware update replaces slot 2 with the image's
+         * content: upload the custom network again after one.
          */
         void nn_upload( const std::vector< uint8_t > & file,
                         rs2_nn_target target = RS2_NN_TARGET_FLASH,

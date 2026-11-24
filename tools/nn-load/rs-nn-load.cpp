@@ -158,11 +158,19 @@ try
         }
     } );
 
-    std::cout << "Uploading " << file_arg.getValue() << " to " << info( loader, RS2_CAMERA_INFO_NAME ) << " s/n "
-              << serial << ". Please don't disconnect the device!" << std::endl;
+    std::string const uploading = "Uploading " + file_arg.getValue() + " to " + info( loader, RS2_CAMERA_INFO_NAME )
+                                + " s/n " + serial + ". Please don't disconnect the device!";
     bool activate = ! no_activate_arg.isSet();
     int last = -1;
+    bool started = false;
     bool writing = false;
+    // Said on the first progress, after the first chunk: options the SDK refuses before any transfer print only the error
+    auto note_start = [&started, &uploading]
+    {
+        if( ! started )
+            std::cout << uploading << std::endl;
+        started = true;
+    };
     // The camera reports little progress while it writes the model to flash (90-99%): say what it is doing
     auto note_writing = [&writing]( float progress )
     {
@@ -173,15 +181,17 @@ try
         }
     };
     if( ISATTY( FILENO( stdout ) ) )
-        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&note_writing]( float progress )
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&note_start, &note_writing]( float progress )
         {
+            note_start();
             printf( "\rNN model upload progress: %d[%%]", int( progress * 100 + 0.001f ) );
             fflush( stdout );
             note_writing( progress );
         } );
     else  // a log gets a line every 10%
-        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last, &note_writing]( float progress )
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last, &note_start, &note_writing]( float progress )
         {
+            note_start();
             int pct = int( progress * 10 + 0.001f ) * 10;  // the last chunk's 0.9 may come as 0.8999999
             if( pct != last )
                 std::cout << "NN model upload progress: " << ( last = pct ) << "%" << std::endl;

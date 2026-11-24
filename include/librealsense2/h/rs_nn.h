@@ -32,7 +32,8 @@ const char * rs2_nn_target_to_string( rs2_nn_target target );
  * on the device is refused while it installs a model, uploaded by any process. If the upload does not complete, wait
  * a minute before resetting or reconnecting the camera: it may still be writing the model. Currently only
  * RS2_NN_TARGET_FLASH and activate != 0 are supported, to slot 0 (Object Detection weights) or slot 2 (a custom
- * network: a code + weights package).
+ * network: a code + weights package). A full firmware update replaces slot 2 with the image's content: upload the
+ * custom network again after one.
  * \param[in]  device       Device extendable to RS2_EXTENSION_NN_LOADER
  * \param[in]  file         Package content, sent as is
  * \param[in]  file_size    Package size in bytes
