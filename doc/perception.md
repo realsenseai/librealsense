@@ -73,8 +73,8 @@ The other values of `rs2_point_cloud_label` are not used by D5x5 cameras.
 
 #### Stream rules
 
-* Over USB, the occupancy grid and color cannot stream at the same time.
-* The camera refuses any other depth sensor combination it does not support when that stream starts.
+* Over USB on dual-RGB (2C) cameras, color cannot stream together with the occupancy grid or the labeled point cloud.
+* The SDK does not check other combinations; the camera decides which ones it supports.
 
 ### Options
 
