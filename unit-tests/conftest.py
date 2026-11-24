@@ -851,9 +851,11 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     #  hub, port OFF         -> don't recycle; enabling it here IS the power-on (teardown-off +
     #                           setup-on = the cycle). Avoids re-disabling an already-off port.
     serials = serial_number if isinstance(serial_number, list) else [serial_number]
-    # Checked while the port is still off, so a camera that lacks a requirement costs no power cycle
+    # Checked while the port is still off, so a camera that lacks a requirement costs no power cycle.
+    # Not when the module switches the camera's configuration: its handle is the previous one's, checked after the switch.
     requires = list(request.node.iter_markers("requires"))
-    unmet = next(filter(None, (unmet_requirement(devices.get(sn), requires) for sn in serials)), None)
+    switching = d585_config.mode_changes(_test_device_serial)
+    unmet = None if switching else next(filter(None, (unmet_requirement(devices.get(sn), requires) for sn in serials)), None)
     if unmet:
         _emit_test_header(item_id)
         pytest.skip(unmet)
@@ -943,6 +945,12 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         _emit_test_header(item_id)
         _teardown([serial_number])
         pytest.fail(f"Failed to set up {_test_device_serial}: {e}")
+
+    unmet = switching and unmet_requirement(devices.get(serial_number), requires)
+    if unmet:
+        _emit_test_header(item_id)
+        _teardown([serial_number])
+        pytest.skip(unmet)
 
     yield serial_number
     _teardown([serial_number])

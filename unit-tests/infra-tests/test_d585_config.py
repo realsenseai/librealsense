@@ -130,3 +130,16 @@ def test_a_failed_switch_is_still_restored_at_session_end( monkeypatch, lab ):
     monkeypatch.setattr( dev, 'hw_reset', lambda sns, **kw: True, raising = False )
     d585_config.restore_all()
     assert d585_config.current( lab['541'].handle ) == 'dedicated_sensor'
+
+
+def test_mode_changes_until_the_camera_is_in_the_instances_mode( monkeypatch, lab ):
+    monkeypatch.setattr( dev, 'hw_reset', lambda sns, **kw: True, raising = False )
+    monkeypatch.setattr( dev, 'enable_only', lambda sns, **kw: None, raising = False )
+    assert not d585_config.mode_changes( '541' )
+    assert d585_config.mode_changes( '541-dual-rgb' )
+    assert not d585_config.mode_changes( ['541', '542'] )
+    d585_config.setup( '541-dual-rgb' )
+    assert not d585_config.mode_changes( '541-dual-rgb' )
+    assert d585_config.mode_changes( '541' )
+    d585_config.restore_all()
+    assert not d585_config.mode_changes( '541' )

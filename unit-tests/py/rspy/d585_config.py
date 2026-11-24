@@ -13,6 +13,7 @@ each module asked for.
 from rspy import log
 
 _switched = set()   # cameras switched away from the dedicated sensor this session, restored by restore_all()
+_last_mode = {}     # camera serial -> the configuration it was last put in; a camera not listed is in the dedicated sensor
 
 MODES = { 'dedicated_sensor': 0, 'dual_rgb': 1 }
 SUFFIX = '-dual-rgb'
@@ -83,6 +84,14 @@ def can_toggle( device ):
     return device.name in DUAL_RGB_NAMES and _supports_switch( device )
 
 
+def mode_changes( serial ):
+    """True if setting up this test instance switches its camera, so its handle still describes the previous configuration"""
+    if not isinstance( serial, str ):
+        return False
+    real, mode = split( serial )
+    return mode != _last_mode.get( real, 'dedicated_sensor' )
+
+
 def setup( serial ):
     """Put the camera of this test instance into its configuration (the camera must be enabled)"""
     real, mode = split( serial ) if isinstance( serial, str ) else ( serial, 'dedicated_sensor' )
@@ -92,6 +101,7 @@ def setup( serial ):
         if mode == 'dual_rgb':
             _switched.add( real )   # before the switch: a failed one still gets restored
         ensure( real, mode )
+        _last_mode[real] = mode
     elif mode == 'dual_rgb':
         raise RuntimeError( 'sensors_config_mode is not supported' )
 
@@ -107,6 +117,7 @@ def restore_all():
         except Exception as e:
             log.warning( f'{sn}: failed to restore the dedicated sensor configuration: {e}' )
     _switched.clear()
+    _last_mode.clear()
 
 
 def adopt_dedicated_sensor_names():
