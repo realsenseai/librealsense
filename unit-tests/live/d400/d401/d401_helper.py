@@ -56,10 +56,11 @@ def skip_without_color1( dev ):
     all of these, whichever FW/driver version added it. A plain D405 never publishes it and always skips."""
     if has_color1( dev.first_depth_sensor() ):
         return
-    def info( i ):
-        return dev.get_info( i ) if dev.supports( i ) else "unknown"
-    pytest.skip( f"No Color 1 profile on FW {info( rs.camera_info.firmware_version )}, MIPI driver "
-                 f"{info( rs.camera_info.mipi_driver_version )}: raw dual-RGB needs FW with the raw path "
+    fw = dev.get_info( rs.camera_info.firmware_version ) if dev.supports( rs.camera_info.firmware_version ) else "unknown"
+    # Only GMSL devices report a MIPI driver; over USB there is none to mention
+    mipi = ( f", MIPI driver {dev.get_info( rs.camera_info.mipi_driver_version )}"
+             if dev.supports( rs.camera_info.mipi_driver_version ) else "" )
+    pytest.skip( f"No Color 1 profile on FW {fw}{mipi}: raw dual-RGB needs FW with the raw path "
                  f"(GMSL: 5.17.4.13+ and a MIPI driver with the raw format)" )
 
 
