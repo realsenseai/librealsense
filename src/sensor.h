@@ -289,13 +289,14 @@ namespace librealsense
 
         void register_on_open( on_open callback ) override { _raw_sensor->register_on_open( callback ); }
 
+    protected:
+        std::recursive_mutex _synthetic_configure_lock;  // recursive: close_streams() stops and closes under it
+
     private:
         void register_processing_block_options(const processing_block& pb);
         void unregister_processing_block_options(const processing_block& pb);
         void add_streams( const stream_profiles & requests );
         void update_active_streams( const stream_profiles & streams );
-
-        std::recursive_mutex _synthetic_configure_lock;  // recursive: close_streams() stops and closes under it
 
         rs2_frame_callback_sptr _post_process_callback;
         std::shared_ptr<raw_sensor_base> _raw_sensor;

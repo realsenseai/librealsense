@@ -71,25 +71,33 @@ namespace librealsense
         // because both are received as GREY 
         {rs_fourcc('P','A','L','8'), RS2_FORMAT_Y8}
     };
-    // EP12 point-cloud (PCL XYZ) profiles: GREY transport selectors whose payload is the bare
-    // W x H float32 x,y,z array (12 B per point, no in-band header). Phase 1 selects the
-    // stream by the full (width, height, fps) tuple, as the FW MAPPING_EP12_PROFILES table.
+    // Device point-cloud profiles: formats may share a resolution, so format + resolution pick one.
+    // pcl_format is both the requested PCL format and the metadata point_format.
     namespace {
 
-    struct pcl_tuple { uint32_t width, height, fps; uint16_t profile_id; };
-    const pcl_tuple pcl_xyz_tuples[] = { { 640, 480, 30, 0x0001 }, { 1280, 720, 15, 0x0002 } };
+    struct pcl_profile { rs2_format format; uint32_t width, height, fps; uint16_t profile_id; uint8_t pcl_format, point_stride; };
+    const pcl_profile pcl_profiles[] = { { RS2_FORMAT_XYZ32F, 640, 480, 30, 0x0001, ds::MAPPING_PCL_FORMAT_XYZ, 12 },
+                                         { RS2_FORMAT_XYZ32F, 1280, 720, 15, 0x0002, ds::MAPPING_PCL_FORMAT_XYZ, 12 } };
 
-    const pcl_tuple * find_pcl_xyz_tuple( uint32_t width, uint32_t height, uint32_t fps )
+    // The table entry for a requested Point Cloud profile or nullptr
+    const pcl_profile * find_pcl_profile( const stream_profile_interface & profile )
     {
-        for( auto const & t : pcl_xyz_tuples )
-            if( t.width == width && t.height == height && t.fps == fps )
-                return &t;
-        return nullptr;
+        auto const sp = to_profile( &profile );
+        if( sp.stream != RS2_STREAM_POINT_CLOUD )
+            return nullptr;
+        auto const it = std::find_if( std::begin( pcl_profiles ), std::end( pcl_profiles ), [&]( const pcl_profile & p ) {
+            return p.format == sp.format && p.width == sp.width && p.height == sp.height && p.fps == sp.fps;
+        } );
+        return it == std::end( pcl_profiles ) ? nullptr : it;
     }
 
-    bool is_pcl_xyz_tuple( uint32_t width, uint32_t height, uint32_t fps )
+    // True for a device point-cloud transport profile: GREY carries no point format, so any table resolution matches
+    bool is_pcl_transport( const platform::stream_profile & p )
     {
-        return find_pcl_xyz_tuple( width, height, fps ) != nullptr;
+        return p.format == rs_fourcc( 'G', 'R', 'E', 'Y' )
+            && std::any_of( std::begin( pcl_profiles ), std::end( pcl_profiles ), [&]( const pcl_profile & t ) {
+                   return t.width == p.width && t.height == p.height && t.fps == p.fps;
+               } );
     }
 
     // The transport profile is GREY (Y8); the payload is XYZ32F. Validate the frame against the
@@ -130,8 +138,12 @@ namespace librealsense
                 {
                     _expected.width = vsp->get_width();
                     _expected.height = vsp->get_height();
-                    if( auto t = find_pcl_xyz_tuple( _expected.width, _expected.height, source->get_framerate() ) )
-                        _expected.profile_id = t->profile_id;
+                    if( auto p = find_pcl_profile( *_target ) )
+                    {
+                        _expected.profile_id = p->profile_id;
+                        _expected.point_stride = p->point_stride;
+                        _expected.point_format = p->pcl_format;
+                    }
                 }
             }
 
@@ -252,7 +264,7 @@ namespace librealsense
         std::vector< std::shared_ptr< platform::uvc_device > > perception_devs;
         std::vector< platform::muxed_stream > descs = { occupancy_muxed_stream, labeled_point_cloud_muxed_stream };
         if( ! _is_safety_layout )
-            for( auto const & t : pcl_xyz_tuples )
+            for( auto const & t : pcl_profiles )
                 descs.push_back( pcl_xyz_muxed_stream( t.width, t.height ) );
         for( auto const & desc : descs )
             if( auto dev = depth_uvc->create_muxed_stream_device( desc, enable ) )
@@ -371,7 +383,7 @@ namespace librealsense
         if( ! _is_d585s )
             _raw_depth_mapping_ep = raw_mapping_ep;
 
-        // The mapping function reports every EP12 output as GREY; the PCL XYZ tuples are the
+        // The Mapping function reports every output as GREY; a point-cloud profile resolution is the
         // device point cloud, not occupancy (D5xx layout only).
         if( ! _is_safety_layout )
         {
@@ -380,7 +392,7 @@ namespace librealsense
                                                         rs2_stream & type,
                                                         std::vector< int > & )
                 {
-                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+                    if( is_pcl_transport( p ) )
                         type = RS2_STREAM_POINT_CLOUD;
                 } );
         }
@@ -517,6 +529,12 @@ namespace librealsense
             return;
 
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
+
+        _supports_stream_selection = is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::STREAM_SELECT,
+                                                      sizeof( uint8_t ) );
+        _supports_pcl_format = _supports_stream_selection
+                            && is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::PCL_FORMAT,
+                                                sizeof( uint8_t ) );
 
         // Not every transport exposes these controls (no GMSL driver CIDs yet)
         if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
@@ -971,8 +989,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             }
             else if (p->get_stream_type() == RS2_STREAM_POINT_CLOUD)
             {
-                const auto&& profile = to_profile(p.get());
-                if (_owner->_is_safety_layout || ! is_pcl_xyz_tuple(profile.width, profile.height, profile.fps))
+                if (_owner->_is_safety_layout || ! find_pcl_profile(*p))
                     continue;
                 relevant_results.push_back(std::move(p));
             }
@@ -1015,7 +1032,36 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << requests.size() << " profiles were requested");
 
         _owner->mapping_allowed_or_throw(requests);
+        // The selection and the commit inside open() are one transaction; an open sensor reports its own error
+        std::lock_guard< std::recursive_mutex > lock( _synthetic_configure_lock );
+        if( ! is_opened() )
+            _owner->select_mapping_stream(requests);
         synthetic_sensor::open(requests);
+    }
+
+    void d500_depth_mapping::select_mapping_stream( const stream_profiles & requests ) const
+    {
+        static const std::map< rs2_stream, uint8_t > stream_select = { { RS2_STREAM_POINT_CLOUD, ds::MAPPING_STREAM_PCL },
+                                                                      { RS2_STREAM_LABELED_POINT_CLOUD, ds::MAPPING_STREAM_LPCL },
+                                                                      { RS2_STREAM_OCCUPANCY, ds::MAPPING_STREAM_OG } };
+        if( ! _supports_stream_selection || requests.empty() )
+            return;
+        rs2_stream const type = requests.front()->get_stream_type();
+        auto const it = stream_select.find( type );
+        if( it == stream_select.end() )
+            return;
+        auto const pcl = _supports_pcl_format ? find_pcl_profile( *requests.front() ) : nullptr;
+        LOG_DEBUG( "Mapping XU stream select " << int( it->second ) << " for " << rs2_stream_to_string( type )
+                                               << ( pcl ? ", PCL format " + std::to_string( pcl->pcl_format ) : std::string() ) );
+        // Writable copies: on Windows the KS SET buffer is in/out, and a read-only one faults
+        uint8_t select = it->second, format = pcl ? pcl->pcl_format : 0;
+        _raw_depth_mapping_ep->invoke_powered( [&]( platform::uvc_device & dev )
+        {
+            if( ! dev.set_xu( ds::mapping_xu, ds::STREAM_SELECT, &select, sizeof( select ) )
+                || ( pcl && ! dev.set_xu( ds::mapping_xu, ds::PCL_FORMAT, &format, sizeof( format ) ) ) )
+                throw io_exception( rsutils::string::from()
+                                    << "Failed to select " << rs2_stream_to_string( type ) << " on the Mapping XU" );
+        } );
     }
 
     rs2_intrinsics d500_depth_mapping_sensor::get_intrinsics(const stream_profile& profile) const
