@@ -28,8 +28,7 @@ void validate_nn_upload_args( size_t size, rs2_nn_target target, int slot, bool 
 }
 
 
-// Object Detection runs a network; Occupancy and the other depth-derived streams don't, so they may stream during an
-// upload. Segmentation and Custom NN join this list when they become streams.
+// Occupancy and the other depth-derived streams run no network, so they may stream during an upload
 bool is_nn_stream( rs2_stream stream )
 {
     return stream == RS2_STREAM_OBJECT_DETECTION;

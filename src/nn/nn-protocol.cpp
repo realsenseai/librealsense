@@ -52,8 +52,7 @@ status parse_status( const std::vector< uint8_t > & reply )
 }
 
 
-// The custom network (slot 2) shares the weights codes, with more causes behind -5 and -10 (HKR, 21/11), and adds the
-// signature codes -65..-67
+// Slot 2 (a custom network) has more causes behind -5, -10 and -15 than slot 0
 static const char * custom_slot_message( int32_t code )
 {
     switch( code )

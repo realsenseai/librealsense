@@ -78,25 +78,8 @@ TEST_CASE( "upload arguments" )
     CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 0, false ), not_implemented_exception );
     CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, 2, false ), not_implemented_exception );
     for( int slot : { -1, 1, 3, 0x10000 } )
-    {
-        CAPTURE( slot );
-        CHECK_THROWS_AS( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, slot, true ), not_implemented_exception );
-    }
-
-    auto message = []( int slot ) -> std::string
-    {
-        try
-        {
-            validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, slot, true );
-        }
-        catch( librealsense_exception const & e )
-        {
-            return e.what();
-        }
-        return {};
-    };
-    CHECK( message( 1 ) == "NN upload: slot 1 is not supported" );
-    CHECK( message( 3 ) == "NN upload: slot 3 is not supported" );
+        CHECK_THROWS_MATCHES( validate_nn_upload_args( 1, RS2_NN_TARGET_FLASH, slot, true ), not_implemented_exception,
+                              Catch::Matchers::Message( "NN upload: slot " + std::to_string( slot ) + " is not supported" ) );
 }
 
 
