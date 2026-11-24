@@ -8,7 +8,7 @@
 
 #ifdef RS2_USE_CUDA
 #include "cuda/cuda-conversion.cuh"
-#include "rsutils/accelerators/gpu.h"
+#include "cuda-host-split.h"
 #endif
 
 namespace librealsense
@@ -18,7 +18,7 @@ namespace librealsense
     {
         auto count = width * height;
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+        if( use_gpu_for_host_split() )
         {
             rscuda::split_frame_y8_y8_from_y8i_mipi_cuda(dest, count, reinterpret_cast<const y8i_pixel_mipi*>(source));
             return;
