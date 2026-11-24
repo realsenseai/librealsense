@@ -82,7 +82,9 @@ extern "C" {
     /**
     * Opt in to declaring resolved profiles and disabled peer streams in device-wide Intent before open/start.
     * Disabled by default. Unsupported firmware or a rejected SET fails start without legacy fallback.
-    * This does not start streaming immediately or clear the declaration on stop.
+    * After teardown or a failed start, pipeline sends a best-effort CLEAR for its
+    * own declaration when idle Status and full Intent readback still match.
+    * Applications using rs2_set_intent directly manage their own CLEAR.
     * \param[in] config Config to update
     * \param[in] enabled 0 to preserve legacy behavior, 1 to enable Intent declaration
     * \param[out] error Receives an error for an invalid config or enabled value

@@ -161,7 +161,9 @@ namespace rs2
         }
         /** Declare resolved profiles and disabled peer streams before open/start.
          * Disabled by default; rejection fails start rather than falling back.
-         * Stop does not implicitly clear the device-wide declaration.
+         * After teardown or a failed start, pipeline attempts to clear its own
+         * declaration if idle Status and full Intent readback still match.
+         * Explicit Intent declarations are managed by the caller.
          */
         void enable_intent(bool enabled = true)
         {
