@@ -377,6 +377,7 @@ void init_frame(py::module &m) {
         .def_property_readonly("shape", &rs2::nn_tensor::shape, "Dimensions; the element count when the description is not available")
         .def_property_readonly("layout", &rs2::nn_tensor::layout, "Order of the dimensions after a leading N, e.g. NHWC; empty when not available")
         .def_property_readonly("dequant_scale", &rs2::nn_tensor::dequant_scale, "The raw value divided by it gives the real value; 0 when not available")
+        .def_property_readonly("size", &rs2::nn_tensor::size, "Size of the data in bytes")
         .def_property_readonly("data", [](const rs2::nn_tensor& self) {
             static const char* formats[] = { "h", "H", "b", "B", "f" };
             size_t const item = self.dtype() == RS2_NN_DTYPE_F32 ? 4 : self.dtype() <= RS2_NN_DTYPE_U16 ? 2 : 1;
