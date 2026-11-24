@@ -1,6 +1,5 @@
 #include "../../test.h"
 #include "../live-common.h"
-#include "../reset-camera.h"
 #include <iostream>
 
 //#test:device D400*
@@ -13,14 +12,11 @@ TEST_CASE( "sensor get_option memory leak", "[live]" )
     // should print nothing!
 
     auto devices = find_devices_by_product_line_or_exit(RS2_PRODUCT_LINE_D400);
-    // The runner resets only the device it targets, but this test reads all connected D400 devices.
-    // On libCI Jetsons several devices are connected without an Acroname hub, so the non-targeted ones keep the
-    // state left by previous tests (e.g. auto-exposure off) and must be reset here.
-    bool multiple_devices = devices.size() > 1;
     for( auto dev : devices )
     {
-        if( multiple_devices )
-            dev = reset_camera_and_wait_for_connection( dev );
+        // The runner resets only the device it targets; other devices may keep state left by previous tests.
+        if( ! test::serial.empty() && test::serial != dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) )
+            continue;
         LOG_DEBUG( "running on " << dev.get_info( RS2_CAMERA_INFO_NAME ) );
         auto depth_sens = dev.first< rs2::depth_sensor >();
         // float option_value(depth_sens.get_option(RS2_OPTION_EXPOSURE));

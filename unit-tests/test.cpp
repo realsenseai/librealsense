@@ -9,6 +9,7 @@ namespace test {
 
 std::string context;
 bool debug = false;
+std::string serial;
 debug_logger log;
 
 

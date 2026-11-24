@@ -45,7 +45,15 @@ int main( int argc, char * argv[] )
 
                  Enable logging of LibRS log messages (LOG_DEBUG, etc.) to console.
              */
-             | Opt( rslog )["--rslog"]( "Enable LibRS logging (LOG_DEBUG, etc.) via rs2::log_to_console()" );
+             | Opt( rslog )["--rslog"]( "Enable LibRS logging (LOG_DEBUG, etc.) via rs2::log_to_console()" )
+             /*
+                 --serial <serial-number>
+
+                 The device the runner targeted (and reset) for the test, for tests that need to run on it alone.
+
+                 We write the value directly to 'test::serial'.
+             */
+             | Opt( test::serial, "serial" )["--serial"]( "Serial number of the device to run the test on" );
     
     // Use '|' to add additional options:
     //       | Opt( test::flag, "flag" )["-f"]["--flag"]("Switch something on")
