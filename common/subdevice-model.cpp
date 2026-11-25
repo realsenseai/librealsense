@@ -104,6 +104,7 @@ namespace rs2
     {
         return type == RS2_STREAM_OCCUPANCY
             || type == RS2_STREAM_LABELED_POINT_CLOUD
+            || type == RS2_STREAM_POINT_CLOUD
             || type == RS2_STREAM_OBJECT_DETECTION;
     }
 
