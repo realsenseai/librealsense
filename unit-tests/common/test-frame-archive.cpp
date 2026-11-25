@@ -105,3 +105,23 @@ TEST_CASE( "Cached mapped buffers remain bounded by the configured queue" )
     extra.reset();
     archive->flush();
 }
+
+TEST_CASE( "Capture can fill a third frame while two consumers retain earlier outputs" )
+{
+    std::atomic< uint32_t > limit{ 16 };
+    std::shared_ptr< archive_interface > archive = std::make_shared< frame_archive< counted_frame > >( &limit, nullptr );
+    counted_frame::allocations = 0;
+    archive->reserve_frame( 512 );
+    REQUIRE( counted_frame::allocations == 3 );
+    frame_holder delivered = archive->alloc_and_track( 512, {}, true );
+    frame_holder waiting = archive->alloc_and_track( 512, {}, true );
+    frame_holder next = archive->alloc_and_track( 512, {}, true );
+    REQUIRE( delivered.frame );
+    REQUIRE( waiting.frame );
+    REQUIRE( next.frame );
+    CHECK( counted_frame::allocations == 3 );
+    delivered.reset();
+    waiting.reset();
+    next.reset();
+    archive->flush();
+}

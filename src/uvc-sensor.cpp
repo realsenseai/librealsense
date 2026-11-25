@@ -297,7 +297,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                 for( auto const & stream : streams )
                 {
                     auto const format = stream.base->get_format();
-                    if( format != RS2_FORMAT_NV12 && format != RS2_FORMAT_Y8I && format != RS2_FORMAT_Z16 )
+                    bool const dual_raw16 = format == RS2_FORMAT_RAW16 && streams.size() > 1;
+                    if( format != RS2_FORMAT_NV12 && format != RS2_FORMAT_Y8I && format != RS2_FORMAT_Z16 && ! dual_raw16 )
                         continue;
                     auto const & video = dynamic_cast< video_stream_profile_interface const & >( *stream.profile );
                     auto const type = stream.base->get_stream_type();

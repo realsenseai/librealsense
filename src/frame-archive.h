@@ -32,8 +32,8 @@ namespace librealsense
         std::shared_ptr<sensor_interface> get_sensor() const override { return _sensor.lock(); }
         void set_sensor( const std::weak_ptr< sensor_interface > & s ) override { _sensor = s; }
 
-        // The consumer can retain the previous output while its successor is being filled.
-        static constexpr uint32_t initial_pixel_buffers = 2;
+        // The consumer and synchronizer can each retain an output while capture fills the next one.
+        static constexpr uint32_t initial_pixel_buffers = 3;
 
         uint32_t pixel_cache_limit() const
         {
