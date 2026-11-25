@@ -7,6 +7,10 @@
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 #include <sensor_msgs/msg/CameraInfo.h>
 #include <geometry_msgs/msg/TransformStamped.h>
+#include <sensor_msgs/msg/CompressedImage.h>
+#include <deque>
+#include <future>
+#include <memory>
 
 #include "ros2_file_format.h"
 
@@ -23,6 +27,7 @@ namespace librealsense
     {
     public:
         explicit ros2_writer( const std::string& file, bool compress_while_record);
+        ~ros2_writer() override;
         void write_device_description(const librealsense::device_snapshot& device_description) override;
         void write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame) override;
         void write_snapshot(uint32_t device_index, const nanoseconds& timestamp, rs2_extension type, const std::shared_ptr<extension_snapshot>& snapshot) override;
@@ -91,10 +96,30 @@ namespace librealsense
 
         // Compression happens inside CompressedImage payloads (PNG or zstd) so the bag
         // stays natively playable by ROS2; whole-CDR compression is playback-breaking.
-        void write_compressed_video_frame(const device_serializer::stream_identifier& stream_id,
-                                          const nanoseconds& timestamp,
-                                          frame_interface* frame);
-        void compress_zstd(const uint8_t* data, size_t size, std::vector<uint8_t>& out);
+        // Encoding runs on worker threads so a slow encoder does not hold the recorded frames, and with them
+        // the sensor's frame pool; storage is still only touched by the calling thread, in submission order.
+        struct encoded_frame
+        {
+            std::string topic;
+            sensor_msgs::msg::CompressedImage msg;
+        };
+        struct pending_frame
+        {
+            device_serializer::stream_identifier stream_id;
+            nanoseconds timestamp;
+            frame_holder frame;
+            std::future< encoded_frame > encoded;
+        };
+        class encode_pool;
+
+        static encoded_frame encode_compressed_frame( const device_serializer::stream_identifier & stream_id,
+                                                      const nanoseconds & timestamp,
+                                                      frame_interface * frame );
+        void queue_compressed_frame( const device_serializer::stream_identifier & stream_id,
+                                     const nanoseconds & timestamp,
+                                     frame_holder && frame );
+        // Writes encoded frames in order: those already done, and the oldest ones while more than max_pending are queued
+        void commit_encoded_frames( size_t max_pending );
 
         static uint8_t is_big_endian();
         std::string m_file_path;
@@ -102,7 +127,8 @@ namespace librealsense
         // Reused across calls. Safe only while _storage->write() stays synchronous
         // (sqlite binds SQLITE_STATIC and drops the ref in execute_and_reset).
         std::shared_ptr<rcutils_uint8_array_t> _cdr_buf;
-        std::vector<uint8_t> _frame_buf;
+        std::unique_ptr< encode_pool > _encoders;
+        std::deque< pending_frame > _pending;
         std::map< std::string, rosbag2_storage::TopicMetadata > _topics; // created topics cache
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::map<uint32_t, std::set<rs2_option>> m_written_options_descriptions;
