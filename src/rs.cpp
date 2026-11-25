@@ -5088,8 +5088,9 @@ const rs2_raw_data_buffer* rs2_get_depth_mapping_params(
     rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
-    auto depth_mapping_sensor = VALIDATE_INTERFACE(sensor->sensor, librealsense::depth_mapping_sensor);
-    auto ret_str = depth_mapping_sensor->get_depth_mapping_params();
+    auto depth_mapping_sensor = VALIDATE_INTERFACE_NO_THROW(sensor->sensor, librealsense::depth_mapping_sensor);
+    auto ret_str = depth_mapping_sensor ? depth_mapping_sensor->get_depth_mapping_params()
+                                        : VALIDATE_INTERFACE(sensor->sensor, librealsense::perception_sensor)->get_depth_mapping_params();
     std::vector<uint8_t> vec(ret_str.begin(), ret_str.end());
     return new rs2_raw_data_buffer{ std::move(vec) };
 }
@@ -5102,8 +5103,11 @@ void rs2_set_depth_mapping_params(
 {
     VALIDATE_NOT_NULL(sensor);
     VALIDATE_NOT_NULL(params_json_str);
-    auto depth_mapping_sensor = VALIDATE_INTERFACE(sensor->sensor, librealsense::depth_mapping_sensor);
-    depth_mapping_sensor->set_depth_mapping_params(params_json_str);
+    auto depth_mapping_sensor = VALIDATE_INTERFACE_NO_THROW(sensor->sensor, librealsense::depth_mapping_sensor);
+    if( depth_mapping_sensor )
+        depth_mapping_sensor->set_depth_mapping_params(params_json_str);
+    else
+        VALIDATE_INTERFACE(sensor->sensor, librealsense::perception_sensor)->set_depth_mapping_params(params_json_str);
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, params_json_str)
 

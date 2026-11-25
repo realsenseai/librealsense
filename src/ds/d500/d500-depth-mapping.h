@@ -8,11 +8,18 @@
 #include "core/video.h"
 #include <src/core/tagged-profile.h>
 #include <rsutils/lazy.h>
+#include <map>
 #include <mutex>
 
 namespace librealsense
 {
     class d500_depth_mapping_sensor;
+
+    extern const std::map< uint32_t, rs2_format > mapping_fourcc_to_rs2_format;
+    extern const std::map< uint32_t, rs2_stream > mapping_fourcc_to_rs2_stream;
+
+    std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type );
+    bool is_pcl_transport( const platform::stream_profile & p );
 
     class d500_depth_mapping : public virtual d500_device
     {
@@ -34,9 +41,10 @@ namespace librealsense
         std::string get_depth_mapping_params() const;
         void set_depth_mapping_params( const std::string & params_json_str ) const;
 
-    private:
+    protected:
 
         friend class d500_depth_mapping_sensor;
+        friend class d500_perception_sensor;
 
         void register_extrinsics();
 
@@ -71,18 +79,21 @@ namespace librealsense
         // Serializes get/set of the depth mapping params, so the GET that explains a failed set reads that set's result
         mutable std::mutex _depth_mapping_params_mutex;
         std::shared_ptr<rsutils::lazy<rs2_extrinsics>> _depth_to_depth_mapping_extrinsics;
+        // Without the safety layout, the Mapping interface (or its MUX streams) for the Perception sensor
+        std::vector< std::shared_ptr< platform::uvc_device > > _mapping_devs;
+        std::string _mapping_port;
     };
 
     class d500_depth_mapping_sensor : public synthetic_sensor,
-                              public video_sensor_interface,
-                              public depth_mapping_sensor
+                              public video_sensor_interface
     {
     public:
         explicit d500_depth_mapping_sensor(d500_depth_mapping* owner,
             std::shared_ptr<uvc_sensor> uvc_sensor,
             std::map<uint32_t, rs2_format> mapping_fourcc_to_rs2_format,
-            std::map<uint32_t, rs2_stream> mapping_fourcc_to_rs2_stream)
-            : synthetic_sensor("Depth Mapping Camera", uvc_sensor, owner, mapping_fourcc_to_rs2_format, mapping_fourcc_to_rs2_stream),
+            std::map<uint32_t, rs2_stream> mapping_fourcc_to_rs2_stream,
+            std::string const & name = "Depth Mapping Camera")
+            : synthetic_sensor(name, uvc_sensor, owner, mapping_fourcc_to_rs2_format, mapping_fourcc_to_rs2_stream),
             _owner(owner)
         {}
 
@@ -91,13 +102,20 @@ namespace librealsense
         // EP12 carries one Mapping stream at a time (PCL, LPCL, or OG)
         void open(const stream_profiles& requests) override;
 
+    protected:
+        d500_depth_mapping* _owner;
+    };
+
+    // D585S's and D585 legacy's own sensor for the Mapping streams
+    class d500_depth_mapping_camera : public d500_depth_mapping_sensor, public depth_mapping_sensor
+    {
+    public:
+        using d500_depth_mapping_sensor::d500_depth_mapping_sensor;
+
         std::string get_depth_mapping_params() const override { return _owner->get_depth_mapping_params(); }
         void set_depth_mapping_params( const std::string & params_json_str ) const override
         {
             _owner->set_depth_mapping_params( params_json_str );
         }
-
-    protected:
-        d500_depth_mapping* _owner;
     };
 }

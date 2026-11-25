@@ -583,6 +583,7 @@ private:
         return _pin_stride;
     }
 
+public:
     // Inverse of the encoding applied in get_profiles(): returns the sub-device index and rewrites 'pin'
     // in place from the encoded value to the sub-device's native backend pin index.
     uint32_t decode_pin( uint32_t & pin ) const
@@ -595,6 +596,7 @@ private:
         return dev_index;
     }
 
+private:
     std::vector< std::shared_ptr< uvc_device > > _dev;
     std::set< uint32_t > _configured_indexes;
     std::set< uint32_t > _streaming_indexes;

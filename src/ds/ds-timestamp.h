@@ -43,6 +43,9 @@ namespace librealsense
         rs2_time_t get_frame_timestamp(const std::shared_ptr<frame_interface>& frame) override;
 
         unsigned long long get_frame_counter(const std::shared_ptr<frame_interface>& frame) const override;
+
+        // From the frame's own metadata: the sensor may also carry streams without the Mapping capture block
+        rs2_timestamp_domain get_frame_timestamp_domain(const std::shared_ptr<frame_interface>& frame) const override;
     };
 
     class ds_timestamp_reader_from_metadata_safety : public ds_timestamp_reader_from_metadata

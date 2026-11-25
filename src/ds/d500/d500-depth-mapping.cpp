@@ -91,6 +91,8 @@ namespace librealsense
         return it == std::end( pcl_profiles ) ? nullptr : it;
     }
 
+    }  // namespace
+
     // True for a device point-cloud transport profile: GREY carries no point format, so any table resolution matches
     bool is_pcl_transport( const platform::stream_profile & p )
     {
@@ -99,6 +101,8 @@ namespace librealsense
                    return t.width == p.width && t.height == p.height && t.fps == p.fps;
                } );
     }
+
+    namespace {
 
     // The transport profile is GREY (Y8); the payload is XYZ32F. Validate the frame against the
     // committed profile, then relabel it to the requested XYZ32F profile without copying, so the
@@ -295,14 +299,23 @@ namespace librealsense
             physical_port = mapping_devs_info.front().device_path;
         }
 
-        auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_dev, physical_port );
-        _depth_mapping_idx = add_sensor(mapping_ep);
-        _depth_mapping_active = true;
+        if( ! _is_safety_layout )  // d500_perception puts these streams on the Perception sensor
+        {
+            _mapping_devs = perception_devs.empty() ? std::vector< std::shared_ptr< platform::uvc_device > >{ mapping_dev }
+                                                    : perception_devs;
+            _mapping_port = physical_port;
+        }
+        else
+        {
+            auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_dev, physical_port );
+            _depth_mapping_idx = add_sensor(mapping_ep);
+            _depth_mapping_active = true;
+        }
         add_stream_combination_validator( [this]( const stream_profiles & requests )
             { colors_with_mapping_or_throw( requests, get_sensor( _depth_mapping_idx ).get_active_streams() ); } );
     }
 
-    static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
+    std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
     {
         auto it = std::find_if( profiles.begin(), profiles.end(),
                                 [type]( const std::shared_ptr< stream_profile_interface > & p ) { return p && p->get_stream_type() == type; } );
@@ -337,26 +350,8 @@ namespace librealsense
             mapping_device,
             std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)),
             this);
-        // Depth mapping params share the Mapping XU with segmentation, so the same products get both;
-        // register_options() registers the XU
-        if( ! _is_d585s )
-            _raw_depth_mapping_ep = raw_mapping_ep;
 
-        // The Mapping function reports every output as GREY; a point-cloud profile resolution is the
-        // device point cloud, not occupancy (D5xx layout only).
-        if( ! _is_safety_layout )
-        {
-            raw_mapping_ep->set_stream_id_resolver( []( const std::vector< platform::stream_profile > &,
-                                                        const platform::stream_profile & p,
-                                                        rs2_stream & type,
-                                                        std::vector< int > & )
-                {
-                    if( is_pcl_transport( p ) )
-                        type = RS2_STREAM_POINT_CLOUD;
-                } );
-        }
-
-        auto mapping_ep = std::make_shared<d500_depth_mapping_sensor>(this,
+        auto mapping_ep = std::make_shared<d500_depth_mapping_camera>(this,
             raw_mapping_ep,
             mapping_fourcc_to_rs2_format,
             mapping_fourcc_to_rs2_stream);
@@ -487,6 +482,7 @@ namespace librealsense
         if( _is_d585s )
             return;
 
+        _raw_depth_mapping_ep = raw_mapping_sensor;  // the depth mapping params share the Mapping XU
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
 
         _supports_stream_selection = is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::STREAM_SELECT,
@@ -952,6 +948,8 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                     continue;
                 relevant_results.push_back(std::move(p));
             }
+            else
+                relevant_results.push_back(std::move(p));  // the Perception sensor's Object Detection
         }
 
         for (auto p : relevant_results)
@@ -965,6 +963,8 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 assign_stream(_owner->_pcl_stream, p);
 
             auto&& video = dynamic_cast<video_stream_profile_interface*>(p.get());
+            if( ! video )  // the Perception sensor's Object Detection: a perception profile, no image
+                continue;
             const auto&& profile = to_profile(p.get());
 
             std::weak_ptr<d500_depth_mapping_sensor> wp =

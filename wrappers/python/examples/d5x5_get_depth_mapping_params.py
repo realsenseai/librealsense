@@ -19,6 +19,8 @@ print(dev.get_info(rs.camera_info.name),
       "| PID", dev.get_info(rs.camera_info.product_id),
       "| FW", dev.get_info(rs.camera_info.firmware_version))
 
-depth_mapping_sensor = dev.first_depth_mapping_sensor()
+# D585 legacy keeps its Depth Mapping Camera; the other D585s serve the params on the Perception sensor
+cameras = [s for s in dev.query_sensors() if s.is_depth_mapping_sensor()]
+depth_mapping_sensor = cameras[0].as_depth_mapping_sensor() if cameras else dev.first_perception_sensor()
 params = depth_mapping_sensor.get_depth_mapping_params()
 print(json.dumps(json.loads(params), indent=2))
