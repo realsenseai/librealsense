@@ -240,7 +240,7 @@ def _record_live_bag(filename, dev):
     depth_sensor.open(depth_profile)
     depth_sensor.start(frame_queue)
 
-    frame_queue.wait_for_frame(15000)  # D5xx first frame can take several seconds; record only once streaming
+    frame_queue.wait_for_frame(5000)  # record only once streaming has started
     time.sleep(LIVE_RECORD_SECONDS)
 
     recorder.pause()
