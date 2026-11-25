@@ -16,7 +16,8 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D555"),
-    pytest.mark.device_exclude("D585 Prototype"),  # FW does not send logs yet
+    pytest.mark.device_exclude("D585 Proto"),  # FW does not send logs yet
+    pytest.mark.device_exclude("D585F"),
     pytest.mark.context("nightly"),
 ]
 
