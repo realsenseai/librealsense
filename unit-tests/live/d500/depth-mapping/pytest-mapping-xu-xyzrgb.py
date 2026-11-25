@@ -14,7 +14,7 @@ pytestmark = [
     pytest.mark.device_exclude("D585S"),
     pytest.mark.device_type_exclude("GMSL", "DDS"),
     pytest.mark.context("nightly"),
-    pytest.mark.requires(sensor="Depth Mapping Camera"),
+    pytest.mark.requires(sensor="Depth Mapping Camera", option=rs.option.pcl_occlusion_removal),
 ]
 
 
@@ -24,8 +24,7 @@ def mapping(test_device):
     sensor = next(sensor for sensor in device.query_sensors()
                   if sensor.get_info(rs.camera_info.name) == "Depth Mapping Camera")
     rgb = [profile for profile in sensor.profiles if profile.format() == rs.format.xyzrgb32f]
-    if not rgb:
-        pytest.skip("Firmware does not advertise XYZRGB capability")
+    assert rgb, "Firmware advertises XYZRGB occlusion control but no XYZRGB profile"
     yield sensor
     if sensor.get_active_streams():
         sensor.close()

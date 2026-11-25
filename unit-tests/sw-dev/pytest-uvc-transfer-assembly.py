@@ -10,12 +10,14 @@ import sys
 import pytest
 
 
+compiler = shutil.which("g++")
+pytestmark = [
+    pytest.mark.skipif(sys.platform != "linux", reason="This sanitizer harness targets the Linux RSUSB backend"),
+    pytest.mark.skipif(not compiler, reason="A host C++ compiler is required"),
+]
+
+
 def test_large_mapping_transfer_assembly(tmp_path):
-    if sys.platform != "linux":
-        pytest.skip("This sanitizer harness targets the Linux RSUSB backend")
-    compiler = shutil.which("g++")
-    if not compiler:
-        pytest.skip("A host C++ compiler is required")
     root = Path(__file__).resolve().parents[2]
     source = (root / "src/uvc/uvc-streamer.cpp").read_text()
     start = source.index("        void uvc_streamer::consume_transfer(")
@@ -100,9 +102,6 @@ int main() {
 
 def test_mapping_profile_and_payload_validation(tmp_path):
     from rspy import repo
-    compiler = shutil.which("g++")
-    if not compiler or sys.platform != "linux":
-        pytest.skip("A Linux host C++ compiler is required")
     root = Path(__file__).resolve().parents[2]
     code = r'''
 #include <src/ds/d500/mapping-pcl-check.h>
