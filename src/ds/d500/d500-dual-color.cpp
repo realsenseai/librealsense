@@ -220,7 +220,7 @@ namespace librealsense
             _passive_depth_mode->set_ae_policy_option( ae_policy );
     }
 
-    // Selects which exposure classes produce depth. Reaching here means a dual-RGB device.
+    // Selects which depth frames (active / passive) are delivered. Reaching here means a dual-RGB device.
     void d500_dual_color::register_passive_depth_option()
     {
         if( ! is_xu_published( get_raw_depth_sensor(), ds::depth_xu, ds::d500_xu_id::PASSIVE_DEPTH,
@@ -235,12 +235,12 @@ namespace librealsense
         auto & depth_sensor = get_depth_sensor();
         depth_sensor.register_option( RS2_OPTION_PASSIVE_DEPTH_MODE, mode );
 
-        // Full Passive Depth forces the laser off in firmware, so the host must stop offering the laser controls.
+        // Full Passive Depth delivers only laser-off frames, so the laser controls are locked there.
         for( auto id : { RS2_OPTION_LASER_POWER, RS2_OPTION_EMITTER_ALWAYS_ON, RS2_OPTION_EMITTER_ON_OFF } )
             if( auto laser = depth_sensor.get_option_handler( id ) )
                 depth_sensor.register_option( id, std::make_shared< passive_depth_locked_option >( laser, _passive_depth_mode ) );
 
-        // The emitter is part of the exposure schedule the firmware fixes at stream start, so it locks there too.
+        // The emitter also locks while streaming in Alternating, see passive_depth_locked_option.
         if( auto emitter = depth_sensor.get_option_handler( RS2_OPTION_EMITTER_ENABLED ) )
             depth_sensor.register_option( RS2_OPTION_EMITTER_ENABLED,
                                           std::make_shared< passive_depth_locked_option >( emitter, _passive_depth_mode,

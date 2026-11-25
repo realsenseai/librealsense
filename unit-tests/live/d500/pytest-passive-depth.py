@@ -1,8 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Passive Depth selects which exposure classes produce depth on D585 dual-RGB SKUs, over the depth XU.
-# Full Passive hands the laser and the AE policy to the firmware, so the host locks both.
+# Passive Depth selects which depth frames (active / passive) a D585 dual-RGB SKU delivers, over the depth XU.
+# Full Passive delivers only laser-off frames on Color Priority, so the host locks the laser and Hybrid AE.
 
 import pytest
 import pyrealsense2 as rs
@@ -38,8 +38,9 @@ def depth_sensor(test_device):
 
 
 def depth_profile(sensor):
+    # Alternating delivers twice the profile rate, so its 60/90 fps profiles stream nothing
     return next(p for p in sensor.profiles
-                if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16)
+                if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16 and p.fps() == 30)
 
 
 def test_passive_depth_range(depth_sensor):
@@ -63,7 +64,7 @@ def test_passive_depth_rejects_out_of_range(depth_sensor):
 
 
 def test_passive_depth_rejected_while_streaming(depth_sensor):
-    # The mode is applied at stream start; the shared imagers make any streaming activity block the set.
+    # The mode reconfigures the shared depth / dual-RGB pipeline, so any streaming activity blocks the set.
     assert not depth_sensor.is_option_read_only(PASSIVE_DEPTH)
     depth_sensor.open(depth_profile(depth_sensor))
     depth_sensor.start(lambda frame: None)
@@ -71,10 +72,10 @@ def test_passive_depth_rejected_while_streaming(depth_sensor):
         assert depth_sensor.is_option_read_only(PASSIVE_DEPTH)  # so the viewer greys it out
         if depth_sensor.supports(AE_MODE):
             assert depth_sensor.is_option_read_only(AE_MODE)
-        # the emitter belongs to the exposure schedule the firmware fixes at stream start
-        assert depth_sensor.is_option_read_only(rs.option.emitter_enabled)
-        with pytest.raises(Exception):
-            depth_sensor.set_option(rs.option.emitter_enabled, 0)
+        # in Disabled the emitter stays settable while streaming
+        assert not depth_sensor.is_option_read_only(rs.option.emitter_enabled)
+        depth_sensor.set_option(rs.option.emitter_enabled, 0)
+        depth_sensor.set_option(rs.option.emitter_enabled, 1)
         with pytest.raises(Exception):
             depth_sensor.set_option(PASSIVE_DEPTH, MODES.full)
         assert depth_sensor.get_option(PASSIVE_DEPTH) == MODES.disabled
@@ -82,7 +83,6 @@ def test_passive_depth_rejected_while_streaming(depth_sensor):
         depth_sensor.stop()
         depth_sensor.close()
     assert not depth_sensor.is_option_read_only(PASSIVE_DEPTH)
-    assert not depth_sensor.is_option_read_only(rs.option.emitter_enabled)
 
 
 def test_full_passive_locks_the_laser(depth_sensor):
@@ -132,7 +132,7 @@ def test_full_passive_hides_hybrid_ae(depth_sensor):
 
 
 def test_alternating_passive_delivers_both_classes(depth_sensor):
-    # Mode 1 alternates the laser, so one stream carries both exposure classes, told apart by metadata.
+    # Mode 1 delivers both active and passive frames on one stream, told apart by metadata.
     emitter_mode = rs.frame_metadata_value.frame_emitter_mode
     depth_sensor.set_option(PASSIVE_DEPTH, MODES.alternating)
 
@@ -140,6 +140,8 @@ def test_alternating_passive_delivers_both_classes(depth_sensor):
     depth_sensor.open(depth_profile(depth_sensor))
     depth_sensor.start(queue)
     try:
+        # turning the emitter off there stops the alternation, so it is locked while streaming
+        assert depth_sensor.is_option_read_only(rs.option.emitter_enabled)
         seen = set()
         for _ in range(50):
             frame = queue.wait_for_frame(5000)

@@ -186,9 +186,10 @@ namespace librealsense
         std::vector< std::function< void( bool ) > > _observers;
     };
 
-    // Which exposure classes produce depth. The firmware applies the mode at stream start, and in Full Passive
-    // it takes the laser and the AE policy over - the policy is moved to Color Priority along with the mode,
-    // since the firmware keeps reporting whatever was selected before.
+    // Which depth frames are delivered: active, both, or passive. The mode reconfigures the shared depth / dual-RGB
+    // pipeline, so it is set with the streams stopped. The firmware resets the AE policy to Hybrid on every mode change,
+    // and Full Passive runs on Color Priority - the policy is moved along with the mode, since the firmware keeps
+    // reporting Hybrid there.
     class passive_depth_mode_option : public uvc_xu_option< uint8_t >
     {
     public:
@@ -200,7 +201,8 @@ namespace librealsense
 
         // Cached state, free of a firmware round-trip: the gated controls consult it on every UI refresh,
         // and it only changes under set() below.
-        bool is_full_passive() const { return _full_passive; }
+        bool is_full_passive() const { return _mode == RS2_PASSIVE_DEPTH_MODE_FULL; }
+        bool is_alternating() const { return _mode == RS2_PASSIVE_DEPTH_MODE_ALTERNATING; }
 
         // Wired once while the device is built, before it is reachable by any other thread - the same
         // contract as d500_enable_aligned_depth_option::add_observer.
@@ -208,14 +210,15 @@ namespace librealsense
 
     private:
         std::weak_ptr< option > _ae_policy;
-        std::atomic< bool > _full_passive;
+        std::atomic< int > _mode;
         // Pairs the write with its read-back, so concurrent sets cannot leave the cache on the losing value.
         std::mutex _set_mutex;
     };
 
-    // A control that Full Passive Depth takes over: the firmware forces the laser off there, so the host
+    // A laser control that Full Passive Depth locks: that mode delivers only laser-off frames, so the host
     // refuses changes and reports the control locked instead of letting a write silently do nothing.
-    // raw_ep is passed for a control the firmware also fixes for the duration of a stream.
+    // raw_ep is passed for the emitter, which is also locked while streaming in Alternating: turning it off there
+    // stops the alternation and every frame is reported active.
     class passive_depth_locked_option : public proxy_option
     {
     public:
@@ -227,12 +230,14 @@ namespace librealsense
         bool is_read_only() const override;
 
     private:
+        bool alternating_while_streaming() const;
+
         std::weak_ptr< passive_depth_mode_option > _passive_depth_mode;
         std::weak_ptr< uvc_sensor > _raw_ep;
     };
 
-    // Auto-exposure policy of a dual-RGB depth sensor. Full Passive Depth locks the policy to Color Priority in
-    // firmware, so Hybrid drops out of the reported range and is refused while that mode is active.
+    // Auto-exposure policy of a dual-RGB depth sensor. Full Passive Depth runs on Color Priority, so Hybrid drops
+    // out of the reported range and is refused while that mode is active.
     class colored_ir_ae_policy_option : public uvc_xu_option< uint8_t >
     {
     public:

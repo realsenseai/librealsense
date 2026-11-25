@@ -302,7 +302,8 @@ namespace librealsense
         return strong && strong->is_full_passive();
     }
 
-    // Firmware applies these at stream start, so there is nothing for the user to change while streaming.
+    // The Passive Depth mode reconfigures the shared depth / dual-RGB pipeline, so it and the AE policy are set only
+    // with the streams stopped.
     static bool sensor_is_streaming( const std::weak_ptr< uvc_sensor > & ep )
     {
         auto sensor = ep.lock();
@@ -318,19 +319,25 @@ namespace librealsense
     {
     }
 
+    bool passive_depth_locked_option::alternating_while_streaming() const
+    {
+        auto mode = _passive_depth_mode.lock();
+        return mode && mode->is_alternating() && sensor_is_streaming( _raw_ep );
+    }
+
     void passive_depth_locked_option::set( float value )
     {
         if( in_full_passive_depth( _passive_depth_mode ) )
             throw invalid_value_exception( "Laser controls cannot be changed in Passive Depth mode 'Full'!" );
-        if( sensor_is_streaming( _raw_ep ) )
-            throw invalid_value_exception( "This control cannot be changed while streaming!" );
+        if( alternating_while_streaming() )
+            throw invalid_value_exception( "Emitter Enabled cannot be changed while streaming in Passive Depth mode 'Alternating'!" );
 
         proxy_option::set( value );
     }
 
     bool passive_depth_locked_option::is_read_only() const
     {
-        return in_full_passive_depth( _passive_depth_mode ) || sensor_is_streaming( _raw_ep ) || proxy_option::is_read_only();
+        return in_full_passive_depth( _passive_depth_mode ) || alternating_while_streaming() || proxy_option::is_read_only();
     }
 
     colored_ir_ae_policy_option::colored_ir_ae_policy_option( const std::weak_ptr< uvc_sensor > & raw_ep,
@@ -372,16 +379,17 @@ namespace librealsense
         : uvc_xu_option< uint8_t >( raw_ep,
                                     ds::depth_xu,
                                     ds::d500_xu_id::PASSIVE_DEPTH,
-                                    "Which exposure classes produce depth: active only, alternating active and passive, or passive only",
+                                    "Which depth frames are delivered: active (laser on) only, active and passive, or passive "
+                                    "(laser off) only. Set with the streams stopped",
                                     description_per_value,
                                     false ) // Not settable while streaming
-        , _full_passive( false )
+        , _mode( RS2_PASSIVE_DEPTH_MODE_DISABLED )
     {
         // Seeded here so the cache is valid from the start. The caller only builds this on firmware that
         // carries the control, so the guard is for a firmware that reports the version but not the XU.
         try
         {
-            _full_passive = ( uvc_xu_option< uint8_t >::query() == RS2_PASSIVE_DEPTH_MODE_FULL );
+            _mode = static_cast< int >( uvc_xu_option< uint8_t >::query() );
         }
         catch( const std::exception & )
         {
@@ -399,11 +407,11 @@ namespace librealsense
             // value we just wrote - the write itself succeeded, so it is the better of the two guesses.
             try
             {
-                _full_passive = ( uvc_xu_option< uint8_t >::query() == RS2_PASSIVE_DEPTH_MODE_FULL );
+                _mode = static_cast< int >( uvc_xu_option< uint8_t >::query() );
             }
             catch( const std::exception & e )
             {
-                _full_passive = ( value == RS2_PASSIVE_DEPTH_MODE_FULL );
+                _mode = static_cast< int >( value );
                 LOG_WARNING( "Passive Depth mode set but could not be read back: " << e.what() );
             }
         }
