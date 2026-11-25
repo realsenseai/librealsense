@@ -545,6 +545,13 @@ rs2_stream_profile_list* rs2_get_active_streams(rs2_sensor* sensor, rs2_error** 
 }
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, sensor)
 
+rs2_stream_profile_list* rs2_get_sensor_active_streams(const rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    return new rs2_stream_profile_list{ sensor->sensor->get_sensor_active_streams() };
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, sensor)
+
 const rs2_stream_profile* rs2_get_stream_profile(const rs2_stream_profile_list* list, int index, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(list);
@@ -844,6 +851,19 @@ int rs2_rum_is_cloud_enabled(rs2_error** error) BEGIN_API_CALL
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(0)
 
+void rs2_rum_set_app_name(const char* name, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(name);
+    std::string app( name );
+    // Validated even without ENABLE_STATS, so an app behaves the same on every build
+    if( app.empty() || app.size() > RS2_RUM_MAX_APP_NAME_LENGTH
+        || app.find_first_not_of( "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-" ) != std::string::npos )
+        throw librealsense::invalid_value_exception( "RUM app name must be 1-" + std::to_string( RS2_RUM_MAX_APP_NAME_LENGTH )
+                                                     + " characters from [A-Za-z0-9._-]; got '" + app + "'" );
+    librealsense::rum::hooks::on_app_name( app );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, name)
+
 void rs2_open(rs2_sensor* sensor, const rs2_stream_profile* profile, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
@@ -876,6 +896,18 @@ void rs2_close(const rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
     sensor->sensor->close();
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor)
+
+void rs2_close_multiple(const rs2_sensor* sensor, const rs2_stream_profile** profiles, int count, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    VALIDATE_NOT_NULL(profiles);
+
+    std::vector<std::shared_ptr<stream_profile_interface>> request;
+    for (auto i = 0; i < count; i++)
+        request.push_back(std::dynamic_pointer_cast<stream_profile_interface>(profiles[i]->profile->shared_from_this()));
+    sensor->sensor->close_streams(request);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, sensor, profiles, count)
 
 int rs2_is_option_read_only(const rs2_options* options, rs2_option option, rs2_error** error) BEGIN_API_CALL
 {

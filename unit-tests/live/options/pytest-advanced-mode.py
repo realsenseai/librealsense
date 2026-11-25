@@ -5,7 +5,9 @@ import pytest
 import pyrealsense2 as rs
 import json
 import locale
+import time
 import logging
+from rspy.snippets import is_dds_dev
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -21,8 +23,15 @@ def get_am_dev(dev):
 _module_state = {}
 
 
+def set_preset(dev, preset):
+    dev.first_depth_sensor().set_option(rs.option.visual_preset, int(preset))
+    if is_dds_dev(dev):
+        time.sleep(1)  # Command is handled in the DDS device, not host. It may take some time to be fully handled.
+
+
 def test_advanced_mode_support(test_device_wrapped):
     """Prerequisite: camera must be in advanced mode. All CI cameras should already be enabled."""
+    _module_state.clear()  # flags are per camera - this is the first test on each
     dev, ctx = test_device_wrapped
     am_dev = get_am_dev(dev)
     assert am_dev is not None
@@ -40,13 +49,85 @@ def test_visual_preset_support(test_device_wrapped):
     _module_state['preset_ok'] = True
 
 
-def test_set_default_visual_preset(test_device_wrapped):
+@pytest.mark.context("nightly")
+@pytest.mark.flaky(reruns=2)  # See FW stability issue RSDSO-18908
+def test_set_presets(test_device_wrapped):
     if not _module_state.get('preset_ok'):
         pytest.skip("prerequisite test_visual_preset_support failed")
     dev, ctx = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
+    for preset in (rs.rs400_visual_preset.high_accuracy, rs.rs400_visual_preset.default):
+        set_preset(dev, preset)
+        assert depth_sensor.get_option(rs.option.visual_preset) == preset
+
+
+@pytest.mark.context("nightly")
+@pytest.mark.flaky(reruns=2)
+def test_save_load_preset(test_device_wrapped):
+    """Editing a control switches the preset to custom; loading the saved JSON restores the control"""
+    if not _module_state.get('preset_ok'):
+        pytest.skip("prerequisite test_visual_preset_support failed")
+    dev, ctx = test_device_wrapped
+    depth_sensor = dev.first_depth_sensor()
+    am_dev = get_am_dev(dev)
+    set_preset(dev, rs.rs400_visual_preset.default)
+    saved_values = am_dev.serialize_json()
+    depth_control_group = am_dev.get_depth_control()
+    saved_threshold = depth_control_group.textureCountThreshold
+    depth_control_group.textureCountThreshold = 250
+    am_dev.set_depth_control(depth_control_group)
+    time.sleep(0.1)  # Give camera time to handle the command
+    assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.custom
+
+    am_dev.load_json(saved_values)
+    assert am_dev.get_depth_control().textureCountThreshold == saved_threshold
+
+
+@pytest.mark.context("nightly")
+@pytest.mark.flaky(reruns=2)
+def test_setting_color_options(test_device_wrapped):
+    """Setting visual preset should update color sensor options on D400 but not D500.
+
+    Uses Hue (not Gain/Exposure) to avoid auto-exposure interference.
+    Skipped on cameras without a color sensor or without Hue support (e.g. D457).
+    """
+    if not _module_state.get('preset_ok'):
+        pytest.skip("prerequisite test_visual_preset_support failed")
+    dev, ctx = test_device_wrapped
+    product_line = dev.get_info(rs.camera_info.product_line)
+    product_name = dev.get_info(rs.camera_info.name)
+    if 'D555' in product_name and is_dds_dev(dev):
+        pytest.skip("D555 DDS FW resets color options on a preset change")
+    depth_sensor = dev.first_depth_sensor()
+
+    # Skipped at runtime: a per-test device_exclude lets pytest run this test before the prerequisite tests
+    try:
+        color_sensor = dev.first_color_sensor()
+    except RuntimeError:
+        if 'D401' in product_name:  # D401 GMSL exposes color through the depth sensor
+            color_sensor = depth_sensor
+        elif 'D405' in product_name:
+            pytest.skip("D405 default preset does not reset hue (see default_405 in presets.cpp)")
+        elif any(m in product_name for m in ('D421', 'D430', 'Dual RGB')):
+            pytest.skip("No color sensor")
+        else:
+            raise
+
+    if not color_sensor.supports(rs.option.hue):
+        pytest.skip("Color sensor does not support hue option")
+
+    color_sensor.set_option(rs.option.hue, 123)
+    assert color_sensor.get_option(rs.option.hue) == 123
+
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
-    assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.default
+    if product_line == "D400":
+        # D400 devices set color options as part of preset setting
+        assert color_sensor.get_option(rs.option.hue) != 123
+    elif product_line == "D500":
+        # D500 devices do not set color options as part of preset setting
+        assert color_sensor.get_option(rs.option.hue) == 123
+    else:
+        pytest.fail(f"Unsupported product line: {product_line}")
 
 
 def test_set_depth_control(test_device_wrapped):

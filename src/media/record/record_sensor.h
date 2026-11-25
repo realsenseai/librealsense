@@ -42,6 +42,7 @@ namespace librealsense
         stream_profiles get_stream_profiles(int tag = profile_tag::PROFILE_TAG_ANY) const override;
         void open(const stream_profiles& requests) override;
         void close() override;
+        void close_streams( const stream_profiles & profiles ) override { m_sensor.close_streams( profiles ); }
         option& get_option(rs2_option id) override;
         const option& get_option(rs2_option id) const override;
         const std::string& get_info(rs2_camera_info info) const override;
@@ -84,7 +85,7 @@ namespace librealsense
         void unhook_sensor_callbacks();
         void enable_sensor_options_recording();
         void disable_sensor_options_recording();
-        void wrap_streams();
+        void wrap_stream( std::shared_ptr< stream_profile_interface > const & stream );
 
     private /*members*/:
 
@@ -100,6 +101,7 @@ namespace librealsense
         bool m_is_sensor_hooked;
         bool m_register_notification_to_base;
         std::mutex m_mutex;
+        std::mutex m_streams_mutex;  // guards m_recorded_streams_ids, also used from the frame thread
 
         // Shared with every lambda this sensor registers on longer-lived objects (the
         // live sensor's notifications dispatcher, individual options' on-change callbacks).

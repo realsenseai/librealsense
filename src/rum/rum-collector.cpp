@@ -38,6 +38,9 @@ static constexpr int rum_schema_version = 1;
 // The server rejects a body over this; an uncapped report would grow past it and never be sent again.
 static constexpr size_t max_report_bytes = 64 * 1024;
 
+// App names are free text, so cap how many distinct ones a report can hold.
+static constexpr size_t max_apps = 64;
+
 
 // Report file: <app-data>/rum/rum.json. Forward slashes work on Windows and POSIX.
 std::string report_path()
@@ -234,6 +237,13 @@ void rum_collector::record_notification( std::string const & category )
 }
 
 
+void rum_collector::record_app( std::string const & name )
+{
+    std::lock_guard< std::mutex > lk( _mutex );
+    _app_name = name;
+}
+
+
 std::string rum_collector::get_report()
 {
     std::lock_guard< std::mutex > lk( _mutex );
@@ -309,6 +319,13 @@ json rum_collector::build_report() const
         notification["count"] = entry.second;
         report["notifications"].push_back( notification );
     }
+
+    report["apps"] = json::object();
+    for( auto const & entry : _app_counts )
+        report["apps"][entry.first] = entry.second;
+    // This run counts once, under the last name set - a layer above (e.g. REST over pyrealsense2) overrides
+    if( ! _app_name.empty() && ( _app_counts.count( _app_name ) || _app_counts.size() < max_apps ) )
+        report["apps"][_app_name] = report["apps"].value( _app_name, 0 ) + 1;
     return report;
 }
 
@@ -405,6 +422,10 @@ void rum_collector::merge_saved_report()
         if( ! category.empty() )
             _notification_counts[ category ] += e.value( "count", 0 );
     }
+
+    auto apps = j.value( "apps", json::object() );
+    for( auto ait = apps.begin(); ait != apps.end(); ++ait )
+        _app_counts[ ait.key() ] += ait.value().get< int >();
 }
 
 

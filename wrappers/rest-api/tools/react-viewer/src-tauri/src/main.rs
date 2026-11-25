@@ -185,7 +185,8 @@ fn spawn_api_process(path: &std::path::Path, port: u16, backend_logs: Arc<Mutex<
     }
 
     let mut cmd = Command::new(&path);
-    cmd.env("UVICORN_PORT", port.to_string())
+    cmd.args(["--app-name", "realsense-react-viewer"])
+        .env("UVICORN_PORT", port.to_string())
         .env("UVICORN_HOST", "127.0.0.1")
         .env("PYTHONUNBUFFERED", "1")
         .stdout(Stdio::piped())

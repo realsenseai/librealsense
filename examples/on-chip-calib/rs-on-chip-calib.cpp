@@ -10,6 +10,7 @@
 // and taking advantage of depth data
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-on-chip-calib" );
     auto settings = rs2::cli( "on-chip-calib example" ).process( argc, argv );
 
     // Create a pipeline - this serves as a top-level API for streaming and processing frames

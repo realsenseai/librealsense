@@ -13,4 +13,7 @@ void init_rum(py::module &m)
              "Set the cloud-upload consent flag (persists to the per-user config file)." );
     rum.def( "is_cloud_enabled", &rs2::rum::is_cloud_enabled,
              "Resolved cloud-upload consent (RS2_RUM_CLOUD_ENABLED env var overrides the config file)." );
+    rum.def( "set_app_name", &rs2::rum::set_app_name, "name"_a,
+             "Name the application in the RUM report (1-32 characters from [A-Za-z0-9._-]); overrides the default 'pyrealsense2'." );
+    rs2::rum::set_app_name( "pyrealsense2" );
 }

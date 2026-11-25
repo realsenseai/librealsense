@@ -11,7 +11,7 @@
 * report file (SDK/system metadata plus whatever has been collected) and the consent get/set
 * always read and write the per-user config file. The ENABLE_STATS build option (default ON)
 * gates only the instrumentation hooks that feed the collector; when it is off the report's
-* collected lists (devices, streams, filters, options, notifications) stay empty, but
+* collected lists (devices, streams, filters, options, notifications, apps) stay empty, but
 * the API itself behaves identically.
 */
 
@@ -47,6 +47,16 @@ void rs2_rum_set_cloud_enabled(int enabled, rs2_error** error);
 * \return  Non-zero if cloud upload is enabled, zero otherwise
 */
 int rs2_rum_is_cloud_enabled(rs2_error** error);
+
+#define RS2_RUM_MAX_APP_NAME_LENGTH 32
+
+/**
+* Name the application in the RUM report, so usage can be told apart per app. The last name set is the
+* one counted, once per process run: an app built on a wrapper (e.g. pyrealsense2) overrides the wrapper's name. A no-op when the SDK is built without ENABLE_STATS.
+* \param[in]  name   1 to RS2_RUM_MAX_APP_NAME_LENGTH characters from [A-Za-z0-9._-]
+* \param[out] error  If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_rum_set_app_name(const char* name, rs2_error** error);
 
 #ifdef __cplusplus
 }

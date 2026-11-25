@@ -31,6 +31,7 @@
 int main()
 try
 {
+    rs2::rum::set_app_name( "rs-gpu-frame" );
     // Keep the console readable: show only warnings/errors from the SDK, not the per-frame DEBUG
     // spam. (Comment this out, or raise to RS2_LOG_SEVERITY_DEBUG, to see the SDK internals.)
     rs2::log_to_console( RS2_LOG_SEVERITY_WARN );

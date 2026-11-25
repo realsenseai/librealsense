@@ -980,7 +980,9 @@ namespace librealsense
         auto & depth_sensor = dynamic_cast< d500_depth_sensor & >( get_depth_sensor() );
         register_feature( std::make_shared< decimation_filter_feature >( depth_sensor, _is_mipi_device ) );
         register_feature( std::make_shared< temporal_filter_feature >( depth_sensor, _is_mipi_device ) );
-        register_feature( std::make_shared< icr_filter_feature >( *this, depth_sensor, _is_mipi_device ) );
+        // Older FW cannot serve the 8-parameter ICR control and a failed read disturbs the next HW commands
+        if( _fw_version >= firmware_version( "7.62.0.0" ) )
+            register_feature( std::make_shared< icr_filter_feature >( *this, depth_sensor, _is_mipi_device ) );
     }
 
     void d500_device::register_converters( synthetic_sensor & depth_sensor )

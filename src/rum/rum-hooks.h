@@ -53,6 +53,9 @@ void on_filter( std::string const & name, frame_interface & f );
 // A notification was raised — record it by category (top-level).
 void on_notification( rs2_notification_category category );
 
+// The application named itself - count it in the report's apps.
+void on_app_name( std::string const & name );
+
 // An SDK session (context) is closing — save the report to the local file. Called from the
 // context destructor, so it never throws.
 void on_context_closed() noexcept;
@@ -66,6 +69,7 @@ inline void on_stream_duration( std::string const &, std::vector< std::shared_pt
 inline void on_set_option( options_interface &, rs2_option, float, float ) {}
 inline void on_filter( std::string const &, frame_interface & ) {}
 inline void on_notification( rs2_notification_category ) {}
+inline void on_app_name( std::string const & ) {}
 inline void on_context_closed() noexcept {}
 
 #endif  // ENABLE_STATS

@@ -17,7 +17,7 @@ namespace librealsense
         class buffer
         {
         public:
-            buffer(int fd, v4l2_buf_type type, bool use_memory_map, uint32_t index);
+            buffer(int fd, v4l2_buf_type type, bool use_memory_map, uint32_t index, bool userptr_dma = false);
 
             void prepare_for_streaming(int fd);
 
@@ -47,7 +47,9 @@ namespace librealsense
             v4l2_buffer _buf;
             std::mutex _mutex;
             bool _must_enqueue = false;
-            bool _zc_registered = false;  // this mmap buffer is registered with CUDA for zero-copy GPU access
+            bool _zc_registered = false;  // this buffer is registered with CUDA for zero-copy GPU access
+            bool _userptr_dma = false;    // USERPTR buffer the capture hardware writes into directly
+            uint32_t _qbuf_length = 0;    // length passed to VIDIOC_QBUF; _length rounded up for _userptr_dma
         };
 
         enum supported_kernel_buf_types : uint8_t

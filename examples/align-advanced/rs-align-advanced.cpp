@@ -23,6 +23,7 @@ void configure_alignable_streams(const rs2::device& dev, rs2::config& cfg);
 
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-align-advanced" );
     auto settings = rs2::cli( "rs-aligned-advanced example" )
         .process( argc, argv );
 

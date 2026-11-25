@@ -22,6 +22,10 @@ extern std::string context;
 extern bool debug;
 
 
+// Serial number of the device the runner targeted for this test (--serial), empty if not passed
+extern std::string serial;
+
+
 class log_message
 {
 public:

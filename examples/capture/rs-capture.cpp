@@ -8,6 +8,7 @@
 // capture depth and color video streams and render them to the screen
 int main(int argc, char * argv[]) try
 {
+    rs2::rum::set_app_name( "rs-capture" );
     rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
     // Create a simple OpenGL window for rendering:
     window app(1280, 720, "RealSense Capture Example");

@@ -207,6 +207,7 @@ public:
 
 int main(int argc, char** argv) try
 {
+    rs2::rum::set_app_name( "rs-benchmark" );
     auto settings = rs2::cli( "rs-benchmark tool" )
         .process( argc, argv );
     rs2::context ctx( settings.dump() );
