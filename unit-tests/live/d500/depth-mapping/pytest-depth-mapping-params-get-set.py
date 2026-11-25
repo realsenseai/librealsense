@@ -41,11 +41,17 @@ def sent_subset(params, sent):
     return {section: {key: params[section][key] for key in sent[section]} for section in sent}
 
 
+def params_sensor(dev):
+    # D585 legacy keeps its Depth Mapping Camera; the other D585s serve the params on the Perception sensor
+    cameras = [s for s in dev.query_sensors() if s.is_depth_mapping_sensor()]
+    return cameras[0].as_depth_mapping_sensor() if cameras else dev.first_perception_sensor()
+
+
 @pytest.fixture
 def depth_mapping_sensor(test_device):
     """Yield depth_mapping_sensor with the original params saved/restored around the test."""
     dev, _ = test_device
-    depth_mapping_sensor = dev.first_depth_mapping_sensor()
+    depth_mapping_sensor = params_sensor(dev)
     original_params = json.loads(depth_mapping_sensor.get_depth_mapping_params())
     # FW omits camera_position until the first write, and a camera can't be made unconfigured again
     if "camera_position" not in original_params:
@@ -58,7 +64,7 @@ def depth_mapping_sensor(test_device):
 
 def test_get_depth_mapping_params(test_device):
     dev, _ = test_device
-    params = json.loads(dev.first_depth_mapping_sensor().get_depth_mapping_params())
+    params = json.loads(params_sensor(dev).get_depth_mapping_params())
     log.debug("depth mapping params successfully downloaded")
     assert isinstance(params, dict)
 

@@ -7,6 +7,7 @@
 # Over USB the SDK refuses 2C colors next to Occupancy/LPCL: once stopped, such colors can stay dead until a hardware reset.
 # The camera decides every other combination.
 
+import itertools
 import pytest
 import pyrealsense2 as rs
 import struct
@@ -60,8 +61,10 @@ def is_2c(dev):
 
 
 def perception(dev, stream_type):
-    """(sensor, profile) of a perception stream, skipping when the device does not expose it."""
+    """(sensor, profile) of a Perception sensor stream, skipping when the device does not expose it there."""
     for s in dev.query_sensors():
+        if not s.is_perception_sensor():
+            continue   # D585 legacy keeps its Mapping streams on a Depth Mapping Camera
         p = next( ( p for p in s.get_stream_profiles() if p.stream_type() == stream_type ), None )
         if p is not None:
             return s, p
@@ -92,7 +95,8 @@ class Collector:
     def __call__(self, f):
         profile = f.get_profile()
         stream_type = profile.stream_type()
-        info = { 'time': time.monotonic(), 'type': stream_type, 'index': profile.stream_index(), 'size': f.get_data_size() }
+        info = { 'time': time.monotonic(), 'type': stream_type, 'index': profile.stream_index(), 'size': f.get_data_size(),
+                 'host': f.get_frame_timestamp_domain() == rs.timestamp_domain.system_time }
         if stream_type == rs.stream.object_detection:
             head = bytes( f.get_data() )[:ODET_HEADER]
             info.update( magic=head[:4], payload=struct.unpack_from( '<I', head, 8 )[0], number=f.get_frame_number() )
@@ -149,6 +153,23 @@ def stop(sensor):
     sensor.close()
 
 
+def settle_depth(dev):
+    """FW (base too): after Object Detection streamed with Occupancy/LPCL, Point Cloud and the next Depth start stay
+    without frames until Depth streams once. Stream it until it does, so a test does not depend on the one before."""
+    stereo = dev.first_depth_sensor()
+    profile = next( p for p in stereo.get_stream_profiles() if p.stream_type() == rs.stream.depth and p.is_default() )
+    for attempt in range( 2 ):
+        frames = Collector()
+        start( stereo, profile, frames )
+        deadline = time.monotonic() + FRAME_TIMEOUT_S
+        while not frames.of( rs.stream.depth ) and time.monotonic() < deadline:
+            time.sleep( 0.05 )
+        stop( stereo )
+        if frames.of( rs.stream.depth ):
+            return
+    pytest.fail( "Depth gives no frames after two starts" )
+
+
 def rejected(sensor, profiles, frames, match=None):
     """True when the SDK refuses the start quickly, before the camera is involved."""
     begin = time.monotonic()
@@ -192,18 +213,70 @@ def test_mapping_stream_switch(device):
         stop( sensor )
 
 
-def test_pd_and_occ_standalone(device):
+PD, OCC, LPCL, PCL = ( rs.stream.object_detection, rs.stream.occupancy, rs.stream.labeled_point_cloud,
+                       rs.stream.point_cloud )
+MAPPING = { OCC, LPCL, PCL }
+MIN_FW = { LPCL: "7.62.0.0", PCL: "7.61.47150" }   # older FW publishes the profiles but delivers no frames
+CAMERA_OWNED = [ { PD, PCL }, { PD, LPCL } ]   # the camera may refuse the second, or serve only one of them
+# Two Mapping streams are test_one_mapping_stream_at_a_time
+PAIRS = [( a, b ) for a, b in itertools.permutations( ( PD, OCC, LPCL, PCL ), 2 ) if not { a, b } <= MAPPING]
+
+
+@pytest.mark.parametrize( 'first, second', PAIRS, ids=[f"{a}+{b}".replace( 'stream.', '' ) for a, b in PAIRS] )
+def test_add_and_close(device, first, second):
+    """A stream added to the streaming Perception sensor streams beside the first; each then closes on its own."""
     if "D555" in device.get_info( rs.camera_info.name ):
-        pytest.skip( "Concurrent PD/Occupancy lifecycle checks are D585-only" )
-    pd, pd_profile = perception( device, rs.stream.object_detection )
-    occ, occ_profile = perception( device, rs.stream.occupancy )
+        pytest.skip( "Concurrent Perception lifecycle checks are D585-only" )
+    if { first, second } == { PD, OCC } and is_gmsl( device ):
+        pytest.skip( "pytest-gmsl-perception-mux.py covers PD + Occupancy over GMSL" )
+    for t in ( first, second ):
+        if t in MIN_FW:
+            require_min_fw_version( device, rsutils.version( MIN_FW[t] ), str( t ) )
+    sensor, a = perception( device, first )
+    _, b = perception( device, second )
+    if PCL in ( first, second ):
+        settle_depth( device )
     frames = Collector()
-    start( pd, pd_profile, frames )
-    since = start( occ, occ_profile, frames )
-    frames.wait( rs.stream.object_detection, since )
-    frames.wait( rs.stream.occupancy, since )
-    stop( occ )
-    stop( pd )
+    frames.wait( first, start( sensor, a, frames ) )
+    since = time.monotonic()
+    try:
+        sensor.open( b )   # joins the streaming sensor without another start()
+    except RuntimeError as e:
+        assert { first, second } in CAMERA_OWNED, f"adding {second} to {first} was refused: {e}"
+        frames.wait( first, time.monotonic() )   # the first keeps streaming
+        return
+    frames.wait( first, since )
+    if { first, second } in CAMERA_OWNED:
+        return
+    frames.wait( second, since )
+    for t in ( first, second ):   # each keeps its own clock
+        assert len( { i['host'] for i in frames.of( t ) } ) == 1, f"{t} mixes timestamp domains"
+    # FW: closing PD before a Mapping stream leaves the next Depth start without frames
+    closed, kept = ( b, a ) if first == PD else ( a, b )
+    sensor.close( [closed] )
+    stopped = len( frames.of( closed.stream_type() ) )
+    frames.wait( kept.stream_type(), time.monotonic() )
+    assert len( frames.of( closed.stream_type() ) ) == stopped, f"{closed} streams after its close"
+    sensor.close( [kept] )   # the last stream stops and closes the sensor
+    assert sensor.get_active_streams() == []
+    stopped = len( frames.of( kept.stream_type() ) )
+    time.sleep( QUIET_S )
+    assert len( frames.of( kept.stream_type() ) ) == stopped, "no frames after the last close"
+
+
+def test_one_mapping_stream_at_a_time(device):
+    """Two Mapping streams are an SDK refusal, together or added to a running one, which keeps streaming."""
+    require_min_fw_version( device, rsutils.version( MIN_FW[LPCL] ), "labeled point cloud" )
+    sensor, occ = perception( device, OCC )
+    _, lpcl = perception( device, LPCL )
+    message = "one of Point Cloud, Labeled Point Cloud, or Occupancy at a time"
+    frames = Collector()
+    assert rejected( sensor, [occ, lpcl], frames, match=message )
+    frames.wait( OCC, start( sensor, occ, frames ) )
+    with pytest.raises( RuntimeError, match=message ):
+        sensor.open( lpcl )
+    frames.wait( OCC, time.monotonic() )
+    stop( sensor )
 
 
 # Both start orders must accept every native source, with either segmentation state.
@@ -245,6 +318,7 @@ def mapping(device, request):
     try:
         if original is not None:
             sensor.set_option( option, segmented )
+        settle_depth( device )
         yield sensor, profile
     finally:
         # These controls are writable only before streaming, including after a failed test.
@@ -340,3 +414,17 @@ def test_depth_and_colors_then_occ_2c(device, mapping):
             frames.wait( stream_type, since )
         stop( occ )
     stop( stereo )
+
+
+def test_od_refused_with_rectification(device):
+    """Object Detection is an SDK refusal while dual RGB rectification is on."""
+    stereo = device.first_depth_sensor()
+    if not stereo.supports( rs.option.dual_rgb_rectification ):
+        pytest.skip( "No dual RGB rectification" )
+    sensor, od_profile = perception( device, rs.stream.object_detection )
+    original = stereo.get_option( rs.option.dual_rgb_rectification )
+    stereo.set_option( rs.option.dual_rgb_rectification, 1 )
+    try:
+        assert rejected( sensor, od_profile, Collector(), match="Object detection is not supported while dual RGB rectification is on" )
+    finally:
+        stereo.set_option( rs.option.dual_rgb_rectification, original )
