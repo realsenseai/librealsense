@@ -4,7 +4,8 @@
 # Perception streams on D555/D585, over USB and GMSL, in 2C and 3C.
 # Object Detection (PD), Occupancy, LPCL and Point Cloud run without host Depth or Color capture.
 # With graph-rebuild firmware, Occupancy/LPCL can share any native Depth size at the Mapping frame rate.
-# Over USB the SDK refuses 2C colors next to Occupancy/LPCL, which the camera would starve; the camera refuses the rest.
+# Over USB the SDK refuses 2C colors next to Occupancy/LPCL: once stopped, such colors can stay dead until a hardware reset.
+# The camera decides every other combination.
 
 import pytest
 import pyrealsense2 as rs
@@ -199,6 +200,25 @@ DEPTH_SOURCES = [( 640, 360, 30 ), ( 1280, 720, 30 ), ( 848, 480, 30 ),
                  ( 640, 480, 30 ), ( 1280, 960, 30 ), ( 480, 270, 30 ), ( 424, 240, 30 )]
 
 
+def xfail_fw_starvation(request, device, stream, segmented):
+    """Known FW starvation over USB: not run (xfail NOTRUN), as a starved session can leave the camera stuck for later tests."""
+    params = request.node.callspec.params
+    size = tuple( params.get( 'source', ( 640, 360 ) )[:2] )
+    if is_gmsl( device ):
+        return
+    if segmented and is_2c( device ) and size != ( 640, 360 ):
+        reason = "RSDEV-16467: 2C segmentation starves Occupancy/LPCL unless Depth is 640x360"
+    elif segmented and stream == 'labeled_point_cloud' \
+            and rsutils.version( device.get_info( rs.camera_info.firmware_version ) ) < rsutils.version( "7.62.47495" ):
+        reason = "RSDEV-16828: LPCL with segmentation on delivers no frames before FW 7.62.47495"
+    elif not segmented and not is_2c( device ) and stream == 'labeled_point_cloud' and size == ( 1280, 720 ) \
+            and len( params.get( 'indices', () ) ) == 1:
+        reason = "3C LPCL sometimes stops when Depth + one IR join at 1280x720"
+    else:
+        return
+    request.applymarker( pytest.mark.xfail( run=False, reason=reason ) )
+
+
 @pytest.fixture(params=[(stream, segmented) for stream in ('occupancy', 'labeled_point_cloud')
                        for segmented in (0, 1)],
                 ids=['occupancy-seg-off', 'occupancy-seg-on', 'lpcl-seg-off', 'lpcl-seg-on'])
@@ -210,6 +230,7 @@ def mapping(device, request):
     original = sensor.get_option( option ) if sensor.supports( option ) else None
     if original is None and (stream == 'labeled_point_cloud' or segmented):
         pytest.skip( "No Mapping segmentation control" )
+    xfail_fw_starvation( request, device, stream, segmented )
     try:
         if original is not None:
             sensor.set_option( option, segmented )
@@ -274,17 +295,22 @@ def test_depth_and_ir_join_mapping(device, mapping, source, indices):
     stop( occ )
 
 
-@pytest.mark.device_type_exclude( "GMSL" )
 def test_colors_and_occ_2c(device, mapping):
-    """Over USB 2C colors cannot join Mapping, with or without Depth: the camera would starve them."""
+    """2C colors, with or without Depth, join Mapping over GMSL; over USB the SDK refuses them."""
     if not is_2c( device ):
         pytest.skip( "3C colors stream from their own sensor" )
     occ, occ_profile = mapping
     stream_type = occ_profile.stream_type()
     stereo, frames = device.first_depth_sensor(), Collector()
     frames.wait( stream_type, start( occ, occ_profile, frames ) )
-    assert rejected( stereo, colors( device ), frames, match="Color cannot start while" )
-    assert rejected( stereo, [depth( device, 640, 360 )] + colors( device ), frames, match="Color cannot start while" )
+    for requests in ( colors( device ), [depth( device, 640, 360 )] + colors( device ) ):
+        if not is_gmsl( device ):
+            assert rejected( stereo, requests, frames, match="cannot stream together over USB" )
+            continue
+        since = start( stereo, requests, frames )
+        frames.wait( rs.stream.color, since )
+        frames.wait( stream_type, since )
+        stop( stereo )
     stop( occ )
 
 
@@ -296,7 +322,7 @@ def test_depth_and_colors_then_occ_2c(device, mapping):
     stereo, frames = device.first_depth_sensor(), Collector()
     frames.wait( rs.stream.color, start( stereo, [depth( device, 640, 360 )] + colors( device ), frames ) )
     if not is_gmsl( device ):
-        assert rejected( occ, occ_profile, frames, match="cannot start while the depth sensor streams color" )
+        assert rejected( occ, occ_profile, frames, match="cannot stream together over USB" )
     else:
         since = start( occ, occ_profile, frames )
         for stream_type in ( occ_profile.stream_type(), rs.stream.depth, rs.stream.color ):

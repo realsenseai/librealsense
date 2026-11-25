@@ -34,9 +34,6 @@ namespace librealsense
         std::string get_depth_mapping_params() const;
         void set_depth_mapping_params( const std::string & params_json_str ) const;
 
-        // Throws if Occupancy/LPCL would starve the 2C colors the depth sensor streams over USB
-        void mapping_allowed_or_throw( const stream_profiles & requests ) const;
-
     private:
 
         friend class d500_depth_mapping_sensor;
@@ -50,8 +47,8 @@ namespace librealsense
         void register_occupancy_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep);
         void register_point_cloud_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep);
 
-        // Depth sensor counterpart of mapping_allowed_or_throw, for colors added while Occupancy/LPCL runs
-        void depth_sensor_allowed_or_throw( const stream_profiles & requests ) const;
+        // Throws if depth sensor colors and Occupancy/LPCL would stream together over USB, in either start order
+        void colors_with_mapping_or_throw( const stream_profiles & depth_streams, const stream_profiles & mapping_streams ) const;
 
         int _depth_mapping_idx = -1;
 

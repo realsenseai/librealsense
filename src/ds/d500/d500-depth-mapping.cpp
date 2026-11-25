@@ -286,9 +286,8 @@ namespace librealsense
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_dev, physical_port );
         _depth_mapping_idx = add_sensor(mapping_ep);
         _depth_mapping_active = true;
-        if( ! _is_safety_layout && ! _is_mipi_device )
-            add_stream_combination_validator( [this]( const stream_profiles & requests )
-                                              { depth_sensor_allowed_or_throw( requests ); } );
+        add_stream_combination_validator( [this]( const stream_profiles & requests )
+            { colors_with_mapping_or_throw( requests, get_sensor( _depth_mapping_idx ).get_active_streams() ); } );
     }
 
     static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
@@ -298,27 +297,18 @@ namespace librealsense
         return it == profiles.end() ? nullptr : *it;
     }
 
-    void d500_depth_mapping::mapping_allowed_or_throw( const stream_profiles & requests ) const
+    void d500_depth_mapping::colors_with_mapping_or_throw( const stream_profiles & depth_streams,
+                                                           const stream_profiles & mapping_streams ) const
     {
-        auto mapping = find_stream( requests, RS2_STREAM_OCCUPANCY );
+        // Over USB, 2C colors that streamed with Occupancy/LPCL can deliver no frames after they stop, until a hardware reset
+        if( _is_safety_layout || _is_mipi_device || ! find_stream( depth_streams, RS2_STREAM_COLOR ) )
+            return;
+        auto mapping = find_stream( mapping_streams, RS2_STREAM_OCCUPANCY );
         if( ! mapping )
-            mapping = find_stream( requests, RS2_STREAM_LABELED_POINT_CLOUD );
-        // Over USB the camera keeps 2C colors open next to Occupancy/LPCL but stops delivering them
-        if( mapping && ! _is_safety_layout && ! _is_mipi_device
-            && find_stream( get_sensor( _depth_device_idx ).get_active_streams(), RS2_STREAM_COLOR ) )
+            mapping = find_stream( mapping_streams, RS2_STREAM_LABELED_POINT_CLOUD );
+        if( mapping )
             throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << rs2_stream_to_string( mapping->get_stream_type() ) << " cannot start while the depth sensor streams color" );
-    }
-
-    void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
-    {
-        auto const active = get_sensor( _depth_mapping_idx ).get_active_streams();
-        auto mapping = find_stream( active, RS2_STREAM_OCCUPANCY );
-        if( ! mapping )
-            mapping = find_stream( active, RS2_STREAM_LABELED_POINT_CLOUD );
-        if( mapping && find_stream( requests, RS2_STREAM_COLOR ) )
-            throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << "Color cannot start while " << rs2_stream_to_string( mapping->get_stream_type() ) << " streams" );
+                << "Color and " << rs2_stream_to_string( mapping->get_stream_type() ) << " cannot stream together over USB" );
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
@@ -983,7 +973,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 << "The Depth Mapping Camera streams one of Point Cloud, Labeled Point Cloud, or Occupancy at a time; "
                 << requests.size() << " profiles were requested");
 
-        _owner->mapping_allowed_or_throw(requests);
+        _owner->colors_with_mapping_or_throw( _owner->get_depth_sensor().get_active_streams(), requests );
         synthetic_sensor::open(requests);
     }
 
