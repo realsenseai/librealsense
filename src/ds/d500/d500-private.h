@@ -539,6 +539,14 @@ namespace librealsense
             EHU_IDX_POT_FAIL                   = 138U,
             EHU_IDX_IPU_SW_FUNCTION_ERR        = 139U,
             EHU_IDX_APM_COMM_ERR               = 140U,
+            EHU_IDX_THERMAL_OHM_WARNING        = 141U,
+            EHU_IDX_THERMAL_MB_WARNING         = 142U,
+            EHU_IDX_THERMAL_PASSIVE            = 143U,
+            EHU_IDX_THERMAL_OHM_STOP           = 144U,
+            EHU_IDX_THERMAL_MB_STOP            = 145U,
+            EHU_IDX_THERMAL_SENSOR_FAILURE     = 146U,
+            EHU_IDX_THERMAL_ACTUATOR_FAILURE   = 147U,
+            EHU_IDX_CRITICAL_THERMAL_KILL      = 148U,
         };
 
         const std::map< int, std::string > d500_fw_error_report = { // Received from HKR team [RSDEV-643]
@@ -683,6 +691,14 @@ namespace librealsense
             { EHU_IDX_POT_FAIL, "POT FAIL" },
             { EHU_IDX_IPU_SW_FUNCTION_ERR, "IPU SW FUNCTION ERROR" },
             { EHU_IDX_APM_COMM_ERR, "APM COMMUNICATION FAILURE" },
+            { EHU_IDX_THERMAL_OHM_WARNING, "OHM THERMAL WARNING" },
+            { EHU_IDX_THERMAL_MB_WARNING, "MAIN-BOARD THERMAL WARNING" },
+            { EHU_IDX_THERMAL_PASSIVE, "THERMAL LASER OFF; PASSIVE DEPTH" },
+            { EHU_IDX_THERMAL_OHM_STOP, "OHM OVERTEMPERATURE; STREAMS STOPPED" },
+            { EHU_IDX_THERMAL_MB_STOP, "MAIN-BOARD OVERTEMPERATURE; STREAMS STOPPED" },
+            { EHU_IDX_THERMAL_SENSOR_FAILURE, "THERMAL TEMPERATURE SENSOR FAILURE" },
+            { EHU_IDX_THERMAL_ACTUATOR_FAILURE, "THERMAL LASER CONTROL FAILURE" },
+            { EHU_IDX_CRITICAL_THERMAL_KILL, "CRITICAL THERMAL SHUTDOWN" },
         };
 
         class d500_hwmon_response : public hwmon_response_interface
