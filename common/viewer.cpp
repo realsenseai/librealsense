@@ -426,24 +426,23 @@ namespace rs2
             }
         }
 
-        // The device cloud's own colors (depth colors / labels) are a menu item too
-        int device_cloud_idx = -1;
-        for( int i = 0; i < tex_profiles.size() && device_cloud_idx < 0; i++ )
+        auto const is_device_cloud = []( rs2::stream_profile const & p )
         {
-            auto const type = tex_profiles[i].stream_type();
-            if( type == RS2_STREAM_POINT_CLOUD || type == RS2_STREAM_LABELED_POINT_CLOUD )
-                device_cloud_idx = i;
-        }
+            return p.stream_type() == RS2_STREAM_POINT_CLOUD || p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD;
+        };
+        auto const cloud_it = std::find_if( tex_profiles.begin(), tex_profiles.end(), is_device_cloud );
+        auto const cloud_idx = cloud_it == tex_profiles.end() ? size_t( -1 ) : size_t( cloud_it - tex_profiles.begin() );
+
+        // The cloud's own colors are the default selection (-1), and a started IR takes over from them like RGB
         auto const cloud_colors_selected = [&]()
         {
-            return device_cloud_idx >= 0
-                && ( selected_tex_source_uid == -1 || selected_tex_source_uid == tex_sources[device_cloud_idx] );
+            return cloud_it != tex_profiles.end()
+                && ( selected_tex_source_uid == -1 || selected_tex_source_uid == tex_sources[cloud_idx] );
         };
 
-        // No selection (-1) means the cloud's own colors: the checkmark belongs on them, not on whichever stream
-        // happens to be first in the list
+        // The checkmark belongs on the cloud item, not on whichever stream happens to be first in the list
         if( selected_tex_source < 0 )
-            selected_tex_source = cloud_colors_selected() ? device_cloud_idx : 0;
+            selected_tex_source = cloud_colors_selected() ? int( cloud_idx ) : 0;
 
         for (int i = 0; i < tex_sources.size(); i++)
         {
@@ -451,15 +450,13 @@ namespace rs2
             auto it = std::find(begin(last_tex_sources), end(last_tex_sources), id);
             if (it == last_tex_sources.end())
             {
-                // Don't auto-switch to a Y8 stream, to depth (when the source changes it would override the user's texture),
-                // nor to the device cloud's own depth colors. The exception is IR while the cloud shows its own
-                // colors, where RGB switches the same way
+                // Don't auto-switch to a Y8 stream (except IR over the cloud's colors), to depth (it would override the
+                // user's texture), nor to the device cloud's own colors
                 bool const ir_over_cloud_colors
                     = tex_profiles[i].stream_type() == RS2_STREAM_INFRARED && cloud_colors_selected();
                 if( ( tex_profiles[i].format() != RS2_FORMAT_Y8 || ir_over_cloud_colors )
                     && tex_profiles[i].stream_type() != RS2_STREAM_DEPTH
-                    && tex_profiles[i].stream_type() != RS2_STREAM_POINT_CLOUD
-                    && tex_profiles[i].stream_type() != RS2_STREAM_LABELED_POINT_CLOUD)
+                    && ! is_device_cloud( tex_profiles[i] ) )
                     selected_tex_source_uid = id;
                 texture_update_time = glfwGetTime();
             }
