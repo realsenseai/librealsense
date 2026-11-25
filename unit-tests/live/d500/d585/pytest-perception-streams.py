@@ -179,6 +179,17 @@ def test_standalone_lifecycle(device, stream):
     stop( sensor )
 
 
+@pytest.mark.device_exclude( "D555" )
+def test_mapping_stream_switch(device):
+    """One Mapping sensor switches Point Cloud -> Labeled Point Cloud -> Occupancy -> Point Cloud, each with valid frames."""
+    require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "labeled point cloud" )
+    frames = Collector()
+    for stream_type in ( rs.stream.point_cloud, rs.stream.labeled_point_cloud, rs.stream.occupancy, rs.stream.point_cloud ):
+        sensor, profile = perception( device, stream_type )
+        check_content( device, profile, frames.wait( stream_type, start( sensor, profile, frames ) ) )
+        stop( sensor )
+
+
 def test_pd_and_occ_standalone(device):
     if "D555" in device.get_info( rs.camera_info.name ):
         pytest.skip( "Concurrent PD/Occupancy lifecycle checks are D585-only" )

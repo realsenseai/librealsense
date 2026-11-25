@@ -53,7 +53,13 @@ namespace librealsense
         // Depth sensor counterpart of mapping_allowed_or_throw, for streams added while Occupancy/LPCL runs
         void depth_sensor_allowed_or_throw( const stream_profiles & requests ) const;
 
+        // Selects mapping stream e.g. PCL XYZ vs XYZRGB; FW reads selection at the UVC commit that follows
+        void select_mapping_stream( const stream_profiles & requests ) const;
+
         int _depth_mapping_idx = -1;
+        // FW that supports it takes the requested stream and format from the host; other FW picks it by the profile alone
+        bool _supports_stream_selection = false;
+        bool _supports_pcl_format = false;
 
     protected:
         std::shared_ptr<stream_interface> _occupancy_stream;

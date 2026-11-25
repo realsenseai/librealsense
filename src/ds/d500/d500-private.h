@@ -65,6 +65,8 @@ namespace librealsense
             LPCL_SEGMENTATION           = 0x06,  // LPCL_Segmentation (Labeled PCL): 0 = off, 1 = on
             DEPTH_MAPPING_PARAMS        = 0x0A   // OG/LPCL params as JSON (D5x5 family only)
         };
+        enum d500_mapping_stream_select : uint8_t { MAPPING_STREAM_PCL = 1, MAPPING_STREAM_LPCL = 2, MAPPING_STREAM_OG = 3 };
+        const uint8_t MAPPING_PCL_FORMAT_XYZ = 0;
         const int DEPTH_MAPPING_PARAMS_LEN = 1024;  // fixed control length; caps the JSON
         const uint16_t DEPTH_MAPPING_PARAMS_VERSION = 1;
 
