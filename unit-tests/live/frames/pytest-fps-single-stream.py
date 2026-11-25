@@ -13,6 +13,7 @@ import pyrsutils as rsutils
 import fps_helper
 import platform
 import logging
+import time
 from rspy.pytest.device_helpers import require_min_fw_version
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ def check_fps_ladder(sensor, exposure, label, matches):
         fps_helper.TIME_TO_COUNT_FRAMES = count_time
         fps_helper.TIME_FOR_STEADY_STATE = 2.5 if requested_fps == 5 else 1.2  # D405 color takes over 2 s to its first 5 fps frame
         fps = fps_helper.measure_fps({sensor: [profile]}).get(profile.stream_name(), 0)
+        if requested_fps <= 6:
+            time.sleep(2)  # FW HW monitor stays 'not ready' for over 1 s after a slow stream stops; remove once FW is fixed
         log.info(f"Exposure: {f'{exposure_us / 1000:.1f} [msec]' if exposure_us else exposure}, "
                  f"requested fps: {requested_fps:.1f} [Hz], actual fps: {fps:.1f} [Hz]")
         delta_Hz = requested_fps * FPS_TOLERANCE
