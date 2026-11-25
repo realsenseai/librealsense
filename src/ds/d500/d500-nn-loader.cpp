@@ -13,8 +13,8 @@
 
 namespace librealsense
 {
-    // First FW with the NN package tables; a placeholder until FW releases the feature
-    static const firmware_version NN_UPLOAD_MIN_FW( "7.60.0.0" );
+    // First FW line that always has the NN package tables: 7.60 builds (such as r58.6) may not
+    static const firmware_version NN_UPLOAD_MIN_FW( "7.61.0.0" );
 
     // The FW answers the status read with -1 / -12 / -19 when it is built without the NN upload
     static bool is_unsupported_firmware( int32_t err )
