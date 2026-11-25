@@ -8,6 +8,7 @@
 #include <src/librealsense-exception.h>
 #include <rsutils/number/crc32.h>
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -267,8 +268,8 @@ TEST_CASE( "custom nn invalid frames" )
 
 
 
-// Frames made by the FW's own writer on a host (see custom-nn-v3-frames/README.md), next to this file
-static std::vector< uint8_t > host_frame( std::string const & name )
+// Frames in custom-nn-v3-frames (see its README.md), next to this file
+static std::vector< uint8_t > frame_file( std::string const & name )
 {
     std::string path = __FILE__;
     path = path.substr( 0, path.find_last_of( "/\\" ) + 1 ) + "custom-nn-v3-frames/" + name;
@@ -289,7 +290,7 @@ static bool has_pattern( std::vector< uint8_t > const & frame, nn::custom_nn_ten
 
 TEST_CASE( "custom nn host-built frames" )
 {
-    auto const frame = host_frame( "v3_01_ok_model_id_42_1024x313.bin" );
+    auto const frame = frame_file( "v3_01_ok_model_id_42_1024x313.bin" );
     REQUIRE( frame.size() == 1024 * 313 );
     auto layout = parse( frame );
     CHECK( layout.header.version == nn::CUSTOM_NN_VERSION );
@@ -299,8 +300,8 @@ TEST_CASE( "custom nn host-built frames" )
     CHECK( layout.header.generation == 0x1234ABCD );
     CHECK( layout.payload.timestamp_ms == 123456.789 );
     CHECK( layout.payload.source_frame_id == 136 + layout.payload.frame_id );
+    // The host writer pads each size to 64 bytes; a camera writes the real size (see the recorded frame below)
     std::vector< size_t > const offsets = { 128, 15104, 15552, 75136, 76608, 314624 };
-    std::vector< uint32_t > const sizes = { 14912, 384, 59520, 1408, 237952, 5440 };
     REQUIRE( layout.tensors.size() == 6 );
     for( size_t i = 0; i < 6; ++i )
     {
@@ -308,15 +309,14 @@ TEST_CASE( "custom nn host-built frames" )
         CHECK( t.output_index == i );
         CHECK( t.dtype == RS2_NN_DTYPE_S16 );
         CHECK( t.offset == offsets[i] );
-        CHECK( t.size == sizes[i] );
         CHECK( has_pattern( frame, t ) );
     }
 
-    CHECK( parse( host_frame( "v3_02_ok_model_id_0_1024x313.bin" ) ).header.model_id == 0 );
-    CHECK( parse( host_frame( "v3_03_ok_model_id_max_1024x313.bin" ) ).header.model_id == 0xFFFFFFFF );
+    CHECK( parse( frame_file( "v3_02_ok_model_id_0_1024x313.bin" ) ).header.model_id == 0 );
+    CHECK( parse( frame_file( "v3_03_ok_model_id_max_1024x313.bin" ) ).header.model_id == 0xFFFFFFFF );
 
     // Tensors in DSP order, their data not a multiple of 64 bytes
-    auto const small_frame = host_frame( "v3_04_ok_small_unaligned_1024x1.bin" );
+    auto const small_frame = frame_file( "v3_04_ok_small_unaligned_1024x1.bin" );
     layout = parse( small_frame );
     CHECK( layout.header.model_id == 7 );
     CHECK( 23 + layout.header.payload_size == 576 );
@@ -341,23 +341,53 @@ TEST_CASE( "custom nn host-built frames" )
     for( auto const & e : errors )
     {
         CAPTURE( e.first );
-        layout = parse( host_frame( e.first + "_1024x313.bin" ) );
+        layout = parse( frame_file( e.first + "_1024x313.bin" ) );
         CHECK( layout.payload.status == e.second );
         CHECK( layout.header.flags == nn::CUSTOM_NN_ERROR_FLAG );
         CHECK( layout.header.payload_size == 41 );
         CHECK( layout.tensors.empty() );
     }
     // After an install, before the reset: no model id and no generation, and the reset message
-    layout = parse( host_frame( "v3_05_load_failed_gen0_1024x313.bin" ) );
+    layout = parse( frame_file( "v3_05_load_failed_gen0_1024x313.bin" ) );
     CHECK( layout.header.generation == 0 );
     CHECK( layout.header.model_id == 0 );
     CHECK_THAT( nn::custom_nn_status_message( layout.payload.status, layout.header.generation ), ContainsSubstring( "reset the camera" ) );
-    layout = parse( host_frame( "v3_06_load_failed_model_1024x313.bin" ) );
+    layout = parse( frame_file( "v3_06_load_failed_model_1024x313.bin" ) );
     CHECK( layout.header.model_id == 42 );
     CHECK_THAT( nn::custom_nn_status_message( layout.payload.status, layout.header.generation ), ContainsSubstring( "Upload it again" ) );
 
-    CHECK_THAT( error_of( host_frame( "v2_90_refused_ok_1024x313.bin" ) ), ContainsSubstring( "unsupported version 0x200" ) );
-    CHECK_THAT( error_of( host_frame( "v3_91_bad_crc_1024x313.bin" ) ), ContainsSubstring( "CRC" ) );
-    CHECK_THAT( error_of( host_frame( "v3_92_bad_size_1024x313.bin" ) ), ContainsSubstring( "payload size" ) );
-    CHECK_THAT( error_of( host_frame( "v3_93_unknown_version_1024x313.bin" ) ), ContainsSubstring( "unsupported version 0x400" ) );
+    CHECK_THAT( error_of( frame_file( "v2_90_refused_ok_1024x313.bin" ) ), ContainsSubstring( "unsupported version 0x200" ) );
+    CHECK_THAT( error_of( frame_file( "v3_91_bad_crc_1024x313.bin" ) ), ContainsSubstring( "CRC" ) );
+    CHECK_THAT( error_of( frame_file( "v3_92_bad_size_1024x313.bin" ) ), ContainsSubstring( "payload size" ) );
+    CHECK_THAT( error_of( frame_file( "v3_93_unknown_version_1024x313.bin" ) ), ContainsSubstring( "unsupported version 0x400" ) );
+}
+
+
+TEST_CASE( "custom nn frame recorded on a D585" )
+{
+    // DAMO-YOLO in slot 2, the second frame of a stream; a package without model_id gives 0
+    auto const frame = frame_file( "d585_damo_yolo_1024x313.bin" );
+    REQUIRE( frame.size() == 1024 * 313 );
+    auto const layout = parse( frame );
+    CHECK( layout.header.version == nn::CUSTOM_NN_VERSION );
+    CHECK( layout.header.flags == 0 );
+    CHECK( 23 + layout.header.payload_size == 320064 );
+    CHECK( layout.header.model_id == 0 );
+    CHECK( layout.header.generation == 0xD3B4048D );
+    CHECK( layout.payload.status == 0 );
+    CHECK( layout.payload.frame_id == 1 );
+    CHECK( layout.payload.source_frame_id == 6 );
+    // Each size is the tensor's element count x 2, the data padded with zeros to the next 64 bytes
+    std::vector< size_t > const offsets = { 128, 15104, 15552, 75136, 76608, 314624 };
+    std::vector< uint32_t > const sizes = { 14872, 338, 59488, 1352, 237952, 5408 };
+    REQUIRE( layout.tensors.size() == 6 );
+    for( size_t i = 0; i < 6; ++i )
+    {
+        auto const & t = layout.tensors[i];
+        CHECK( t.output_index == i );
+        CHECK( t.dtype == RS2_NN_DTYPE_S16 );
+        CHECK( t.offset == offsets[i] );
+        CHECK( t.size == sizes[i] );
+        CHECK( std::all_of( frame.begin() + t.offset + t.size, frame.begin() + round64( t.offset + t.size ), []( uint8_t b ) { return b == 0; } ) );
+    }
 }

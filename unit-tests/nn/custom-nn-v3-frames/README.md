@@ -9,6 +9,8 @@ Common values:
 - `timestamp_ms` 123456.789; `source_frame_id` = 136 + `frame_id`.
 - Every tensor is s16 (dtype 0). Byte k of output i's data is (i × 37 + k) mod 256.
 
+**One file recorded on a camera:** `d585_damo_yolo_1024x313.bin` is a frame as the SDK delivered it from a D585 Prototype on image c6 (7.62.47502.18590), with DAMO-YOLO installed in slot 2 by `nn_upload.py` from a package without `model_id`. Real inference output, the second frame of the stream (`frame_id` 1, `source_frame_id` 6), `model_id` 0, `model_generation` 0xD3B4048D. Its six s16 outputs are 14,872, 338, 59,488, 1,352, 237,952 and 5,408 B at the same offsets as file 01: the real size, data zero-padded to the next 64 bytes. **FW confirmed the camera is right:** the host-built files 01-04 pad each `size` to 64 bytes, a bug in the host writer, so the tests check their offsets and data but not their sizes.
+
 ## Files
 
 | File | Bytes | Frame | Case |
