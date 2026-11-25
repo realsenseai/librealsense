@@ -31,7 +31,7 @@ def test_depth_units():
         check.equal( df.get_distance( 0, 0 ), 0. )
 
         log.debug( "Set the sensor DEPTH_UNITS" )
-        sensor.add_option( rs.option.depth_units, rs.option_range( 0, 1, 0.000001, 0.001 ), True )
+        sensor.add_option( rs.option.depth_units, rs.option_range( 0, 1, 0.001, 0.001 ), True )
         #check.equal( sensor.get_option( rs.option.depth_units ), 0.001 )   it's not set yet
         sensor.set_option( rs.option.depth_units, 0.001 )
 

@@ -40,7 +40,7 @@ void init_types(py::module &m) {
     option_range.def(py::init<>())
         .def( py::init(
                   []( float min, float max, float step, float default_value ) {
-                      return rs2::option_range{ min, max, step, default_value };
+                      return rs2::option_range{ min, max, default_value, step };  // struct order: min, max, def, step
                   } ),
               "min"_a,
               "max"_a,
