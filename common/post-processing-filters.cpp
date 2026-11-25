@@ -44,6 +44,7 @@ rs2::frame post_processing_filters::apply_filters(rs2::frame f, const rs2::frame
 
 std::shared_ptr<subdevice_model> post_processing_filters::get_frame_origin(const rs2::frame& f)
 {
+    std::lock_guard< std::mutex > lock( viewer.streams_mutex );  // begin_stream / gc_streams change it on the UI thread
     for (auto&& s : viewer.streams)
     {
         if (s.second.dev)
@@ -171,6 +172,14 @@ void rs2::post_processing_filters::map_id_frame_to_frame(rs2::frame first, rs2::
         auto first_uid = first.get_profile().unique_id();
         auto second_uid = second.get_profile().unique_id();
 
+        // An unfiltered frame maps to itself, unless it maps to a shown stream (decoded H.264 to its source)
+        if( first_uid == second_uid )
+        {
+            auto it = viewer.streams_origin.find( first_uid );
+            if( it == viewer.streams_origin.end() || ! viewer.streams.count( it->second ) )
+                viewer.streams_origin[first_uid] = first_uid;
+            return;
+        }
         viewer.streams_origin[first_uid] = second_uid;
         viewer.streams_origin[second_uid] = first_uid;
     }
@@ -185,7 +194,11 @@ std::vector<rs2::frame> post_processing_filters::handle_frame(rs2::frame f, cons
 
     auto filtered = apply_filters(f, source);
 
-    map_id(filtered, f);
+    {
+        // Also written by the H.264 decoder callback (subdevice-model.cpp)
+        std::lock_guard< std::mutex > lock( viewer.streams_mutex );
+        map_id( filtered, f );
+    }
 
     if (auto composite = filtered.as<rs2::frameset>())
     {
@@ -268,7 +281,8 @@ void post_processing_filters::render_loop()
     {
         try
         {
-            if (viewer.synchronization_enable)
+            bool const synchronized = viewer.synchronization_enable;
+            if (synchronized)
             {
                 auto frames = viewer.syncer->try_wait_for_frames();
                 for (auto f : frames)
@@ -276,20 +290,18 @@ void post_processing_filters::render_loop()
                     processing_block.invoke(f);
                 }
             }
-            else
+            // The queues carry every frame when not synchronized, and decoded H.264 (which bypasses the syncer) always
+            std::map<int, rs2::frame_queue> frames_queue_local;
             {
-                std::map<int, rs2::frame_queue> frames_queue_local;
+                std::lock_guard<std::mutex> lock(frames_queue_mutex);
+                frames_queue_local = frames_queue;
+            }
+            for (auto&& q : frames_queue_local)
+            {
+                frame frm;
+                if (synchronized ? q.second.poll_for_frame(&frm) : q.second.try_wait_for_frame(&frm, 30))
                 {
-                    std::lock_guard<std::mutex> lock(frames_queue_mutex);
-                    frames_queue_local = frames_queue;
-                }
-                for (auto&& q : frames_queue_local)
-                {
-                    frame frm;
-                    if (q.second.try_wait_for_frame(&frm, 30))
-                    {
-                        processing_block.invoke(frm);
-                    }
+                    processing_block.invoke(frm);
                 }
             }
         }

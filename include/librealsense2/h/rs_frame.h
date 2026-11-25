@@ -167,6 +167,7 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_SEGMENTATION_MODE                    , /**< OG / LPCL: 0 - segmentation not applied, otherwise the mode applied */
     RS2_FRAME_METADATA_SEGMENTATION_CLASSES                 , /**< OG / LPCL: bitmask of the segmentation classes applied */
     RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL                , /**< Point cloud: 0 - occlusion removal off, 1 - on */
+    RS2_FRAME_METADATA_AE_POLICY                            , /**< AE policy applied by the FW, see rs2_colored_ir_auto_exposure_mode: 1 - depth priority, 2 - color priority, 3 - hybrid */
     RS2_FRAME_METADATA_COUNT
 } rs2_frame_metadata_value;
 const char* rs2_frame_metadata_to_string(rs2_frame_metadata_value metadata);

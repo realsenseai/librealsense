@@ -27,6 +27,9 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
+    static const firmware_version MIN_FW_COLORED_IR_AE_POLICY( "7.58.45946.14332" );
+    static const firmware_version MIN_FW_AE_POLICY_METADATA( "7.62.48509.18628" );
+
     // Image, compressed and calibration encodings published by the color pins.
     // The 16-bit raw can have several spellings: RW16 over USB (V4L2 passes it through, WMF normalizes it to BYR2)
     // and BA10 or GR16 over GMSL, depending on the d4xx driver version.
@@ -194,7 +197,7 @@ namespace librealsense
 
     void d500_dual_color::register_ae_policy_option()
     {
-        if( _fw_version < firmware_version( "7.58.45946.14332" ) )
+        if( _fw_version < MIN_FW_COLORED_IR_AE_POLICY )
             return;
         if( ! is_xu_published( get_raw_depth_sensor(), ds::depth_xu, ds::d500_xu_id::COLORED_IR_AE_POLICY,
                                sizeof( uint8_t ), RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE ) )
@@ -385,6 +388,22 @@ namespace librealsense
         // all DS color sensors - reuse the shared registration on the depth sensor.
         ds_color_common color_md( get_raw_depth_sensor(), depth_sensor, _fw_version, _hw_monitor, this );
         color_md.register_metadata();
+
+        if( _fw_version >= MIN_FW_AE_POLICY_METADATA )
+        {
+            // Depth/IR and RGB frames share the sensor but not the layout; each parser validates its own configuration struct
+            auto const depth_configuration_offset = metadata_raw_mode_offset + offsetof( md_depth_mode, depth_y_mode )
+                                                  + offsetof( md_depth_y_normal_mode, intel_configuration );
+            auto const rgb_configuration_offset = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode )
+                                                + offsetof( md_rgb_normal_mode, intel_configuration );
+
+            depth_sensor.register_metadata( RS2_FRAME_METADATA_AE_POLICY,
+                make_attribute_parser( &md_configuration::ae_policy, md_configuration_attributes::ae_policy_attribute,
+                                       depth_configuration_offset ) );
+            depth_sensor.register_metadata( RS2_FRAME_METADATA_AE_POLICY,
+                make_attribute_parser( &md_rgb_configuration::rgb_ae_policy, md_configuration_attributes::ae_policy_attribute,
+                                       rgb_configuration_offset ) );
+        }
     }
 
     void d500_dual_color::register_color_extrinsics()

@@ -4344,7 +4344,13 @@ namespace rs2
             return false;
 
         auto index = f.get_profile().unique_id();
-        auto mapped_index = streams_origin[index];
+        int mapped_index = -2;  // matches no source uid; operator[] would insert 0, a real uid
+        {
+            std::lock_guard< std::mutex > lock( streams_mutex );
+            auto it = streams_origin.find( index );
+            if( it != streams_origin.end() )
+                mapped_index = it->second;
+        }
 
         if(index == selected_depth_source_uid || mapped_index  == selected_depth_source_uid
                 ||(selected_depth_source_uid == -1 && f.get_profile().stream_type() == RS2_STREAM_DEPTH))

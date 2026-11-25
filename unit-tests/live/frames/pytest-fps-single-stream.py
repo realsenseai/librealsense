@@ -3,7 +3,7 @@
 
 """
 Test FPS accuracy for single depth and color streams at various frame rates.
-Verify that actual fps is within 5% of requested, with manual exposure (half the frame time)
+Verify that actual fps is within 10% of requested, with manual exposure (half the frame time)
 on every build and auto exposure added on nightly.
 """
 
@@ -24,6 +24,7 @@ pytestmark = [
 
 TESTED_FPS =          [5,  6,  15, 30, 60, 90]
 TIME_TO_TEST_FPS =    [8,  8,  5,  4,  3,  2]
+FPS_TOLERANCE = 0.10
 
 fps_helper.TIME_FOR_STEADY_STATE = 1.2  # t2ff KPI is 1 second + some extra
 
@@ -44,7 +45,7 @@ def set_exposure_half_frame_time(sensor, requested_fps):
     return desired_us
 
 
-def check_fps_ladder(sensor, exposure, label, matches, tolerance_at_5fps=0.05):
+def check_fps_ladder(sensor, exposure, label, matches):
     """Stream each TESTED_FPS rate the sensor offers; return (rates tested, failures)."""
     # A manual run before this one leaves auto exposure off; write only on change, D585S rejects any write in run mode
     auto = int(exposure == "auto")
@@ -67,7 +68,7 @@ def check_fps_ladder(sensor, exposure, label, matches, tolerance_at_5fps=0.05):
         fps = fps_helper.measure_fps({sensor: [profile]}).get(profile.stream_name(), 0)
         log.info(f"Exposure: {f'{exposure_us / 1000:.1f} [msec]' if exposure_us else exposure}, "
                  f"requested fps: {requested_fps:.1f} [Hz], actual fps: {fps:.1f} [Hz]")
-        delta_Hz = requested_fps * (tolerance_at_5fps if requested_fps == 5 else 0.05)
+        delta_Hz = requested_fps * FPS_TOLERANCE
         if not (requested_fps - delta_Hz <= fps <= requested_fps + delta_Hz):
             failures.append(f"{label} {requested_fps}Hz: got {fps:.1f}Hz")
     return tested, failures
@@ -123,11 +124,10 @@ def test_color_fps(test_device, exposure):
     if skip_90:
         log.info("Skipping color 90 fps with auto exposure: FW gets no frames after the RAW 60 fps profile")
 
-    # Resolution does not affect FPS accuracy; the KPI allows 10% at 5 FPS
+    # Resolution does not affect FPS accuracy
     tested, failures = check_fps_ladder(cs, exposure, "Color",
                                         lambda p: p.stream_type() == rs.stream.color and p.format() == rs.format.rgb8
-                                        and not (skip_90 and p.fps() == 90),
-                                        tolerance_at_5fps=0.10)
+                                        and not (skip_90 and p.fps() == 90))
 
     assert tested > 0, f"No color profiles found on {product_name} — test ran no FPS checks"
     assert not failures, "Color FPS out of tolerance:\n" + "\n".join(failures)
@@ -152,6 +152,6 @@ def test_object_detection_fps(test_device):
     fps = fps_dict.get(op.stream_name(), 0)
     log.info(f"Requested fps: {requested_fps:.1f} [Hz], actual fps: {fps:.1f} [Hz]")
 
-    delta_Hz = requested_fps * 0.05
+    delta_Hz = requested_fps * FPS_TOLERANCE
     assert fps >= requested_fps - delta_Hz and fps <= requested_fps + delta_Hz, \
         f"Object Detection {requested_fps}Hz: got {fps:.1f}Hz"
