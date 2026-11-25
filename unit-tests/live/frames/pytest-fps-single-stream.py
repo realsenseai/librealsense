@@ -107,6 +107,9 @@ def test_color_fps(test_device, exposure):
     if product_line == "D400" and exposure == "manual":
         require_min_fw_version(dev, rsutils.version(5, 17, 4, 6), "color manual exposure FPS")
 
+    if is_d585_dual_rgb(product_name):
+        require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "D585 dual RGB color fps")
+
     log.info(f"Testing color fps ({exposure} exposure) {product_line} device - {platform.system()} OS")
 
     # D405 and D401 expose color through the depth sensor (no separate color sensor)

@@ -8,10 +8,12 @@
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 import math
 import platform
 import time
 import logging
+from rspy.pytest.device_helpers import require_min_fw_version
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -146,6 +148,7 @@ def test_rgb_and_depth_values_are_independent(depth_sensor):
 def test_rgb_options_work_while_streaming(test_device, depth_sensor):
     # Hybrid streaming: depth and both color streams at once
     dev, ctx = test_device
+    require_min_fw_version( dev, rsutils.version( 7, 62, 0, 0 ), "hybrid depth + 2 color streaming" )
     cfg = rs.config()
     cfg.enable_device( dev.get_info( rs.camera_info.serial_number ) )
     cfg.enable_stream( rs.stream.depth, 640, 480, rs.format.z16, 30 )
