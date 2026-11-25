@@ -164,9 +164,9 @@ int main() {
     code.write_text(fixture.replace("/* POLICY */", policy).replace("/* CALLBACK */", callback))
     subprocess.run([
         compiler, "-std=c++14", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
-        "-Wno-error=reorder", "-pthread",
+        "-pthread",
         "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
-        "-I" + str(root / "third-party/rsutils/include"),
+        "-isystem", str(root / "third-party/rsutils/include"),
         str(code), str(root / "third-party/rsutils/src/dispatcher.cpp"), "-o", str(binary),
     ], check=True)
     native_env = dict(os.environ)
