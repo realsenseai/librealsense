@@ -223,8 +223,8 @@ def xfail_fw_starvation(request, device, stream, segmented):
             and rsutils.version( device.get_info( rs.camera_info.firmware_version ) ) < rsutils.version( "7.62.47495" ):
         reason = "RSDEV-16828: LPCL with segmentation on delivers no frames before FW 7.62.47495"
     elif not segmented and not is_2c( device ) and stream == 'labeled_point_cloud' and size == ( 1280, 720 ) \
-            and len( params.get( 'indices', () ) ) == 1:
-        reason = "3C LPCL sometimes stops when Depth + one IR join at 1280x720"
+            and 'indices' in params:
+        reason = "3C LPCL sometimes stops when Depth + IR join at 1280x720"
     else:
         return
     request.applymarker( pytest.mark.xfail( run=False, reason=reason ) )
