@@ -8,12 +8,14 @@
 
 #include <vector>
 #include <memory>
+#include <functional>
 
 
 namespace librealsense {
 
 
 class stream_interface;
+class frame_interface;
 class matcher;
 
 
@@ -24,8 +26,11 @@ class matcher;
 class matcher_factory
 {
 public:
+    using matching_clock = std::function< double( frame_interface const & ) >;
+
     static std::shared_ptr< matcher > create( rs2_matchers matcher,
-                                              std::vector< stream_interface * > const & profiles );
+                                              std::vector< stream_interface * > const & profiles,
+                                              matching_clock const & clock = {} );
 
 private:
     // A stream taking part in a matcher's group; a negative index means every stream of that type
@@ -46,7 +51,8 @@ private:
 
     static std::vector< stream_interface * > select_group( std::vector< match_group > const & group,
                                                            std::vector< stream_interface * > const & profiles );
-    static std::shared_ptr< matcher > relate( std::vector< stream_interface * > const & profiles, sync_by );
+    static std::shared_ptr< matcher > relate( std::vector< stream_interface * > const & profiles, sync_by,
+                                              matching_clock const & clock = {} );
     static std::shared_ptr< matcher > match_sensor_profiles( std::vector< match_group > const & group,
                                                       sync_by,
                                                       std::vector< stream_interface * > const & profiles );
@@ -59,7 +65,8 @@ private:
     static std::shared_ptr< matcher >
         create_frame_number_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers );
     static std::shared_ptr< matcher >
-        create_timestamp_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers );
+        create_timestamp_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers,
+                                            matching_clock const & clock = {} );
     // Take the streams of one kind out of 'profiles', leaving every other stream in 'rest'
     static std::vector< stream_interface * > separate_color( std::vector< stream_interface * > const & profiles,
                                                              std::vector< stream_interface * > & rest );

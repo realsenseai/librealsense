@@ -48,7 +48,8 @@ std::vector< stream_interface * > matcher_factory::select_group( std::vector< ma
 
 // Relates the given profiles to one another: one matcher per stream, composed by frame number, by timestamp,
 // or - for streams that are matched to nothing - not at all, each passing through on its own.
-std::shared_ptr< matcher > matcher_factory::relate( std::vector< stream_interface * > const & profiles, sync_by sync )
+std::shared_ptr< matcher > matcher_factory::relate( std::vector< stream_interface * > const & profiles, sync_by sync,
+                                                   matching_clock const & clock )
 {
     std::vector< std::shared_ptr< matcher > > matchers;
     for( auto & p : profiles )
@@ -59,7 +60,7 @@ std::shared_ptr< matcher > matcher_factory::relate( std::vector< stream_interfac
     case sync_by::frame_number:
         return create_frame_number_composite_matcher( matchers );
     case sync_by::timestamp:
-        return create_timestamp_composite_matcher( matchers );
+        return create_timestamp_composite_matcher( matchers, clock );
     default:
         return create_composite_identity_matcher( matchers );
     }
@@ -105,7 +106,8 @@ matcher_factory::match_sensor_profiles_with_color( std::vector< match_group > co
 
 
 std::shared_ptr< matcher > matcher_factory::create( rs2_matchers matcher,
-                                                    std::vector< stream_interface * > const & profiles )
+                                                    std::vector< stream_interface * > const & profiles,
+                                                   matching_clock const & clock )
 {
     // Depth is selected without an index: a device may expose more than one depth stream - raw next to
     // device-aligned - and they are produced from the same frame, so they carry its frame number.
@@ -144,7 +146,7 @@ std::shared_ptr< matcher > matcher_factory::create( rs2_matchers matcher,
             // No group at all: whatever is streaming, related by timestamp
             std::vector< stream_interface * > rest;
             auto const perception = separate_perception( profiles, rest );
-            auto const matched = relate( rest, sync_by::timestamp );
+            auto const matched = relate( rest, sync_by::timestamp, clock );
             if( perception.empty() )
                 return matched;
 
@@ -175,9 +177,10 @@ matcher_factory::create_frame_number_composite_matcher( std::vector< std::shared
 
 
 std::shared_ptr< matcher >
-matcher_factory::create_timestamp_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers )
+matcher_factory::create_timestamp_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers,
+                                                  matching_clock const & clock )
 {
-    return std::make_shared< timestamp_composite_matcher >( matchers );
+    return std::make_shared< timestamp_composite_matcher >( matchers, clock );
 }
 
 

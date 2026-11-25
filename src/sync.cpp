@@ -126,7 +126,8 @@ namespace librealsense
     }
 
     composite_matcher::composite_matcher(
-        std::vector< std::shared_ptr< matcher > > const & matchers, std::string const & name )
+        std::vector< std::shared_ptr< matcher > > const & matchers, std::string const & name, matcher_factory::matching_clock clock )
+        : _clock( std::move( clock ) )
     {
         for (auto&& matcher : matchers)
         {
@@ -334,7 +335,9 @@ namespace librealsense
 
         // We want to keep track of a "last-arrived" frame which is our current equivalent of "now" -- it contains the
         // latest timestamp/frame-number/etc. that we can compare to.
-        auto const last_arrived = f->get_header();
+        auto last_arrived = f->get_header();
+        if( _clock )
+            last_arrived.timestamp = _clock( *f.frame );
 
         if( ! _frames_queue[matcher.get()].q.enqueue( std::move( f ) ) )
             // If we get stopped, nothing to do!
@@ -544,17 +547,22 @@ namespace librealsense
         _next_expected[matcher.get()].value = f.frame->get_frame_number()+1.;
     }
 
-    std::pair<double, double> extract_timestamps(frame_holder & a, frame_holder & b)
+    double composite_matcher::matching_timestamp( frame_interface const & f ) const
+    {
+        return _clock ? _clock( f ) : f.get_frame_timestamp();
+    }
+
+    std::pair<double, double> timestamp_composite_matcher::extract_timestamps(frame_holder & a, frame_holder & b) const
     {
         if (a->get_frame_timestamp_domain() == b->get_frame_timestamp_domain())
-            return{ a->get_frame_timestamp(), b->get_frame_timestamp() };
+            return{ matching_timestamp( *a.frame ), matching_timestamp( *b.frame ) };
         else
             return{ a->get_frame_system_time(), b->get_frame_system_time() };
     }
 
     timestamp_composite_matcher::timestamp_composite_matcher(
-        std::vector< std::shared_ptr< matcher > > const & matchers )
-        : composite_matcher( matchers, "TS: " )
+        std::vector< std::shared_ptr< matcher > > const & matchers, matcher_factory::matching_clock clock )
+        : composite_matcher( matchers, "TS: ", std::move( clock ) )
     {
     }
     bool timestamp_composite_matcher::are_equivalent(frame_holder & a, frame_holder & b)
@@ -613,7 +621,7 @@ namespace librealsense
         auto fps = get_fps( f );
         auto gap = 1000. / fps;
 
-        auto ts = f.frame->get_frame_timestamp();
+        auto ts = matching_timestamp( *f.frame );
         auto ne = ts + gap;
         //LOG_DEBUG( "... next_expected = {timestamp}" << rsutils::string::from( ts ) << " + {gap}(1000/{fps}"
         //                                             << rsutils::string::from( fps )
@@ -727,7 +735,7 @@ namespace librealsense
             return true;
         }
 
-        return ! are_equivalent( waiting_to_be_released->get_frame_timestamp(),
+        return ! are_equivalent( matching_timestamp( *waiting_to_be_released ),
                                  next_expected.value,
                                  fps );
     }
