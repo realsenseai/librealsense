@@ -293,14 +293,12 @@ namespace librealsense
                                               frame_holder && frame )
     {
         // std::function needs a copyable job, so the frame travels in a shared holder and the job takes it out
-        auto holder = std::make_shared< frame_holder >();
-        *holder = std::move( frame );
+        auto holder = std::make_shared< frame_holder >( std::move( frame ) );
         auto encoded = _encoders->submit( [stream_id, timestamp, holder]()
         {
-            frame_holder encoded_frame_holder;  // released on every path, including a throw
-            encoded_frame_holder = std::move( *holder );
-            auto result = encode_compressed_frame( stream_id, timestamp, encoded_frame_holder.frame );
-            result.extras = make_frame_extras( encoded_frame_holder.frame );
+            frame_holder source( std::move( *holder ) );  // released on every path, including a throw
+            auto result = encode_compressed_frame( stream_id, timestamp, source.frame );
+            result.extras = make_frame_extras( source.frame );
             return result;
         } );
         _pending.push_back( { stream_id, timestamp, std::move( encoded ) } );
