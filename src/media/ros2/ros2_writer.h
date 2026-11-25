@@ -28,7 +28,6 @@ namespace librealsense
     public:
         explicit ros2_writer( const std::string& file, bool compress_while_record);
         ~ros2_writer() override;
-        void flush() override;
         void write_device_description(const librealsense::device_snapshot& device_description) override;
         void write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame) override;
         void write_snapshot(uint32_t device_index, const nanoseconds& timestamp, rs2_extension type, const std::shared_ptr<extension_snapshot>& snapshot) override;
@@ -37,14 +36,21 @@ namespace librealsense
 
     private:
         void write_file_version();
-        void write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
-        void write_camera_info(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
+        void write_camera_info(const stream_identifier& stream_id, const nanoseconds& timestamp, const std::shared_ptr<stream_profile_interface>& stream);
         void write_string( std::string const & topic, const device_serializer::nanoseconds & ts, std::string const & payload );
         void ensure_topic( const std::string & name, const std::string & type, const std::string & offered_qos = "" );
 
         void write_notification(const sensor_identifier& sensor_id, const nanoseconds& timestamp, const notification& n) override;
         void write_extrinsics(const stream_identifier& stream_id, uint32_t reference_id, const rs2_extrinsics& ext) override;
-        void write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
+        // What the extra per-frame messages need from a frame, so a frame can be released before they are written
+        struct frame_extras
+        {
+            std::string metadata;
+            std::shared_ptr< stream_profile_interface > stream;
+            std::shared_ptr< sensor_interface > sensor;
+        };
+        static frame_extras make_frame_extras( frame_interface * frame );
+        void write_additional_frame_messages( const stream_identifier & stream_id, const nanoseconds & timestamp, const frame_extras & extras );
         void write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<motion_stream_profile_interface> profile);
@@ -97,18 +103,18 @@ namespace librealsense
 
         // Compression happens inside CompressedImage payloads (PNG or zstd) so the bag
         // stays natively playable by ROS2; whole-CDR compression is playback-breaking.
-        // Encoding runs on worker threads so a slow encoder does not hold the recorded frames, and with them
-        // the sensor's frame pool; storage is still only touched by the calling thread, in submission order.
+        // Encoding runs on worker threads, each releasing its frame as soon as it is encoded, so a slow encoder
+        // does not exhaust the sensor's frame pool; storage is still only touched by the calling thread, in submission order.
         struct encoded_frame
         {
             std::string topic;
             sensor_msgs::msg::CompressedImage msg;
+            frame_extras extras;
         };
         struct pending_frame
         {
             device_serializer::stream_identifier stream_id;
             nanoseconds timestamp;
-            frame_holder frame;
             std::future< encoded_frame > encoded;
         };
         class encode_pool;
@@ -128,8 +134,8 @@ namespace librealsense
         // Reused across calls. Safe only while _storage->write() stays synchronous
         // (sqlite binds SQLITE_STATIC and drops the ref in execute_and_reset).
         std::shared_ptr<rcutils_uint8_array_t> _cdr_buf;
+        std::unique_ptr< encode_pool > _encoders;
         std::deque< pending_frame > _pending;
-        std::unique_ptr< encode_pool > _encoders;  // after _pending: joined first, so no job outlives its frame
         size_t _max_pending = 0;
         std::map< std::string, rosbag2_storage::TopicMetadata > _topics; // created topics cache
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
