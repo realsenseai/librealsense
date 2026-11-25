@@ -120,6 +120,8 @@ namespace librealsense
 
         void hardware_reset() override;
 
+        bool compress_while_record() const override;
+
         platform::usb_spec get_usb_spec() const;
         virtual double get_device_time_ms() override;
 

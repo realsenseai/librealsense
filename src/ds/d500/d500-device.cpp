@@ -1007,6 +1007,24 @@ namespace librealsense
     }
 
 
+    bool d500_device::compress_while_record() const
+    {
+        // Encoding PNG on the recorder thread can hold enough D585 GMSL frames to stall live delivery.
+        if( _is_mipi_device )
+        {
+            switch( _pid )
+            {
+            case ds::D585_2C_PID:
+            case ds::D585_3C_PID:
+            case ds::D585F_PID:
+            case ds::D585_2C_PROTO_PID:
+            case ds::D585_3C_PROTO_PID:
+                return false;
+            }
+        }
+        return device::compress_while_record();
+    }
+
     platform::usb_spec d500_device::get_usb_spec() const
     {
         if(!supports_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR))
