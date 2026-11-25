@@ -28,7 +28,7 @@ function nameMatches(pattern: string, name: string) {
  *  names cameras before the wildcards they would also match. Only entries for any platform count: the image
  *  runs on the camera, not on the machine the viewer runs on */
 export async function recommendedFirmware(deviceName: string): Promise<{ version: string; link: string } | undefined> {
-  const versions: VersionEntry[] = (await (await fetch(VERSIONS_DB_URL)).json()).versions
+  const { versions } = (await axios.get<{ versions: VersionEntry[] }>(VERSIONS_DB_URL)).data
   return versions.find((e) => e.component === 'FIRMWARE' && e.policy_type === 'RECOMMENDED'
     && e.platform === '*' && nameMatches(e.device_name, deviceName))
 }

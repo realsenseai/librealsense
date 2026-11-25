@@ -33,7 +33,7 @@ class Camera:
         # Its firmware-update ID: the one ID it has in every state, recovery (DFU) mode included, where it has no
         # serial number. A device without one raises, and is not listed
         self.id: str = dev.get_info(rs.camera_info.firmware_update_id)
-        self.pipeline = rs.pipeline(ctx)  # one in recovery mode fails to start, in the SDK
+        self.pipeline = rs.pipeline(ctx)  # also for a camera in recovery mode: the SDK refuses to start it
         self.pipeline.set_device(dev)  # skips re-creating the device on start
         self._events = events
         self._frame_sender = frame_sender
