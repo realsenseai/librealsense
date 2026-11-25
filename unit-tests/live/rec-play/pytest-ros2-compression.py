@@ -240,6 +240,7 @@ def _record_live_bag(filename, dev):
     depth_sensor.open(depth_profile)
     depth_sensor.start(frame_queue)
 
+    frame_queue.wait_for_frame(15000)  # D5xx first frame can take several seconds; record only once streaming
     time.sleep(LIVE_RECORD_SECONDS)
 
     recorder.pause()
@@ -255,10 +256,10 @@ def test_live_compressed_frames_match_playback(tmp_path, test_device):
     _record_live_bag(bag, dev)
 
     blobs = _read_frame_blobs(bag)
+    assert blobs, "no frames recorded"
     sqlite_pixels = [_deserialize_blob(b) for b in blobs]
     playback_pixels = _playback_frames(bag, rs.stream.depth)
 
-    assert sqlite_pixels, "no frames recorded"
     assert len(sqlite_pixels) == len(playback_pixels), \
         f"frame count mismatch: {len(sqlite_pixels)} blobs vs {len(playback_pixels)} playback frames"
 
