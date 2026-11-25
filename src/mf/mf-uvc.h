@@ -73,6 +73,7 @@ namespace librealsense
             void start_callbacks() override;
             void stop_callbacks() override;
             void close(stream_profile profile) override;
+            void close_pin( stream_profile profile ) override;
             void set_power_state(power_state state) override;
             power_state get_power_state() const override { return _power_state; }
             std::vector<stream_profile> get_profiles() const override;

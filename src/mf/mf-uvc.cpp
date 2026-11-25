@@ -1420,6 +1420,21 @@ namespace librealsense
             stop_stream_cleanup(profile, elem);
         }
 
+        // Media Foundation stops an endpoint only with its source: restart the source, and the XU controls on it
+        void wmf_uvc_device::close_pin( stream_profile profile )
+        {
+            // A refused start has closed the pin already, and left its reader failing every call
+            if( ! _profiles.empty() )
+                close( profile );
+            if( ! _profiles.empty() )
+                return;
+            std::lock_guard< named_mutex > lock( _systemwide_lock );  // XU calls and the HW monitor wait for the restart
+            set_power_state( D3 );
+            set_power_state( D0 );
+            for( auto & c : _ks_controls )
+                init_xu( { 0, 0, c.first, {} } );  // only the node is used
+        }
+
         // ReSharper disable once CppMemberFunctionMayBeConst
         void wmf_uvc_device::flush(int sIndex)
         {

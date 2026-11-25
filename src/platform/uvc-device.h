@@ -13,7 +13,9 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <chrono>
 #include <thread>
@@ -167,6 +169,8 @@ public:
     virtual void start_callbacks() = 0;
     virtual void stop_callbacks() = 0;
     virtual void close( stream_profile profile ) = 0;
+    // Closes one pin while the other pins of the sensor keep streaming, so its endpoint must stop now
+    virtual void close_pin( stream_profile profile ) { close( profile ); }
 
     virtual void set_power_state( power_state state ) = 0;
     virtual power_state get_power_state() const = 0;
@@ -242,6 +246,7 @@ public:
     void stop_callbacks() override { _dev->stop_callbacks(); }
 
     void close( stream_profile profile ) override { _dev->close( profile ); }
+    void close_pin( stream_profile profile ) override { _dev->close_pin( profile ); }
 
     void set_power_state( power_state state ) override { _dev->set_power_state( state ); }
 
@@ -358,8 +363,11 @@ private:
 class multi_pins_uvc_device : public uvc_device
 {
 public:
-    explicit multi_pins_uvc_device( const std::vector< std::shared_ptr< uvc_device > > & dev )
+    // `xu_owners` maps an XU unit to the sub-device that publishes it; other units go to the first sub-device
+    explicit multi_pins_uvc_device( const std::vector< std::shared_ptr< uvc_device > > & dev,
+                                    std::map< uint8_t, size_t > xu_owners = {} )
         : _dev( dev )
+        , _xu_owners( std::move( xu_owners ) )
     {
     }
 
@@ -414,6 +422,13 @@ public:
         _streaming_indexes.erase( dev_index );
         _dev[dev_index]->close( profile ); // Might throw, keep after erase()
     }
+    void close_pin( stream_profile profile ) override
+    {
+        auto dev_index = decode_pin( profile.pin_index );
+        _configured_indexes.erase( dev_index );
+        _streaming_indexes.erase( dev_index );
+        _dev[dev_index]->close_pin( profile );
+    }
 
     void set_power_state( power_state state ) override
     {
@@ -425,21 +440,24 @@ public:
 
     power_state get_power_state() const override { return _dev.front()->get_power_state(); }
 
-    void init_xu( const extension_unit & xu ) override { _dev.front()->init_xu( xu ); }
+    void init_xu( const extension_unit & xu ) override
+    {
+        on_xu_owner( xu, [&]( uvc_device & dev ) { dev.init_xu( xu ); } );
+    }
 
     bool set_xu( const extension_unit & xu, uint8_t ctrl, const uint8_t * data, int len ) override
     {
-        return _dev.front()->set_xu( xu, ctrl, data, len );
+        return on_xu_owner( xu, [&]( uvc_device & dev ) { return dev.set_xu( xu, ctrl, data, len ); } );
     }
 
     bool get_xu( const extension_unit & xu, uint8_t ctrl, uint8_t * data, int len ) const override
     {
-        return _dev.front()->get_xu( xu, ctrl, data, len );
+        return on_xu_owner( xu, [&]( uvc_device & dev ) { return dev.get_xu( xu, ctrl, data, len ); } );
     }
 
     control_range get_xu_range( const extension_unit & xu, uint8_t ctrl, int len ) const override
     {
-        return _dev.front()->get_xu_range( xu, ctrl, len );
+        return on_xu_owner( xu, [&]( uvc_device & dev ) { return dev.get_xu_range( xu, ctrl, len ); } );
     }
 
     bool get_pu( rs2_option opt, int32_t & value ) const override { return _dev.front()->get_pu( opt, value ); }
@@ -536,6 +554,17 @@ public:
     }
 
 private:
+    // A routed XU's interface closes its pins on its own: hold its lock, as close_pin() does while it restarts
+    template< class Action >
+    auto on_xu_owner( const extension_unit & xu, Action action ) const -> decltype( action( *static_cast< uvc_device * >( nullptr ) ) )
+    {
+        auto it = _xu_owners.find( xu.unit );
+        if( it == _xu_owners.end() )
+            return action( *_dev.front() );
+        std::lock_guard< const uvc_device > lock( *_dev[it->second] );
+        return action( *_dev[it->second] );
+    }
+
     // Width of the pin_index range reserved per sub-device = (max native pin index across all sub-devices) + 1.
     // Computed lazily (not at construction): get_profiles() requires the device to be powered to D0, which is not
     // the case during enumeration. Cached because the sub-devices' profile sets are static; >= 1, so 0 is a safe
@@ -569,6 +598,7 @@ private:
     std::vector< std::shared_ptr< uvc_device > > _dev;
     std::set< uint32_t > _configured_indexes;
     std::set< uint32_t > _streaming_indexes;
+    std::map< uint8_t, size_t > _xu_owners;
     mutable uint32_t _pin_stride = 0;
 };
 
