@@ -53,7 +53,6 @@ The API now mirrors the SDK's own objects and calls. Breaking changes:
     *   `extrinsics` takes `from_stream`, `from_index`, `to_stream`, `to_index` and answers one `Extrinsics`.
     *   `POST .../hw_reset/` is `POST .../hardware_reset` and answers nothing.
     *   HWM answers the firmware's raw reply bytes instead of `HwmResponse`: its first uint32 echoes the opcode, or is the firmware's error code.
-    *   The server no longer closes a frame socket (codes 4000, 4001, 4002 are gone).
 
 ## Missing Features
 * Not all SDK capabilities are yet supported(e.g. Texture Mapping, Post processing filters,...)
