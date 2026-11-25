@@ -100,6 +100,80 @@ int main() {
     subprocess.run([str(binary)], check=True, timeout=10, env=native_env)
 
 
+def test_peer_stream_survives_shared_producer_rebuild(tmp_path):
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "src/uvc/uvc-streamer.cpp").read_text()
+    begin = source.index("            _watchdog_timeout =")
+    policy = source[begin:source.index("\n\n            init();", begin)]
+    begin = source.index("            _watchdog = std::make_shared<watchdog>")
+    end = source.index("            _watchdog->start();", begin)
+    callback = source[begin:end + len("            _watchdog->start();")]
+    fixture = r'''
+#include <rsutils/concurrency/concurrency.h>
+#include <algorithm>
+#include <cstdint>
+#define LOG_ERROR(...) ((void)0)
+constexpr unsigned ENDPOINT_RESET_MILLISECONDS_TIMEOUT=100;
+struct Messenger {
+    std::atomic<unsigned> resets{0};
+    void reset_endpoint(int,unsigned){++resets;}
+};
+struct Context {
+    struct {unsigned fps=30;} profile;
+    bool variable_payload=false;
+    std::shared_ptr<Messenger> messenger=std::make_shared<Messenger>();
+};
+struct uvc_streamer {
+    Context _context;
+    int64_t _watchdog_timeout=0;
+    int _read_endpoint=0;
+    bool _running=true,_frame_arrived=false;
+    dispatcher _action_dispatcher{10,"peer-stream"};
+    std::shared_ptr<watchdog> _watchdog;
+    uvc_streamer() {
+        _action_dispatcher.start();
+        /* POLICY */
+        /* CALLBACK */
+    }
+    ~uvc_streamer(){_watchdog->stop();_action_dispatcher.stop();}
+    void received_frame() {
+        _action_dispatcher.invoke_and_wait([this](dispatcher::cancellable_timer) {
+            _frame_arrived=true;_watchdog->kick();
+        },[]{return false;});
+    }
+};
+int main() {
+    uvc_streamer peer;
+    peer.received_frame();
+    // A normal Mapping join rebuilds the shared producer for 0.6-0.8 s.
+    // The existing Depth capture must keep its host intent through that pause.
+    std::this_thread::sleep_for(std::chrono::milliseconds(800));
+    assert(peer._context.messenger->resets==0);
+    peer.received_frame();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    assert(peer._context.messenger->resets==0);
+    // A genuinely silent endpoint must still reach the recovery callback.
+    auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+    while(peer._context.messenger->resets==0 &&
+          std::chrono::steady_clock::now()<deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    assert(peer._context.messenger->resets>0);
+}
+'''
+    code, binary = tmp_path / "peer-rebuild.cpp", tmp_path / "peer-rebuild"
+    code.write_text(fixture.replace("/* POLICY */", policy).replace("/* CALLBACK */", callback))
+    subprocess.run([
+        compiler, "-std=c++14", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
+        "-Wno-error=reorder", "-pthread",
+        "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
+        "-I" + str(root / "third-party/rsutils/include"),
+        str(code), str(root / "third-party/rsutils/src/dispatcher.cpp"), "-o", str(binary),
+    ], check=True)
+    native_env = dict(os.environ)
+    native_env.pop("LD_PRELOAD", None)
+    subprocess.run([str(binary)], check=True, timeout=10, env=native_env)
+
+
 def test_mapping_profile_and_payload_validation(tmp_path):
     from rspy import repo
     root = Path(__file__).resolve().parents[2]

@@ -41,9 +41,11 @@ namespace librealsense
 
             _action_dispatcher.start();
 
-            _watchdog_timeout = static_cast<int64_t>(((1000.0 / _context.profile.fps) * 10));
-            if( _context.variable_payload )
-                _watchdog_timeout = std::max< int64_t >( _watchdog_timeout, 1000 );
+            // Another interface can rebuild a producer shared with this stream.
+            // Keep peer captures alive through that pause: an endpoint reset can
+            // be interpreted by the device as withdrawing the host request.
+            _watchdog_timeout = std::max< int64_t >(
+                1000, static_cast< int64_t >( ( 1000.0 / _context.profile.fps ) * 10 ) );
 
             init();
         }
