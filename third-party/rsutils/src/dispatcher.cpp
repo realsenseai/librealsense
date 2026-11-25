@@ -30,7 +30,9 @@ dispatcher::dispatcher( unsigned int cap, std::string name, std::function< void(
                     {
                         // While we're dispatching the item, we cannot stop!
                         std::lock_guard< std::mutex > lock(_dispatch_mutex);
-                        item(time);
+                        // stop() may have run between dequeue and lock; it returned, so the owner may be gone
+                        if( ! _stopping && ! _was_stopped )
+                            item(time);
                     }
                     catch (const std::exception& e)
                     {
