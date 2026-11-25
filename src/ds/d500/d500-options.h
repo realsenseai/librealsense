@@ -186,10 +186,8 @@ namespace librealsense
         std::vector< std::function< void( bool ) > > _observers;
     };
 
-    // Which depth frames are delivered: active, both, or passive. The mode reconfigures the shared depth / dual-RGB
-    // pipeline, so it is set with the streams stopped. The firmware resets the AE policy to Hybrid on every mode change,
-    // and Full Passive runs on Color Priority - the policy is moved along with the mode, since the firmware keeps
-    // reporting Hybrid there.
+    // Which depth frames are delivered: active, both, or passive. Set with the streams stopped; entering Full Passive
+    // moves the AE policy to Color Priority, since the firmware does not.
     class passive_depth_mode_option : public uvc_xu_option< uint8_t >
     {
     public:
@@ -236,8 +234,7 @@ namespace librealsense
         std::weak_ptr< uvc_sensor > _raw_ep;
     };
 
-    // Auto-exposure policy of a dual-RGB depth sensor. Full Passive Depth runs on Color Priority, so Hybrid drops
-    // out of the reported range and is refused while that mode is active.
+    // Auto-exposure policy of a dual-RGB depth sensor; Hybrid is refused in Full Passive Depth.
     class colored_ir_ae_policy_option : public uvc_xu_option< uint8_t >
     {
     public:
