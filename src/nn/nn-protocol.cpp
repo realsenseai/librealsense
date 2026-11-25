@@ -178,6 +178,9 @@ const char * custom_nn_status_message( uint8_t status, uint32_t generation )
         return generation ? "The Custom NN model didn't load. Upload it again."
                           : "A new Custom NN model is installed; reset the camera to use it.";
     case custom_nn_status::dsp_error: return "Inference failed on this frame.";
+    case custom_nn_status::dsp_fault:
+        return "The Custom NN model stopped the camera's DSP. Stop all streams and start again, or reset the camera. "
+               "Object Detection and other perception streams won't work until then.";
     case custom_nn_status::no_metadata: return "The camera has no Custom NN model description.";
     case custom_nn_status::too_large: return "The Custom NN output didn't fit the frame.";
     case custom_nn_status::tensor_invalid: return "The Custom NN output was invalid.";

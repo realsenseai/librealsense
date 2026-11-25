@@ -10,6 +10,7 @@
 #include <src/backend.h>
 #include <src/metadata-parser.h>
 #include <src/proc/processing-blocks-factory.h>
+#include <src/core/notification.h>
 #include "stream.h"
 #include "platform/platform-utils.h"
 #include <src/platform/uvc-option.h>
@@ -49,16 +50,26 @@ namespace librealsense
     class custom_nn_validator : public processing_block
     {
     public:
-        custom_nn_validator( std::weak_ptr< time_diff_keeper > tf_keeper, std::shared_ptr< global_time_option > global_time )
+        custom_nn_validator( std::weak_ptr< time_diff_keeper > tf_keeper,
+                             std::shared_ptr< global_time_option > global_time,
+                             std::weak_ptr< notifications_processor > notifications )
             : processing_block( "Custom NN validator" )
         {
-            auto on_frame = [this, tf_keeper, global_time]( rs2::frame f, const rs2::frame_source & source )
+            auto on_frame = [this, tf_keeper, global_time, notifications]( rs2::frame f, const rs2::frame_source & source )
             {
                 auto nn = dynamic_cast< custom_nn_frame * >( (frame_interface *)f.get() );
                 if( ! nn || ! nn->is_valid() )
                     return;  // logged by the parser
                 if( nn->get_status() == uint8_t( nn::custom_nn_status::load_failed ) && ! _load_failed_logged.exchange( true ) )
                     LOG_ERROR( nn->get_status_message() );
+                // Every frame after a DSP crash says so; report it once, the application decides to stop
+                if( nn->get_status() == uint8_t( nn::custom_nn_status::dsp_fault ) && ! _dsp_fault_reported.exchange( true ) )
+                {
+                    LOG_ERROR( nn->get_status_message() );
+                    if( auto n = notifications.lock() )
+                        n->raise_notification( { RS2_NOTIFICATION_CATEGORY_HARDWARE_ERROR, 0, RS2_LOG_SEVERITY_ERROR,
+                                                 nn->get_status_message() } );
+                }
 
                 // The UVC sensor stamped the frame before its payload was read
                 rs2_metadata_type hw_us = 0;
@@ -85,6 +96,7 @@ namespace librealsense
 
     private:
         std::atomic_bool _load_failed_logged{ false };
+        std::atomic_bool _dsp_fault_reported{ false };
     };
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
@@ -207,8 +219,9 @@ namespace librealsense
         od_ep->register_processing_block( od_pbf );
         processing_block_factory custom_nn_pbf = { { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
                                                    { { RS2_FORMAT_Y8, RS2_STREAM_CUSTOM_NN } },
-                                                   [keeper = std::weak_ptr< time_diff_keeper >( _tf_keeper ), global_time]()
-                                                   { return std::make_shared< custom_nn_validator >( keeper, global_time ); } };
+                                                   [keeper = std::weak_ptr< time_diff_keeper >( _tf_keeper ), global_time,
+                                                    notifications = std::weak_ptr< notifications_processor >( od_ep->get_notifications_processor() )]()
+                                                   { return std::make_shared< custom_nn_validator >( keeper, global_time, notifications ); } };
         od_ep->register_processing_block( custom_nn_pbf );
     }
 

@@ -109,6 +109,7 @@ enum class custom_nn_status : uint8_t
     tensor_invalid,
     load_failed,
     dsp_error,
+    dsp_fault,  // on every frame after the model crashed the DSP
 };
 
 #pragma pack( push, 1 )

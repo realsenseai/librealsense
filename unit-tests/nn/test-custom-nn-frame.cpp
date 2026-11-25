@@ -208,6 +208,10 @@ TEST_CASE( "custom nn error frames" )
     CHECK_THAT( nn::custom_nn_status_message( 4, 0 ), ContainsSubstring( "reset the camera" ) );
     CHECK_THAT( nn::custom_nn_status_message( 4, 0x56ECB061 ), ContainsSubstring( "Upload it again" ) );
     CHECK_THAT( nn::custom_nn_status_message( 5, 1 ), ContainsSubstring( "Inference failed" ) );
+    CHECK_THAT( nn::custom_nn_status_message( 6, 1 ), ContainsSubstring( "stopped the camera's DSP" ) );
+    auto dsp_fault = parse( make_frame( {}, 6 ) );
+    CHECK( dsp_fault.payload.status == 6 );
+    CHECK( dsp_fault.tensors.empty() );
     CHECK( std::string( nn::custom_nn_status_message( 0, 1 ) ).empty() );
     CHECK_THAT( nn::custom_nn_status_message( 1, 1 ), ContainsSubstring( "no Custom NN model description" ) );
     CHECK_THAT( nn::custom_nn_status_message( 2, 1 ), ContainsSubstring( "didn't fit" ) );
