@@ -151,6 +151,7 @@ extern "C" {
         RS2_OPTION_ACCEL_SENSITIVITY, /**< Control of the accel sensitivity (dynamic range) level, see rs2_accel_sensitivity for values. Selects the saturation point only, the reported unit scale is unchanged */
         RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION, /**< OccupancyGrid_Segmentation: Off (0) = depth-only labeling, On (1) = OG uses the segmentation mode and classes (pre-stream only) */
         RS2_OPTION_LPCL_SEGMENTATION, /**< LPCL_Segmentation: Off (0) = depth-only labeling, On (1) = Labeled PCL uses the segmentation mode and classes (pre-stream only) */
+        RS2_OPTION_PCL_OCCLUSION_REMOVAL, /**< Device XYZRGB: clear color on points hidden from the RGB camera, pre-stream only. */
         RS2_OPTION_COUNT /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_option;
 

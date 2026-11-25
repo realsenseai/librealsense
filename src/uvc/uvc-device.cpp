@@ -466,7 +466,13 @@ namespace librealsense
             if(sts != RS2_USB_STATUS_SUCCESS)
                 throw std::runtime_error("Failed to start streaming!");
 
-            uvc_streamer_context usc = { profile, callback, ctrl, _usb_device, _messenger, _usb_request_count };
+            bool variable_payload = false;
+            for( const auto & format : _parser->get_formats().at( interface_number ) )
+                if( format.bFormatIndex == ctrl->bFormatIndex )
+                    variable_payload = format.bDescriptorSubtype == UVC_VS_FORMAT_FRAME_BASED
+                                       && format.bVariableSize != 0;
+            uvc_streamer_context usc = { profile, callback, ctrl, _usb_device, _messenger,
+                                         _usb_request_count, variable_payload };
 
             auto streamer = std::make_shared<uvc_streamer>(usc);
             _streamers.push_back(streamer);

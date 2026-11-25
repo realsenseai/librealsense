@@ -105,6 +105,7 @@ typedef enum rs2_format
     RS2_FORMAT_COMBINED_MOTION , /**< Combined motion data, as in the combined_motion structure */
     RS2_FORMAT_NV12            , /**< Semi-planar YUV 4:2:0: full-resolution Y plane followed by interleaved half-resolution U,V plane. 12 bits per pixel. */
     RS2_FORMAT_H264            , /**< H.264 compressed video bitstream; each frame is an access unit of variable length. */
+    RS2_FORMAT_XYZRGB32F       , /**< Device point cloud: float32 x,y,z in meters followed by uint8 b,g,r,a, 16 bytes per point. */
     RS2_FORMAT_COUNT             /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
 } rs2_format;
 const char* rs2_format_to_string(rs2_format format);

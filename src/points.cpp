@@ -17,6 +17,8 @@ namespace librealsense {
 
 float3 * points::get_vertices()
 {
+    if( get_stream()->get_format() == RS2_FORMAT_XYZRGB32F )
+        throw not_implemented_exception( "XYZRGB vertices have a 16-byte stride. Read interleaved XYZ/BGRA from frame data." );
     // Not `data`: it is empty when the pixels live in an external (zero-copy) buffer
     return (float3 *)get_frame_data();
 }
@@ -160,7 +162,8 @@ size_t points::get_vertex_count() const
 {
     if( is_device_cloud() )
     {
-        size_t count = get_frame_data_size() / sizeof( float3 );
+        const size_t stride = get_stream()->get_format() == RS2_FORMAT_XYZRGB32F ? 16 : sizeof( float3 );
+        size_t count = get_frame_data_size() / stride;
         auto vsp = dynamic_cast< video_stream_profile_interface * >( get_stream().get() );
         if( vsp )
             count = std::min( count, size_t( vsp->get_width() ) * vsp->get_height() );

@@ -65,6 +65,11 @@ inline bool pcl_has( uint32_t flags, md_point_cloud_attributes a )
     return ( flags & static_cast< uint32_t >( a ) ) != 0;
 }
 
+inline bool pcl_has( uint32_t flags, md_occupancy_attributes attribute )
+{
+    return ( flags & static_cast< uint32_t >( attribute ) ) != 0;
+}
+
 // FW restarts the Mapping stream on its own when the pipeline is rebuilt (for example, host Depth
 // opening at another profile): the generation changes and the source counters restart while the
 // host session goes on. Follow the new generation instead of rejecting the rest of the session.
@@ -128,6 +133,45 @@ inline pcl_frame_check check_pcl_frame( const uint8_t * payload,
     if( pcl_has( m.flags, md_point_cloud_attributes::stream_generation_attribute ) )
         track_pcl_generation( m.stream_generation, session );
 
+    return pcl_frame_check::ok;
+}
+
+inline pcl_frame_check check_occupancy_frame( const uint8_t * payload,
+                                            size_t payload_size,
+                                            const uint8_t * metadata,
+                                            size_t metadata_size,
+                                            const pcl_expected & expected,
+                                            pcl_session & session )
+{
+    if( payload_size != size_t( expected.width ) * expected.height )
+        return pcl_frame_check::size_mismatch;
+    if( !metadata || metadata_size == 0 )
+        return pcl_frame_check::ok;
+    if( metadata_size < sizeof( md_occupancy ) )
+        return pcl_frame_check::abi_mismatch;
+    md_occupancy attributes;
+    std::memcpy( &attributes, metadata, sizeof( attributes ) );
+    if( attributes.header.md_type_id != md_type::META_DATA_INTEL_OCCUPANCY_ID
+        || attributes.header.md_size < sizeof( attributes ) )
+        return pcl_frame_check::abi_mismatch;
+    if( ( attributes.version >> 16 ) != pcl_metadata_layout )
+    {
+        session.unknown_metadata_layout = true;
+        return pcl_frame_check::ok;
+    }
+    if( pcl_has( attributes.flags, md_occupancy_attributes::payload_crc32_attribute )
+        && rsutils::number::calc_crc32( payload, payload_size ) != attributes.payload_crc32 )
+        return pcl_frame_check::crc_mismatch;
+    if( pcl_has( attributes.flags, md_occupancy_attributes::profile_id_attribute )
+        && attributes.profile_id != expected.profile_id )
+        return pcl_frame_check::profile_mismatch;
+    if( ( pcl_has( attributes.flags, md_occupancy_attributes::grid_rows_attribute )
+          && attributes.grid_rows != expected.height )
+        || ( pcl_has( attributes.flags, md_occupancy_attributes::grid_columns_attribute )
+             && attributes.grid_columns != expected.width ) )
+        return pcl_frame_check::abi_mismatch;
+    if( pcl_has( attributes.flags, md_occupancy_attributes::stream_generation_attribute ) )
+        track_pcl_generation( attributes.stream_generation, session );
     return pcl_frame_check::ok;
 }
 

@@ -24,18 +24,28 @@ namespace librealsense
             _read_endpoint = inf->first_endpoint(platform::RS2_USB_ENDPOINT_DIRECTION_READ);
 
             _read_buff_length = UVC_PAYLOAD_MAX_HEADER_LENGTH + _context.control->dwMaxVideoFrameSize;
+            _split_transfers = _context.variable_payload && _read_buff_length > 8U * 1024U * 1024U;
+            // Queue bounded transfers continuously while assembling the one-payload
+            // Mapping frame in userspace. Two full HD XYZRGB requests exceed the
+            // default Linux usbfs budget before another sensor can start.
+            _transfer_buffer_size = _split_transfers ? 4U * 1024U * 1024U : _read_buff_length;
             // Compressed streams have a variable payload length. Perception stream does too.
             // Scope the exception to perception interface so regular Y8 images retain strict frame-size validation.
             // Streaming MI is control MI + 1 (control MI 9, confirmed with the HKR firmware team).
             constexpr uint8_t perception_streaming_mi = 10;
             _allow_variable_length_payload
                 = val_in_range( _context.profile.format, { 0x4d4a5047U, 0x48323634U, 0x5a313648U } )  // MJPEG, H264, Z16H
+               || _context.variable_payload
                || context.control->bInterfaceNumber == perception_streaming_mi;
             LOG_INFO("endpoint " << (int)_read_endpoint->get_address() << " read buffer size: " << std::dec <<_read_buff_length);
 
             _action_dispatcher.start();
 
-            _watchdog_timeout = static_cast<int64_t>(((1000.0 / _context.profile.fps) * 10));
+            // Another interface can rebuild a producer shared with this stream.
+            // Keep peer captures alive through that pause: an endpoint reset can
+            // be interpreted by the device as withdrawing the host request.
+            _watchdog_timeout = std::max< int64_t >(
+                1000, static_cast< int64_t >( ( 1000.0 / _context.profile.fps ) * 10 ) );
 
             init();
         }
@@ -125,7 +135,13 @@ namespace librealsense
                       return;
 
                     auto al = r->get_actual_length();
-                    if( al > 0L
+                    const bool header_valid = al >= 2 && r->get_buffer()[0] >= 2
+                                              && r->get_buffer()[0] <= al;
+                    const bool payload_fits = header_valid
+                        && size_t( al - r->get_buffer()[0] ) <= _context.control->dwMaxVideoFrameSize;
+                    if( _split_transfers )
+                        consume_transfer( r->get_buffer().data(), al );
+                    else if( payload_fits
                         && ( al == r->get_buffer().data()[0] + _context.control->dwMaxVideoFrameSize
                              || _allow_variable_length_payload ) )
                     {
@@ -149,8 +165,43 @@ namespace librealsense
             for(auto&& r : _requests)
             {
                 r = _context.messenger->create_request(_read_endpoint);
-                r->set_buffer(std::vector<uint8_t>(_read_buff_length));
+                r->set_buffer(std::vector<uint8_t>(_transfer_buffer_size));
                 r->set_callback(_request_callback);
+            }
+        }
+
+        void uvc_streamer::consume_transfer( const uint8_t * data, size_t size )
+        {
+            const bool complete = size < _transfer_buffer_size;
+            if( !_partial_frame && !_discard_payload && size != 0 )
+            {
+                _partial_frame = backend_frame_ptr( _frames_archive->allocate(), &cleanup_frame );
+                _discard_payload = !_partial_frame;
+            }
+            if( _partial_frame )
+            {
+                if( size > _partial_frame->pixels.size() - _partial_size )
+                {
+                    LOG_WARNING( "UVC payload exceeds the negotiated frame capacity" );
+                    _partial_frame.reset();
+                    _discard_payload = true;
+                }
+                else
+                {
+                    memcpy( _partial_frame->pixels.data() + _partial_size, data, size );
+                    _partial_size += size;
+                }
+            }
+            if( complete )
+            {
+                if( _partial_frame && _partial_size != 0 )
+                {
+                    _frame_arrived = true;
+                    _watchdog->kick();
+                    uvc_process_bulk_payload( std::move( _partial_frame ), _partial_size, _queue );
+                }
+                _partial_size = 0;
+                _discard_payload = false;
             }
         }
 
@@ -168,11 +219,30 @@ namespace librealsense
                     _running = true;
                 }
 
-                for(auto&& r : _requests)
+                for( size_t index = 0; index < _requests.size(); ++index )
                 {
+                    auto const & r = _requests[index];
                     auto sts = _context.messenger->submit_request(r);
+                    if( sts == platform::RS2_USB_STATUS_NO_MEM && index != 0 )
+                    {
+                        LOG_WARNING( "USB transfer memory exhausted; streaming endpoint "
+                                     << int( _read_endpoint->get_address() ) << " with " << index
+                                     << " outstanding request(s)" );
+                        _requests.resize( index );
+                        break;
+                    }
                     if(sts != platform::RS2_USB_STATUS_SUCCESS)
+                    {
+                        {
+                            std::lock_guard< std::mutex > lock( _running_mutex );
+                            _running = false;
+                        }
+                        _request_callback->cancel();
+                        for( size_t submitted = 0; submitted < index; ++submitted )
+                            _context.messenger->cancel_request( _requests[submitted] );
+                        _stopped_cv.notify_all();
                         throw std::runtime_error("failed to submit UVC request while start streaming");
+                    }
                 }
 
                 _publish_frame_thread->start();
@@ -194,6 +264,9 @@ namespace librealsense
                 _frames_archive->stop_allocation();
 
                 _queue.clear();
+                _partial_frame.reset();
+                _partial_size = 0;
+                _discard_payload = false;
 
                 for(auto&& r : _requests)
                   _context.messenger->cancel_request(r);

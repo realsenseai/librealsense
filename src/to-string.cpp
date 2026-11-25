@@ -658,6 +658,7 @@ std::string const & get_string_( rs2_option value )
         CASE( ACCEL_SENSITIVITY )
         CASE( OCCUPANCY_GRID_SEGMENTATION )
         arr[RS2_OPTION_LPCL_SEGMENTATION] = "LPCL Segmentation";
+        arr[RS2_OPTION_PCL_OCCLUSION_REMOVAL] = "PCL Occlusion Removal";
 #undef CASE
         return arr;
     }();
@@ -766,6 +767,7 @@ const char * get_string( rs2_format value )
     CASE( DISPARITY16 )
     CASE( DISPARITY32 )
     CASE( XYZ32F )
+    CASE( XYZRGB32F )
     CASE( YUYV )
     CASE( RGB8 )
     CASE( BGR8 )
