@@ -146,7 +146,6 @@ def recording( test_device, tmp_path_factory, request ):
 
 @pytest.mark.device_exclude( "D401" )  # failure not yet checked
 @pytest.mark.device_exclude( "D555" )  # unstable
-@pytest.mark.device_type_exclude( "GMSL" )  # recording slows depth delivery on Jetson
 def test_fps_while_recording( recording ):
     for _, p in recording['picks']:
         fps = recording['frames'].fps( p.stream_name() )
