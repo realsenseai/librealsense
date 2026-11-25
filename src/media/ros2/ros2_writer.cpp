@@ -292,14 +292,15 @@ namespace librealsense
                                               const nanoseconds & timestamp,
                                               frame_holder && frame )
     {
-        // std::function needs a copyable job; the frame is released by the job itself once encoded
+        // std::function needs a copyable job, so the frame travels in a shared holder and the job takes it out
         auto holder = std::make_shared< frame_holder >();
         *holder = std::move( frame );
-        auto encoded = _encoders->submit( [stream_id, timestamp, holder]() mutable
+        auto encoded = _encoders->submit( [stream_id, timestamp, holder]()
         {
-            auto result = encode_compressed_frame( stream_id, timestamp, holder->frame );
-            result.extras = make_frame_extras( holder->frame );
-            holder.reset();
+            frame_holder encoded_frame_holder;  // released on every path, including a throw
+            encoded_frame_holder = std::move( *holder );
+            auto result = encode_compressed_frame( stream_id, timestamp, encoded_frame_holder.frame );
+            result.extras = make_frame_extras( encoded_frame_holder.frame );
             return result;
         } );
         _pending.push_back( { stream_id, timestamp, std::move( encoded ) } );
@@ -316,7 +317,16 @@ namespace librealsense
 
             pending_frame done = std::move( _pending.front() );
             _pending.pop_front();
-            auto encoded = done.encoded.get();
+            encoded_frame encoded;
+            try
+            {
+                encoded = done.encoded.get();
+            }
+            catch( const std::exception & e )
+            {
+                LOG_ERROR( "Failed to encode a " << done.stream_id.stream_type << " frame, dropping it. " << e.what() );
+                continue;
+            }
             write_message( encoded.topic, "sensor_msgs/msg/CompressedImage", done.timestamp, encoded.msg );
             write_additional_frame_messages( done.stream_id, done.timestamp, encoded.extras );
         }
@@ -750,7 +760,7 @@ namespace librealsense
         }
         catch (std::exception const& e)
         {
-            LOG_WARNING("Failed to build frame metadata for " << frame->get_stream()->get_stream_type() << ". Exception: " << e.what());
+            LOG_WARNING("Failed to get frame metadata. Exception: " << e.what());
         }
         extras.stream = frame->get_stream();
         extras.sensor = frame->get_sensor();
