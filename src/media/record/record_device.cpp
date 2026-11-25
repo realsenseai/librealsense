@@ -51,6 +51,7 @@ std::vector<std::shared_ptr<librealsense::record_sensor>> librealsense::record_d
         };
         recording_sensor->on_frame( [this, sensor_index, on_error]( frame_holder f )
                                     { write_data( sensor_index, std::move( f ), on_error ); } );
+        recording_sensor->on_stop( [this]() { flush_writer(); } );
         recording_sensor->on_extension_change(
             [this, sensor_index, on_error]( rs2_extension ext,
                                                               std::shared_ptr< extension_snapshot > snapshot )
@@ -392,8 +393,24 @@ void librealsense::record_device::pause_recording()
         m_is_recording = false;
         LOG_DEBUG("Time of pause: " << std::dec << m_time_of_pause.time_since_epoch().count());
     });
-    (*m_write_thread)->flush();
+    flush_writer();
     LOG_INFO("Record paused");
+}
+
+void librealsense::record_device::flush_writer()
+{
+    (*m_write_thread)->invoke( [this]( dispatcher::cancellable_timer )
+    {
+        try
+        {
+            m_ros_writer->flush();
+        }
+        catch( const std::exception & e )
+        {
+            LOG_ERROR( "Failed to write the recorded frames. " << e.what() );
+        }
+    } );
+    (*m_write_thread)->flush();
 }
 void librealsense::record_device::resume_recording()
 {

@@ -51,20 +51,19 @@ namespace librealsense
     public:
         explicit encode_pool( size_t threads )
         {
-            for( size_t i = 0; i < threads; ++i )
-                _threads.emplace_back( [this]() { run(); } );
+            try
+            {
+                for( size_t i = 0; i < threads; ++i )
+                    _threads.emplace_back( [this]() { run(); } );
+            }
+            catch( ... )
+            {
+                stop();  // a constructor that throws does not run the destructor
+                throw;
+            }
         }
 
-        ~encode_pool()
-        {
-            {
-                std::lock_guard< std::mutex > lock( _mutex );
-                _stop = true;
-            }
-            _wake.notify_all();
-            for( auto & t : _threads )
-                t.join();
-        }
+        ~encode_pool() { stop(); }
 
         std::future< encoded_frame > submit( std::function< encoded_frame() > job )
         {
@@ -79,6 +78,17 @@ namespace librealsense
         }
 
     private:
+        void stop()
+        {
+            {
+                std::lock_guard< std::mutex > lock( _mutex );
+                _stop = true;
+            }
+            _wake.notify_all();
+            for( auto & t : _threads )
+                t.join();
+        }
+
         void run()
         {
             for( ;; )
@@ -135,21 +145,34 @@ namespace librealsense
 
         _compress = compress_while_record;
         if( _compress )
-            _encoders = std::make_unique< encode_pool >( encoder_thread_count() );
+        {
+            auto const threads = encoder_thread_count();
+            _encoders = std::make_unique< encode_pool >( threads );
+            _max_pending = 2 * threads;
+        }
 
         write_file_version();
     }
 
     ros2_writer::~ros2_writer()
     {
-        try
+        // A failing frame is dropped from the queue before it throws, so this ends
+        while( ! _pending.empty() )
         {
-            commit_encoded_frames( 0 );
+            try
+            {
+                commit_encoded_frames( 0 );
+            }
+            catch( const std::exception & e )
+            {
+                LOG_ERROR( "Failed to write queued frames. " << e.what() );
+            }
         }
-        catch( const std::exception & e )
-        {
-            LOG_ERROR( "Failed to write queued frames. " << e.what() );
-        }
+    }
+
+    void ros2_writer::flush()
+    {
+        commit_encoded_frames( 0 );
     }
 
     void ros2_writer::ensure_topic(const std::string& name, const std::string& type, const std::string& offered_qos)
@@ -274,10 +297,19 @@ namespace librealsense
                                               const nanoseconds & timestamp,
                                               frame_holder && frame )
     {
-        auto * raw = frame.frame;
-        auto encoded = _encoders->submit( [stream_id, timestamp, raw]() { return encode_compressed_frame( stream_id, timestamp, raw ); } );
-        _pending.push_back( { stream_id, timestamp, std::move( frame ), std::move( encoded ) } );
-        commit_encoded_frames( 2 * encoder_thread_count() );
+        // Queue first: the job reads the frame, which must stay owned until the job is known to be running
+        _pending.push_back( { stream_id, timestamp, std::move( frame ), {} } );
+        try
+        {
+            auto * raw = _pending.back().frame.frame;
+            _pending.back().encoded = _encoders->submit( [stream_id, timestamp, raw]() { return encode_compressed_frame( stream_id, timestamp, raw ); } );
+        }
+        catch( ... )
+        {
+            _pending.pop_back();
+            throw;
+        }
+        commit_encoded_frames( _max_pending );
     }
 
     void ros2_writer::commit_encoded_frames( size_t max_pending )

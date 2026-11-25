@@ -162,6 +162,8 @@ void librealsense::record_sensor::start( rs2_frame_callback_sptr callback )
 void librealsense::record_sensor::stop()
 {
     m_sensor.stop();
+    if( m_is_recording && _on_stop )
+        _on_stop();  // frames the writer still holds must be released before the sensor closes
 }
 bool librealsense::record_sensor::is_streaming() const
 {

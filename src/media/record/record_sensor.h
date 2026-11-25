@@ -32,6 +32,7 @@ namespace librealsense
         }
         void on_frame( std::function< void( frame_holder ) > && callback )
             { _on_frame = std::move( callback ); }
+        void on_stop( std::function< void() > && callback ) { _on_stop = std::move( callback ); }
         void on_extension_change( std::function< void( rs2_extension, std::shared_ptr< extension_snapshot > ) > && callback )
         {
             std::lock_guard< std::mutex > lock( m_callback_lifetime->mutex );
@@ -75,6 +76,7 @@ namespace librealsense
     private /*methods*/:
         std::function< void( const notification & ) > _on_notification;
         std::function< void( frame_holder ) > _on_frame;
+        std::function< void() > _on_stop;
         std::function< void( rs2_extension, std::shared_ptr< extension_snapshot > ) > _on_extension_change;
 
         void record_frame(frame_holder holder);

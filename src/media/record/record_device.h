@@ -39,6 +39,7 @@ namespace librealsense
         virtual std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;
 
         void pause_recording();
+        void flush_writer();
         void resume_recording();
         const std::string& get_filename() const;
         std::shared_ptr< const device_info > get_device_info() const override;

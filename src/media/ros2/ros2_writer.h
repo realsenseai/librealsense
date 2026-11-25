@@ -28,6 +28,7 @@ namespace librealsense
     public:
         explicit ros2_writer( const std::string& file, bool compress_while_record);
         ~ros2_writer() override;
+        void flush() override;
         void write_device_description(const librealsense::device_snapshot& device_description) override;
         void write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame) override;
         void write_snapshot(uint32_t device_index, const nanoseconds& timestamp, rs2_extension type, const std::shared_ptr<extension_snapshot>& snapshot) override;
@@ -127,8 +128,9 @@ namespace librealsense
         // Reused across calls. Safe only while _storage->write() stays synchronous
         // (sqlite binds SQLITE_STATIC and drops the ref in execute_and_reset).
         std::shared_ptr<rcutils_uint8_array_t> _cdr_buf;
-        std::unique_ptr< encode_pool > _encoders;
         std::deque< pending_frame > _pending;
+        std::unique_ptr< encode_pool > _encoders;  // after _pending: joined first, so no job outlives its frame
+        size_t _max_pending = 0;
         std::map< std::string, rosbag2_storage::TopicMetadata > _topics; // created topics cache
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::map<uint32_t, std::set<rs2_option>> m_written_options_descriptions;
