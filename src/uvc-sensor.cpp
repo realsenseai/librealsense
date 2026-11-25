@@ -19,6 +19,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <limits>
 #include <map>
 #include <thread>
 
@@ -69,7 +70,8 @@ struct pin_stream
     std::shared_ptr< stream_profile_interface > profile;
     std::shared_ptr< stream_profile_base > base;
     unsigned long long last_frame_number = 0;
-    rs2_time_t last_timestamp = 0;
+    // ACTUAL_FPS needs two observations. A device clock can legitimately start at zero.
+    rs2_time_t last_timestamp = std::numeric_limits< rs2_time_t >::quiet_NaN();
     unsigned long long color_fn = 0;  // see update_per_stream_color_fn()
 };
 
