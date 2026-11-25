@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MutableRefObject, ReactElement } from 'react'
 import { useAppStore } from '../store'
+import { apiClient } from '../api/client'
 import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState } from '../api/types'
 import { SECTIONS, firmwareStatus, isStreaming, optionLabel } from '../api/types'
 import {
@@ -22,18 +23,13 @@ interface Toast {
 
 // Toast once per disabled-device set; re-arm when the set becomes empty.
 function showMetadataEnablePromptIfNeeded(
-  devices: DeviceInfo[],
+  disabledIds: string,
   promptedSetRef: MutableRefObject<string>,
   enableInFlightRef: MutableRefObject<boolean>,
   addToast: (type: ToastType, message: string, action?: ToastAction) => void,
   removeToast: (id: string) => void,
-  enableMetadata: () => Promise<{ status: string; note?: string }>,
+  enableMetadata: () => Promise<void>,
 ): void {
-  const disabledIds = devices
-    .filter(d => d.device_id && d.metadata_enabled === false)
-    .map(d => d.device_id)
-    .sort()
-    .join(' ')
   if (!disabledIds) { promptedSetRef.current = ''; return }
   if (disabledIds === promptedSetRef.current) return
   promptedSetRef.current = disabledIds
@@ -47,10 +43,9 @@ function showMetadataEnablePromptIfNeeded(
         if (enableInFlightRef.current) return
         enableInFlightRef.current = true
         try {
-          const result = await enableMetadata()
+          await enableMetadata()
           removeToast(toastId)
-          const variant = result.status === 'ok' ? 'success' : 'info'
-          addToast(variant, result.note ?? 'Done.')
+          addToast('success', 'Metadata enabled.')
         } catch (err: any) {
           removeToast(toastId)
           addToast('error', `Failed to enable metadata: ${err?.response?.data?.detail ?? err?.message ?? 'unknown error'}`)
@@ -76,14 +71,14 @@ function showFirmwareUpdatePromptsIfNeeded(
   const live = new Set<string>()
   for (const ds of Object.values(deviceStates)) {
     const fw = ds.firmware
-    if (firmwareStatus(ds.device.firmware_version, fw?.recommended) !== 'outdated') continue
+    if (firmwareStatus(ds.device.info.firmware_version, fw?.recommended) !== 'outdated') continue
     const key = `${ds.device.device_id}:${fw?.recommended ?? ''}`
     live.add(key)
     if (promptedRef.current.has(key)) continue
     promptedRef.current.add(key)
     addToast(
       'info',
-      `${ds.device.name} (S/N ${ds.device.serial_number}): firmware ${ds.device.firmware_version ?? '?'} → ${fw?.recommended ?? '?'} is available.`,
+      `${ds.device.info.name} (S/N ${ds.device.info.serial_number ?? 'Unknown'}): firmware ${ds.device.info.firmware_version ?? '?'} → ${fw?.recommended ?? '?'} is available.`,
       {
         label: 'Update',
         onClick: (toastId) => {
@@ -181,7 +176,7 @@ startSensorStreaming,
     // Backend has already refreshed the device list (in _refresh_until_device_returns)
     // by the time it emits firmware_update_success; pull the new device_infos so
     // the UI shows the updated firmware_version without a manual Refresh click.
-    fetchDevices(true)
+    fetchDevices()
   }
 
   const handleFirmwareError = (error: string) => {
@@ -193,7 +188,7 @@ startSensorStreaming,
     addToast('error', `Firmware update failed: ${error}`)
     // Device may or may not have returned; refresh so the UI reflects the
     // current connection state (e.g. stuck-in-DFU disappears from the list).
-    fetchDevices(true)
+    fetchDevices()
   }
 
   const handleCloseFirmwareModal = () => {
@@ -228,7 +223,16 @@ startSensorStreaming,
   const promptedSetRef = useRef<string>('')
   const enableInFlightRef = useRef<boolean>(false)
   useEffect(() => {
-    showMetadataEnablePromptIfNeeded(devices, promptedSetRef, enableInFlightRef, addToast, removeToast, enableMetadata)
+    // Asked again on each new device list: enabling metadata refreshes it. One gone meanwhile counts as enabled;
+    // answers for a list already replaced are dropped.
+    let stale = false
+    Promise.all(devices.map((d) => apiClient.getMetadataEnabled(d.device_id).catch(() => true)))
+      .then((enabled) => {
+        if (stale) return
+        const disabledIds = devices.filter((_, i) => !enabled[i]).map((d) => d.device_id).sort().join(' ')
+        showMetadataEnablePromptIfNeeded(disabledIds, promptedSetRef, enableInFlightRef, addToast, removeToast, enableMetadata)
+      })
+    return () => { stale = true }
   }, [devices])
 
   // Explicit "Check for Firmware Updates": an outdated result raises the proposal toast
@@ -242,7 +246,7 @@ startSensorStreaming,
       return
     }
     const device = deviceStates[deviceId]?.device ?? devices.find((d) => d.device_id === deviceId)
-    const status = firmwareStatus(device?.firmware_version, recommended)
+    const status = firmwareStatus(device?.info.firmware_version, recommended)
     if (status === 'up_to_date') addToast('success', 'Firmware is up to date.')
     else if (status === 'unknown') addToast('info', 'No firmware recommendation available for this device.')
   }
@@ -254,19 +258,8 @@ startSensorStreaming,
 
   return (
     <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="panel-header mb-0">Devices</h2>
-        <button
-          onClick={() => fetchDevices(true)}
-          disabled={isLoadingDevices}
-          aria-label={isLoadingDevices ? 'Refreshing devices…' : 'Refresh devices'}
-          aria-busy={isLoadingDevices}
-          className="p-2 text-rs-muted hover:text-rs-text hover:bg-rs-inset rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={isLoadingDevices ? 'Refreshing…' : 'Refresh devices'}
-        >
-          <RefreshCcw className={`w-5 h-5 ${isLoadingDevices ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
+      {/* The list follows devices_changed: nothing to refresh by hand */}
+      <h2 className="panel-header mb-4">Devices</h2>
 
       {/* Error Display */}
       {error && (
@@ -420,8 +413,8 @@ const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
       <div className="p-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-rs-text truncate">{device.name}</h3>
-            <p className="text-sm text-rs-muted truncate nums">S/N: {device.serial_number}</p>
+            <h3 className="font-semibold text-rs-text truncate">{device.info.name}</h3>
+            <p className="text-sm text-rs-muted truncate nums">S/N: {device.info.serial_number ?? 'Unknown'}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
             {streaming && (
@@ -487,11 +480,11 @@ const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
                       </svg>
                       Check for Firmware Updates
                     </button>
-                    {deviceState?.advancedMode?.supported && (
+                    {deviceState?.device.info.advanced_mode && (
                       <button
                         onClick={() => {
                           setShowMenu(false)
-                          onToggleAdvancedMode(!deviceState.advancedMode?.enabled)
+                          onToggleAdvancedMode(deviceState.device.info.advanced_mode !== 'YES')
                         }}
                         // Toggling either way restarts the device, so the C++ viewer keeps this
                         // item disabled while streaming (device-model.cpp) - do the same here.
@@ -507,7 +500,7 @@ const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        {deviceState.advancedMode.enabled ? 'Disable Advanced Mode' : 'Enable Advanced Mode'}
+                        {deviceState.device.info.advanced_mode === 'YES' ? 'Disable Advanced Mode' : 'Enable Advanced Mode'}
                       </button>
                     )}
                     <button
@@ -568,25 +561,11 @@ const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
 
         {/* Device Details */}
         <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-rs-muted nums">
-          {device.firmware_version && (
-            <span>FW: {device.firmware_version}</span>
+          {device.info.firmware_version && (
+            <span>FW: {device.info.firmware_version}</span>
           )}
-          {device.usb_type && <span>USB: {device.usb_type}</span>}
+          {device.info.usb_type_descriptor && <span>USB: {device.info.usb_type_descriptor}</span>}
         </div>
-
-        {/* Sensors Tags */}
-        {device.sensors.length > 0 && !isActive && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {device.sensors.map((sensor) => (
-              <span
-                key={sensor}
-                className="px-2 py-0.5 bg-rs-border/50 border border-rs-border rounded text-xs text-rs-muted"
-              >
-                {sensor}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Device Controls - shown when active */}

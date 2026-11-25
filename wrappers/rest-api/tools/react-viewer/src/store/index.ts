@@ -136,8 +136,8 @@ interface AppState {
   devices: DeviceInfo[]
   deviceStates: Record<string, DeviceState> // keyed by device_id
   isLoadingDevices: boolean
-  fetchDevices: (forceRefresh?: boolean) => Promise<void>
-  enableMetadata: () => Promise<{ status: string; note?: string }>
+  fetchDevices: () => Promise<void>
+  enableMetadata: () => Promise<void>
   checkFirmwareUpdates: (deviceId: string) => Promise<string | undefined>
   updateFirmwareFromFile: (deviceId: string, file: File) => Promise<void>
   updateFirmwareFromRecommended: (deviceId: string) => Promise<void>
@@ -236,7 +236,7 @@ async function performFirmwareUpdate(
     await apiCall()
     // The backend only responds once the flashed device has re-enumerated
     // (_refresh_until_device_returns), so one forced fetch is enough to pick it up.
-    await get().fetchDevices(true)
+    await get().fetchDevices()
     setFirmwareState({ is_updating: false, progress: 1 })
   } catch (error) {
     const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -260,11 +260,11 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
   isLoadingDevices: false,
   
   // Unguarded on purpose: dropping a concurrent call loses the post-flash refresh.
-  fetchDevices: async (forceRefresh = false) => {
+  fetchDevices: async () => {
     set({ isLoadingDevices: true, error: null })
     const seq = ++_fetchSeq
     try {
-      const devices = await apiClient.getDevices(forceRefresh)
+      const devices = await apiClient.getDevices()
       // A newer enumeration already landed: this response is older than what we show.
       if (seq !== _fetchSeq) return
       const known = new Set(get().devices.map((d) => d.device_id))
@@ -300,9 +300,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     performFirmwareUpdate(set, get, deviceId, () => apiClient.updateFirmwareFromRecommended(deviceId)),
 
   enableMetadata: async () => {
-    const result = await apiClient.enableMetadata()
-    if (result.status === 'ok') await get().fetchDevices(true)
-    return result
+    await apiClient.enableMetadata()
+    await get().fetchDevices()
   },
 
   toggleAdvancedMode: async (deviceId: string, enable: boolean) => {
@@ -319,11 +318,11 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
   fetchDeviceControls: async (deviceId: string) => {
     const sensors = get().deviceStates[deviceId]?.sensors || []
     // The controls exist only while advanced mode is on - the device refuses to read them
-    // otherwise - so its state decides whether to ask at all.
-    const advancedMode = await apiClient.getAdvancedMode(deviceId).catch(() => undefined)
+    // otherwise - so its camera info decides whether to ask at all.
+    const advancedMode = get().deviceStates[deviceId]?.device.info.advanced_mode === 'YES'
     const [colorizer, advanced, options, filters] = await Promise.all([
       apiClient.getColorizerOptions(deviceId).catch(() => [] as OptionInfo[]),
-      advancedMode?.enabled
+      advancedMode
         ? apiClient.getAdvancedControls(deviceId).catch(() => ({} as AdvancedControls))
         : ({} as AdvancedControls),
       Promise.all(sensors.map((s) =>
@@ -342,8 +341,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }
     // Firmware blocks the AE setpoint on D457 and on the D500 family, so the group is not
     // worth drawing there; the legacy viewer leaves it out for the same reason.
-    const deviceName = get().deviceStates[deviceId]?.device.name ?? ''
-    const noAeSetpoint = deviceName.includes('D457') || deviceName.includes('D5')
+    const info = get().deviceStates[deviceId]?.device.info
+    const noAeSetpoint = info?.name.includes('D457') || info?.product_line === 'D500'
     for (const [name, options] of Object.entries(advanced)) {
       if (noAeSetpoint && name === 'ae_control') continue
       groups[`advanced_mode/controls/${name}`] =
@@ -361,7 +360,7 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
           { section: 'Post-Processing', sensorIndex: s.sensor_index, name, ...filter, default_enabled: legacyFilterDefault(name, color) }
       }
     })
-    set((state) => patchDevice(state, deviceId, () => ({ controls: groups, advancedMode })))
+    set((state) => patchDevice(state, deviceId, () => ({ controls: groups })))
   },
 
   refreshControlGroup: async (deviceId, key) => {
@@ -481,10 +480,6 @@ isLoading: true,
       await get().fetchSensors(device.device_id)
       // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
       get().checkFirmwareUpdates(device.device_id).catch(() => {})
-      // Calibration, so read once: the 3D view textures with it, whoever started the streams
-      apiClient.getExtrinsics(device.device_id)
-        .then((extrinsics) => set((state) => patchDevice(state, device.device_id, () => ({ extrinsics }))))
-        .catch(() => {})
       get().fetchDeviceControls(device.device_id).then(async () => {
         // The server starts every filter off; the viewer starts from the legacy viewer's. A filter
         // already on was chosen by a client (this one earlier, or another), so the server's are kept.
@@ -744,16 +739,11 @@ const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p 
     if (!settings) return
     
     try {
-      // Find the device
-      const deviceState = Object.values(state.deviceStates).find(
-        ds => ds.device.serial_number === settings.deviceSerial
-      )
-      
+      const deviceId = settings.deviceId
+      const deviceState = state.deviceStates[deviceId]
       if (!deviceState) {
-        throw new Error(`Device ${settings.deviceSerial} not found`)
+        throw new Error(`Device ${deviceId} not found`)
       }
-      
-      const deviceId = deviceState.device.device_id
       
       // Apply stream configurations to local state first
       // Apply stream configurations - match by stream_type (case-insensitive)

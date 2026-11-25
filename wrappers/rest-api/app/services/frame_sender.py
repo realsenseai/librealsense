@@ -12,21 +12,19 @@ The header holds what the SDK reports about the frame: number, timestamp, its do
 the frame's metadata, its profile (stream, format, fps, size), intrinsics, and depth units. A subscriber
 that falls behind gets only the newest frame; older ones are dropped, never queued.
 
-The socket closes when its stream ends, with the code below that says why.
+Only the client closes the socket: it gets the stream's frames whenever the stream runs, by any client, and
+nothing while it is stopped or the device is gone. The events socket tells it which.
 """
 
 import asyncio
 import json
 import struct
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
 
 import pyrealsense2 as rs
 from fastapi import WebSocket
 
-STOPPED = 4000  # the stream was stopped, by any client
-DISCONNECTED = 4001  # the device is gone
-NOT_STREAMING = 4002  # the stream was not running when the socket connected
-REASONS = {STOPPED: "stream stopped", DISCONNECTED: "device disconnected", NOT_STREAMING: "not streaming"}
+from app.services.events import serve
 
 _METADATA = list(rs.frame_metadata_value.__members__.items())
 
@@ -65,30 +63,27 @@ def encode_frame(frame: rs.frame, color_table: bytes = b"") -> bytes:
     return struct.pack("<I", len(head)) + head + bytes(frame.get_data()) + color_table
 
 
+def _key(device_id: str, frame: rs.frame) -> Tuple[str, rs.stream, int]:
+    profile = frame.get_profile()
+    return device_id, profile.stream_type(), profile.stream_index()
+
+
 class _Subscriber:
-    """One WebSocket. Holds at most one unsent frame: a newer frame replaces it, and a close ends it."""
+    """One WebSocket. Holds at most one unsent frame: a newer frame replaces it."""
 
     def __init__(self, websocket: WebSocket):
         self.websocket = websocket
         self._pending: Optional[bytes] = None
-        self._close_code: Optional[int] = None
         self._ready = asyncio.Event()
 
     def offer(self, message: bytes) -> None:  # on the event loop
         self._pending = message
         self._ready.set()
 
-    def close(self, code: int) -> None:  # on the event loop; only the first close is sent
-        self._close_code = self._close_code or code
-        self._ready.set()
-
     async def run(self) -> None:
         while True:
             await self._ready.wait()
             self._ready.clear()
-            if self._close_code:
-                await self.websocket.close(self._close_code, REASONS[self._close_code])
-                return
             await self.websocket.send_bytes(self._pending)
 
 
@@ -99,46 +94,29 @@ class FrameSender:
         self._subscribers: Dict[Tuple[str, rs.stream, int], Set[_Subscriber]] = {}  # (device, stream, index)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
-    async def serve(self, websocket: WebSocket, device_id: str, stream_type: rs.stream, stream_index: int,
-                    streaming: Callable[[], bool]) -> None:
-        """Stream one device stream's frames to an accepted WebSocket until the client disconnects or the stream ends."""
+    async def serve(self, websocket: WebSocket, device_id: str, stream_type: rs.stream, stream_index: int) -> None:
+        """Stream one device stream's frames to an accepted WebSocket until the client disconnects."""
         self._loop = asyncio.get_running_loop()
         key = (device_id, stream_type, stream_index)
         subscriber = _Subscriber(websocket)
         self._subscribers.setdefault(key, set()).add(subscriber)
-        sending = asyncio.ensure_future(subscriber.run())
-        sending.add_done_callback(lambda t: t.cancelled() or t.exception())  # a send to a gone client is expected
         try:
-            if not streaming():  # asked once subscribed: a stop from then on closes the socket through close()
-                subscriber.close(NOT_STREAMING)
-            while (await websocket.receive())["type"] != "websocket.disconnect":
-                pass  # the client has nothing to say; a failed send also ends in a disconnect
+            await serve(websocket, subscriber.run())
         finally:
-            sending.cancel()
             self._subscribers[key].discard(subscriber)
             if not self._subscribers[key]:
                 del self._subscribers[key]
 
-    def send(self, device_id: str, frame: rs.frame, colorizer: Any = None) -> None:
+    def watched(self, device_id: str, frame: rs.frame) -> bool:
+        """Whether any socket shows the frame's stream"""
+        return bool(self._subscribers.get(_key(device_id, frame)))
+
+    def send(self, device_id: str, frame: rs.frame, colorizer: rs.colorizer) -> None:
         """Called from an SDK thread with a frame of the device; returns once its data is copied."""
-        profile = frame.get_profile()
-        key = (device_id, profile.stream_type(), profile.stream_index())
-        if self._subscribers.get(key):
-            z16 = hasattr(colorizer, "get_color_table") and profile.format() == rs.format.z16  # older SDKs lack it
-            table = colorizer.get_color_table(frame.as_depth_frame()) if z16 else b""
-            self._loop.call_soon_threadsafe(self._offer, key, encode_frame(frame, table))
+        z16 = frame.get_profile().format() == rs.format.z16
+        table = colorizer.get_color_table(frame.as_depth_frame()) if z16 else b""
+        self._loop.call_soon_threadsafe(self._offer, _key(device_id, frame), encode_frame(frame, table))
 
     def _offer(self, key: Tuple[str, rs.stream, int], message: bytes) -> None:
         for subscriber in self._subscribers.get(key, ()):
             subscriber.offer(message)
-
-    def close(self, device_id: str, code: int, streams: Optional[List[Tuple[rs.stream, int]]] = None) -> None:
-        """Close the sockets of the device's streams, given as (rs.stream, index), or all of them; from any thread."""
-        if self._loop:  # no socket was ever served otherwise
-            self._loop.call_soon_threadsafe(self._close, device_id, code, streams)
-
-    def _close(self, device_id: str, code: int, streams: Optional[List[Tuple[rs.stream, int]]]) -> None:
-        for (device, stream_type, stream_index), subscribers in self._subscribers.items():
-            if device == device_id and (streams is None or (stream_type, stream_index) in streams):
-                for subscriber in subscribers:
-                    subscriber.close(code)

@@ -48,8 +48,7 @@ export function connectEvents(): void {
   }
 }
 
-// A device returning after a FW flash must not be served from the cached list
-onEvent('devices_changed', () => useAppStore.getState().fetchDevices(true))
+onEvent('devices_changed', () => useAppStore.getState().fetchDevices())
 
 // A sensor's options changed, by any client's write or the camera itself: every page shows what the device now holds
 onEvent<{ device_id: string; group: string; options: Record<string, number | boolean | string | null> }>('options_changed',

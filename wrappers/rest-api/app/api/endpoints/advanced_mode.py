@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from typing import Dict
 
 from app.models.option import AdvancedControl, OptionUpdate
-from app.services import advanced_mode
 from app.api.dependencies import get_camera
 from app.services.camera import Camera
 
@@ -17,20 +16,13 @@ class AdvancedModeUpdate(BaseModel):
     enable: bool
 
 
-@router.get("/", response_model=Dict[str, bool])
-def get_advanced_mode(
-    camera: Camera = Depends(get_camera),
-):
-    """Return {supported, enabled} for RS400 advanced mode on a device."""
-    return advanced_mode.status(camera.dev)
-
-
 @router.post("/")
 def set_advanced_mode(
     body: AdvancedModeUpdate,
     camera: Camera = Depends(get_camera),
 ):
-    """Enable/disable advanced mode. This resets the device: devices_changed reports it leaving and coming back"""
+    """Enable/disable advanced mode. This resets the device: devices_changed reports it leaving and coming back.
+    Whether it is on is the device's camera info advanced_mode, YES or NO; a device without it lacks the key"""
     return camera.set_advanced_mode(body.enable)
 
 

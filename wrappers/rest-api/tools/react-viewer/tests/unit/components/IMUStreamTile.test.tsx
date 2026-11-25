@@ -39,7 +39,7 @@ function motionConfig(streamType: 'accel' | 'gyro'): StreamConfig {
 function streamingDevice(deviceId: string, serial: string, accel?: Sample, gyro?: Sample) {
   if (accel) samples.set(`${deviceId}/accel`, accel)
   if (gyro) samples.set(`${deviceId}/gyro`, gyro)
-  const device = createMockDevice({ device_id: deviceId, serial_number: serial })
+  const device = createMockDevice({ device_id: deviceId, info: { serial_number: serial } })
   return createMockDeviceState(device, {
     // A stream is shown only when its sensor reports it running; pipeline mode is gone.
     sensorStreamingStatus: {

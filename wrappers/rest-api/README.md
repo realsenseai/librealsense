@@ -26,12 +26,33 @@ Frames are sent raw (720p depth + color is about 1 Gbit/s), so a slower link dro
     *   Start/Stop streams with specific configurations (resolution, format, FPS), through the pipeline.
     *   Open, start, stop and close each sensor on its own, as the SDK's sensor.
 *   **Frame Streaming:**
-    *   Open a WebSocket to `/api/v1/devices/{device_id}/frames/{stream_type}/{stream_index}` for a running stream.
+    *   Open a WebSocket to `/api/v1/devices/{device_id}/frames/{stream_type}/{stream_index}` at any time: it gets the stream's frames whenever the stream runs, started by any client, and only the client closes it. `streaming_changed` on the events socket says when frames start and stop.
     *   Each binary message is one frame: a JSON header (number, timestamp, metadata, profile, size, intrinsics) and the frame's bytes, unchanged; see `app/services/frame_sender.py`.
 *   **Events:**
     *   Open a plain WebSocket to `/api/v1/events`; each message is JSON, `{"event": name, ...fields}`.
-    *   `devices_changed`, `streaming_changed`, `firmware_progress`, `firmware_update_success`, `firmware_update_failed`; see `app/services/events.py`.
+    *   `devices_changed`, `streaming_changed`, `firmware_progress`, `firmware_update_success`, `firmware_update_failed`, `options_changed`; see `app/services/events.py`.
     *   Events are not replayed: read the current state through the REST API once connected.
+
+## Changes from v2.59.2
+The API now mirrors the SDK's own objects and calls. Breaking changes:
+*   **Sensors:**
+    *   A sensor is addressed by `sensor_index` (int) instead of `sensor_id`, and driven by `POST .../sensors/{index}/open`, `/start`, `/stop`, `/close`, as `rs2::sensor`, instead of the combined `start` and `stop`.
+    *   `SensorInfo` loses `sensor_id`, `type` and `options`; `supported_stream_profiles` is `stream_profiles`, `active_profiles` is `active_streams`.
+    *   The `streaming_changed` event's `sensors` is a list by sensor index instead of a dict by `sensor_id`.
+    *   `/health` no longer returns `status` and `service`.
+*   **Options:**
+    *   Sensor, colorizer and filter options are a map by option ID instead of a list; `OptionInfo` loses `option_id` (it is the key) and `units`.
+    *   An option the camera supports but can't read now is listed with a null `current_value`; one whose range the SDK can't read has null `min_value`, `max_value`, `step` and `default_value`.
+    *   A write (option, filter, advanced-mode control or toggle) answers nothing: read the value back with its GET; sensor option changes reach every client as `options_changed`.
+    *   A route to one option has no trailing slash: `.../options/{option_id}`, `.../filters/{name}/{field}`, `.../advanced_mode/controls/{group}/{field}`.
+    *   Advanced-mode controls are `AdvancedControl` (`current_value`, `min_value`, `max_value`, `integer`) by group, instead of `OptionInfo` lists.
+*   **Devices and frames:**
+    *   A device is the SDK's camera info by name (`serial_number`, `firmware_version`, `advanced_mode`, ...) instead of `DeviceInfo`; its ID is its serial number. `force_refresh` and `POST /devices/refresh` are gone.
+    *   `GET .../advanced_mode/` is gone: read the camera info `advanced_mode`, YES or NO.
+    *   Metadata status is `GET .../is_metadata_enabled`; `POST /system/enable-metadata` is `enable_metadata` and answers nothing.
+    *   `extrinsics` takes `from_stream`, `from_index`, `to_stream`, `to_index` and answers one `Extrinsics`.
+    *   `POST .../hw_reset/` is `POST .../hardware_reset` and answers nothing.
+    *   HWM answers the firmware's raw reply bytes instead of `HwmResponse`: its first uint32 echoes the opcode, or is the firmware's error code.
 
 ## Missing Features
 * Not all SDK capabilities are yet supported(e.g. Texture Mapping, Post processing filters,...)

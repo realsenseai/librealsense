@@ -62,7 +62,7 @@ def test_sdk_refuses_pipeline_on_a_streaming_sensor(mgr):
 
 
 def test_sdk_refuses_stop_before_start(mgr):
-    with pytest.raises(RuntimeError, match="can only be called between a start\\(\\) and a following stop\\(\\)"):
+    with pytest.raises(RuntimeError, match="stop\\(\\) cannot be called before start\\(\\)"):
         mgr.cameras["SW1"].stop_stream()
 
 

@@ -4,18 +4,15 @@
 import pytest
 
 from .conftest import client
-from ..mocks.pyrealsense_mock import camera_info, device as MockDevice, debug_protocol as MockDebugDevice
+from ..mocks.pyrealsense_mock import camera_info, debug_protocol as MockDebugDevice, device as MockDevice
 
 
 def test_hwm_command_basic(setup_mock_managers):
     """POST /devices/{id}/hwm with a minimal request returns 200 and a response list."""
     response = client.post("/api/v1/devices/device1/hwm", json={"opcode": 0xA6})
     assert response.status_code == 200
-    body = response.json()
-    assert body["device_id"] == "device1"
-    assert isinstance(body["response"], list)
     # Mock echoes opcode (0xA6 = 166) as little-endian uint32 in the first 4 bytes.
-    assert body["response"] == [0xA6, 0, 0, 0]
+    assert response.json() == [0xA6, 0, 0, 0]
 
 
 def test_hwm_command_with_params(setup_mock_managers):
@@ -32,41 +29,27 @@ def test_hwm_command_with_params(setup_mock_managers):
         },
     )
     assert response.status_code == 200
-    body = response.json()
-    assert body["device_id"] == "device1"
-    assert isinstance(body["response"], list)
+    assert isinstance(response.json(), list)
 
 
-@pytest.mark.parametrize(
-    "device,status,details",
-    [
-        (None, 404, []),
-        # Plain device (not a debug_protocol subclass) does not expose the extension.
-        (MockDevice(serial_number="no-debug", name="Limited Device"), 400, ["does not support"]),
-        # fw_error_code differs from opcode 0xA6 so the opcode check must fire; the
-        # detail carries both the returned error code and the expected opcode echo.
-        (
-            MockDebugDevice(serial_number="fw-error", name="Error Device", fw_error_code=0x00000009),
-            500,
-            ["error code", "0x00000009", "0x000000a6"],
-        ),
-        (
-            MockDebugDevice(serial_number="short-resp", name="Short Response Device", short_hwm_response=True),
-            500,
-            ["too short"],
-        ),
-    ],
-    ids=["unknown_device", "unsupported_device", "firmware_error", "response_too_short"],
-)
-def test_hwm_command_errors(setup_mock_managers, device, status, details):
-    device_id = "no-such-device"
-    if device is not None:
-        device_id = device.get_info(camera_info.serial_number)
-        with setup_mock_managers["rs_manager"].lock:
-            setup_mock_managers["rs_manager"]._add_cameras([device])
+def test_a_firmware_error_reply_is_returned_as_is(setup_mock_managers):
+    """As the SDK returns it: its first uint32 is the firmware's error code instead of the opcode echo"""
+    device = MockDebugDevice(serial_number="fw-error", name="Error Device", fw_error_code=0x00000009)
+    with setup_mock_managers["rs_manager"].lock:
+        setup_mock_managers["rs_manager"]._add_cameras([device])
+    response = client.post("/api/v1/devices/fw-error/hwm", json={"opcode": 0xA6})
+    assert (response.status_code, response.json()) == (200, [0x09, 0, 0, 0])
 
-    response = client.post(f"/api/v1/devices/{device_id}/hwm", json={"opcode": 0xA6})
-    assert response.status_code == status
-    detail = response.json()["detail"].lower()
-    assert all(d in detail for d in details)
 
+@pytest.mark.parametrize("body", [{"opcode": -1}, {"opcode": 0x10, "param1": 0x100000000}, {"opcode": 0x10, "data": [256]}])
+def test_a_value_out_of_the_sdks_uint32_or_byte_is_refused(setup_mock_managers, body):
+    """The SDK's build_command takes uint32 and uint8: anything else is the client's error (422), not a 500"""
+    assert client.post("/api/v1/devices/device1/hwm", json=body).status_code == 422
+
+
+def test_a_device_without_hwm_is_refused_with_the_sdks_error(setup_mock_managers):
+    """As the SDK: its debug_protocol of such a device is an empty handle, and using it raises (400)"""
+    with setup_mock_managers["rs_manager"].lock:
+        setup_mock_managers["rs_manager"]._add_cameras([MockDevice(serial_number="no-debug", name="Limited Device")])
+    response = client.post("/api/v1/devices/no-debug/hwm", json={"opcode": 0xA6})
+    assert response.status_code == 400 and "null pointer" in response.json()["detail"]

@@ -70,8 +70,8 @@ describe('DevicePanel', () => {
     })
 
     it('shows multiple devices when connected', () => {
-      const device1 = createMockDevice({ device_id: 'device-1', name: 'D435', serial: '111' })
-      const device2 = createMockDevice({ device_id: 'device-2', name: 'D455', serial: '222' })
+      const device1 = createMockDevice({ device_id: 'device-1', info: { name: 'D435', serial_number: '111' } })
+      const device2 = createMockDevice({ device_id: 'device-2', info: { name: 'D455', serial_number: '222' } })
       
       render(<DevicePanel />, {
         initialStoreState: {
@@ -85,7 +85,7 @@ describe('DevicePanel', () => {
     })
 
     it('displays device serial number', () => {
-      const mockDevice = createMockDevice({ serial_number: 'TEST-SERIAL-123' })
+      const mockDevice = createMockDevice({ info: { serial_number: 'TEST-SERIAL-123' } })
 
       render(<DevicePanel />, {
         initialStoreState: { devices: [mockDevice], deviceStates: {} },
@@ -95,7 +95,7 @@ describe('DevicePanel', () => {
     })
 
     it('displays firmware version', () => {
-      const mockDevice = createMockDevice({ firmware_version: '5.16.0.1' })
+      const mockDevice = createMockDevice({ info: { firmware_version: '5.16.0.1' } })
       
       render(<DevicePanel />, {
         initialStoreState: {
@@ -135,51 +135,6 @@ describe('DevicePanel', () => {
       await userEvent.click(dismissButton)
       
       expect(clearError).toHaveBeenCalled()
-    })
-  })
-
-  describe('Refresh Button', () => {
-    it('renders refresh button', () => {
-      render(<DevicePanel />)
-      
-      const refreshButton = screen.getByTitle('Refresh devices')
-      expect(refreshButton).toBeInTheDocument()
-    })
-
-    it('calls fetchDevices when refresh is clicked', async () => {
-      const fetchDevices = vi.fn().mockResolvedValue(undefined)
-      useAppStore.setState({ fetchDevices })
-
-      render(<DevicePanel />)
-
-      const refreshButton = screen.getByTitle('Refresh devices')
-      await userEvent.click(refreshButton)
-
-      expect(fetchDevices).toHaveBeenCalled()
-    })
-
-    it('passes forceRefresh=true when refresh is clicked manually', async () => {
-      const fetchDevices = vi.fn().mockResolvedValue(undefined)
-      useAppStore.setState({ fetchDevices })
-
-      render(<DevicePanel />)
-
-      const refreshButton = screen.getByLabelText('Refresh devices')
-      await userEvent.click(refreshButton)
-
-      expect(fetchDevices).toHaveBeenCalledWith(true)
-    })
-
-    it('is disabled while a fetch is in flight', () => {
-      // Must use initialStoreState (not pre-render setState) because
-      // renderWithProviders calls resetStore() first, which would reset
-      // isLoadingDevices back to false.
-      render(<DevicePanel />, {
-        initialStoreState: { isLoadingDevices: true },
-      })
-
-      const refreshButton = screen.getByLabelText('Refreshing devices…')
-      expect(refreshButton).toBeDisabled()
     })
   })
 
@@ -226,8 +181,7 @@ describe('DevicePanel', () => {
   describe('Firmware Update Proposal', () => {
     const outdated = (overrides = {}) => {
       const device = createMockDevice({
-        serial_number: '123456789012',
-        firmware_version: '5.17.0.10',
+        info: { serial_number: '123456789012', firmware_version: '5.17.0.10' },
         ...overrides,
       })
       const ds = createMockDeviceState(device, { firmware: { recommended: '5.17.3.10' } })
@@ -241,8 +195,8 @@ describe('DevicePanel', () => {
       })
 
       const toast = await screen.findByText(/firmware 5\.17\.0\.10 → 5\.17\.3\.10 is available/)
-      expect(toast).toHaveTextContent(`S/N ${device.serial_number}`)
-      expect(toast).toHaveTextContent(device.name)
+      expect(toast).toHaveTextContent(`S/N ${device.info.serial_number}`)
+      expect(toast).toHaveTextContent(device.info.name)
       expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument()
     })
 
@@ -259,7 +213,7 @@ describe('DevicePanel', () => {
     })
 
     it('does not toast when firmware is up to date', async () => {
-      const device = createMockDevice({ firmware_version: '5.17.3.10' })
+      const device = createMockDevice({ info: { firmware_version: '5.17.3.10' } })
       const ds = createMockDeviceState(device, { firmware: { recommended: '5.17.3.10' } })
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
@@ -299,13 +253,10 @@ describe('DevicePanel', () => {
   })
 
   describe('Advanced Mode', () => {
-    const withAdvancedMode = (overrides: Partial<ReturnType<typeof createMockDeviceState>> = {}) => {
-      const device = createMockDevice()
-      const ds = createMockDeviceState(device, {
-        isActive: true,
-        advancedMode: { supported: true, enabled: false },
-        ...overrides,
-      })
+    // advanced_mode as the camera info reports it: YES, NO, or no key on a device without it
+    const withAdvancedMode = (advanced_mode?: string, overrides: Partial<ReturnType<typeof createMockDeviceState>> = {}) => {
+      const device = createMockDevice({ info: advanced_mode ? { advanced_mode } : {} })
+      const ds = createMockDeviceState(device, overrides)
       return { device, ds }
     }
 
@@ -313,7 +264,7 @@ describe('DevicePanel', () => {
       userEvent.click(await screen.findByTitle('Device actions'))
 
     it('hides the toggle on devices that do not support advanced mode', async () => {
-      const { device, ds } = withAdvancedMode({ advancedMode: { supported: false, enabled: false } })
+      const { device, ds } = withAdvancedMode()
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
       })
@@ -326,7 +277,7 @@ describe('DevicePanel', () => {
       const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
       useAppStore.setState({ toggleAdvancedMode })
-      const { device, ds } = withAdvancedMode()
+      const { device, ds } = withAdvancedMode('NO')
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
       })
@@ -342,7 +293,8 @@ describe('DevicePanel', () => {
     it('disables the toggle while streaming, as the C++ viewer does', async () => {
       const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
       useAppStore.setState({ toggleAdvancedMode })
-      const { device, ds } = withAdvancedMode({ sensorStreamingStatus: { 0: { sensor_index: 0, is_streaming: true } } })
+      const { device, ds } = withAdvancedMode('NO', {
+        sensorStreamingStatus: { 0: { sensor_index: 0, is_streaming: true } } })
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
       })
@@ -358,7 +310,7 @@ describe('DevicePanel', () => {
     it('offers to disable once advanced mode is on', async () => {
       const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
       useAppStore.setState({ toggleAdvancedMode })
-      const { device, ds } = withAdvancedMode({ advancedMode: { supported: true, enabled: true } })
+      const { device, ds } = withAdvancedMode('YES')
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
       })

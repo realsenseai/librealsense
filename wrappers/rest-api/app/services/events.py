@@ -17,7 +17,7 @@ Nothing is replayed: a client reads the current state through the REST API once 
 """
 
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Any, Coroutine, Dict, Optional
 
 from fastapi import WebSocket
 
@@ -25,6 +25,17 @@ from fastapi import WebSocket
 # a client 100 events behind has its socket closed with this code; it reconnects and reads the state again.
 QUEUE_SIZE = 100
 TOO_SLOW = 4003
+
+
+async def serve(websocket: WebSocket, send: Coroutine) -> None:
+    """Run send until the client disconnects; it has nothing to say. A failed send also ends in a disconnect"""
+    sending = asyncio.ensure_future(send)
+    sending.add_done_callback(lambda t: t.cancelled() or t.exception())  # a send to a gone client is expected
+    try:
+        while (await websocket.receive())["type"] != "websocket.disconnect":
+            pass
+    finally:
+        sending.cancel()
 
 
 class Events:
@@ -43,13 +54,9 @@ class Events:
             while True:
                 await websocket.send_json(await queue.get())
 
-        sending = asyncio.ensure_future(send())
-        sending.add_done_callback(lambda t: t.cancelled() or t.exception())  # a send to a gone client is expected
         try:
-            while (await websocket.receive())["type"] != "websocket.disconnect":
-                pass  # the client has nothing to say
+            await serve(websocket, send())
         finally:
-            sending.cancel()
             self._queues.pop(queue, None)
 
     def emit(self, event: str, fields: Dict[str, Any]) -> None:

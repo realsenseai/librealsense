@@ -42,27 +42,9 @@ describe('API Client', () => {
       const device = devices.find((d: any) => d.device_id === mockDevice.device_id)
 
       expect(device).toBeDefined()
-      expect(device.name).toBe('RealSense D435')
-      expect(device.serial_number).toBe('123456789')
-      expect(device.firmware_version).toBe('5.16.0.1')
-    })
-
-    it('omits force_refresh from the query by default', async () => {
-      const seen = captureDevicesQuery()
-      await apiClient.getDevices()
-      expect(seen.current).toBe('')
-    })
-
-    it('omits force_refresh when forceRefresh=false', async () => {
-      const seen = captureDevicesQuery()
-      await apiClient.getDevices(false)
-      expect(seen.current).toBe('')
-    })
-
-    it('sends force_refresh=true when forceRefresh=true', async () => {
-      const seen = captureDevicesQuery()
-      await apiClient.getDevices(true)
-      expect(seen.current).toContain('force_refresh=true')
+      expect(device.info.name).toBe('RealSense D435')
+      expect(device.info.serial_number).toBe('123456789')
+      expect(device.info.firmware_version).toBe('5.16.0.1')
     })
   })
 
@@ -167,6 +149,23 @@ describe('API Client', () => {
       const { recommended } = await apiClient.getRecommendedFirmware(mockDevice.device_id)
 
       expect(recommended).toBe('5.17.3.10')
+    })
+  })
+
+  describe('getExtrinsics', () => {
+    it('asks for one pair of streams, by query', async () => {
+      let query = ''
+      server.use(http.get('/api/v1/devices/:deviceId/extrinsics', ({ request }) => {
+        query = new URL(request.url).search
+        return HttpResponse.json({ rotation: [], translation: [0.015, 0, 0] })
+      }))
+      const depth = { stream_type: 'depth', stream_index: 0, format: 'z16', width: 848, height: 480, fps: 30, default: true }
+      const color = { ...depth, stream_type: 'color', format: 'rgb8' }
+
+      const e = await apiClient.getExtrinsics(mockDevice.device_id, depth, color)
+
+      expect(query).toBe('?from_stream=depth&from_index=0&to_stream=color&to_index=0')
+      expect(e.translation).toEqual([0.015, 0, 0])
     })
   })
 

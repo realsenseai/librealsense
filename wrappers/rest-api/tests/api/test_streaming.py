@@ -1,6 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+import pytest
+from starlette.websockets import WebSocketDisconnect
+
 from .conftest import STREAM_CONFIG, client
 
 
@@ -59,10 +62,30 @@ def test_sensor_reports_the_profiles_it_streams(setup_mock_managers):
     assert depth_sensor()["active_streams"] == []
 
 
-def test_extrinsics_between_the_device_streams(setup_mock_managers):
-    response = client.get("/api/v1/devices/device1/extrinsics")
-    assert response.status_code == 200
-    assert {(e["stream_type"], e["stream_index"]) for e in response.json()} >= {("depth", 0)}
+EXTRINSICS = "/api/v1/devices/device1/extrinsics"
+
+
+def test_extrinsics_from_one_stream_to_another(setup_mock_managers):
+    response = client.get(EXTRINSICS, params={"from_stream": "depth", "from_index": 0,
+                                              "to_stream": "color", "to_index": 0})
+    assert response.json() == {"rotation": [1, 0, 0, 0, 1, 0, 0, 0, 1], "translation": [0.015, 0, 0]}
+
+
+def test_extrinsics_of_a_stream_the_device_lacks_is_not_found(setup_mock_managers):
+    params = {"from_stream": "depth", "from_index": 0, "to_stream": "color", "to_index": 7}
+    assert client.get(EXTRINSICS, params=params).status_code == 404
+
+
+@pytest.mark.parametrize("bad", [
+    {"from_stream": "depth/../../etc", "from_index": 0},
+    {"from_stream": "depth'; DROP TABLE x;--", "from_index": 0},
+    {"from_stream": "http://evil.example/", "from_index": 0},
+    {"from_stream": "depth", "from_index": "0 OR 1=1"},
+    {"from_stream": "depth"},  # an index missing
+])
+def test_extrinsics_takes_only_stream_names_and_integers(setup_mock_managers, bad):
+    params = {"to_stream": "color", "to_index": 0, **bad}
+    assert client.get(EXTRINSICS, params=params).status_code == 422
 
 
 def test_stopping_a_sensor_the_pipeline_runs_stops_it(setup_mock_managers):
@@ -98,3 +121,9 @@ def test_a_refused_open_leaves_the_other_owner_streaming(setup_mock_managers):
     response = client.post("/api/v1/devices/device1/sensors/0/open", json={"profiles": [row]})
     assert response.status_code == 400  # the SDK's error
     assert sensor.get_active_streams() == running
+
+
+def test_a_frame_socket_for_an_unknown_stream_name_is_refused(setup_mock_managers):
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/api/v1/devices/device1/frames/nope/0"):
+            pass

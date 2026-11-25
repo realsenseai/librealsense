@@ -4,14 +4,13 @@ import { BACKEND_ORIGIN } from './backend'
 import { visibleOptions } from './types'
 import type {
   AdvancedControls,
-  AdvancedModeStatus,
   OptionMap,
   WireAdvancedControl,
   DeviceInfo,
   SensorFilters,
   SensorInfo,
   OptionInfo,
-  StreamExtrinsics,
+  Extrinsics,
   SupportedStreamProfile,
 } from './types'
 
@@ -58,10 +57,14 @@ class ApiClient {
 
   // ============ Devices ============
 
-  async getDevices(forceRefresh: boolean = false): Promise<DeviceInfo[]> {
-    const response = await this.client.get<DeviceInfo[]>('/devices/', {
-      params: { force_refresh: forceRefresh || undefined },
-    })
+  async getDevices(): Promise<DeviceInfo[]> {
+    const response = await this.client.get<Record<string, string>[]>('/devices/')
+    return response.data.map((info) => ({ device_id: info.serial_number, info }))
+  }
+
+  /** False only on Windows until frame metadata is enabled there */
+  async getMetadataEnabled(deviceId: string): Promise<boolean> {
+    const response = await this.client.get<boolean>(`/devices/${deviceId}/is_metadata_enabled`)
     return response.data
   }
 
@@ -72,12 +75,7 @@ class ApiClient {
   }
 
   async resetDevice(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/hw_reset/`)
-  }
-
-  async getAdvancedMode(deviceId: string): Promise<AdvancedModeStatus> {
-    const response = await this.client.get(`/devices/${deviceId}/advanced_mode/`)
-    return response.data
+    await this.client.post(`/devices/${deviceId}/hardware_reset`)
   }
 
   /** Resets the device: it leaves and comes back through devices_changed */
@@ -183,10 +181,11 @@ class ApiClient {
     }
   }
 
-  /** The device's calibration between its streams, from each to every other */
-  async getExtrinsics(deviceId: string): Promise<StreamExtrinsics[]> {
-    const { data } = await this.client.get<StreamExtrinsics[]>(`/devices/${deviceId}/extrinsics`)
-    return data
+  /** The device's calibration from one stream to another, as the SDK's get_extrinsics_to */
+  async getExtrinsics(deviceId: string, from: SupportedStreamProfile, to: SupportedStreamProfile): Promise<Extrinsics> {
+    const params = { from_stream: from.stream_type, from_index: from.stream_index,
+                     to_stream: to.stream_type, to_index: to.stream_index }
+    return (await this.client.get<Extrinsics>(`/devices/${deviceId}/extrinsics`, { params })).data
   }
 
   /** Stop the sensor, then close it, as the SDK's sensor does */
@@ -199,9 +198,9 @@ class ApiClient {
 
   // ============ System ============
 
-  async enableMetadata(): Promise<{ status: string; note?: string }> {
-    const response = await this.client.post<{ status: string; note?: string }>('/system/enable-metadata')
-    return response.data
+  /** Behind a UAC prompt on Windows; declining it rejects */
+  async enableMetadata(): Promise<void> {
+    await this.client.post('/system/enable_metadata')
   }
 }
 

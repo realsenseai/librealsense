@@ -35,7 +35,7 @@ def first_device_id(client):
 
     devices = response.json()
     assert devices, "/api/v1/devices returned no devices — hub/USB enumeration likely failed"
-    return devices[0]["device_id"]
+    return devices[0]["serial_number"]
 
 
 class TestRealSenseAPIIntegration:
@@ -139,7 +139,7 @@ class TestRealSenseAPIIntegration:
 
         if devices:  # Only test if devices are connected
             assert isinstance(devices, list)
-            for key in ("device_id", "name", "serial_number", "sensors"):
+            for key in ("name", "serial_number"):
                 assert key in devices[0]
 
     def test_sensors_endpoint_rs(self):
@@ -336,19 +336,18 @@ class TestRealSenseAPIIntegration:
         if not devices:
             pytest.skip("No RealSense devices connected")
 
-        device_id = devices[0]["device_id"]
+        device_id = devices[0]["serial_number"]
         log.info("Testing HWM command on device: %s", device_id)
 
         # GVD (Get Version and Date) is opcode 0x10 — safe read-only command
         hwm_response = client.post(f"/api/v1/devices/{device_id}/hwm", json={"opcode": 0x10})
         body = hwm_response.json()
-        parsed = self._parse_gvd_d400(body.get("response", []))
+        parsed = self._parse_gvd_d400(body if isinstance(body, list) else [])
         log.info("HWM response: status=%s parsed=%s", hwm_response.status_code, parsed)
 
         if hwm_response.status_code == 400:
             pytest.skip(f"Device {device_id} does not support hardware monitor commands")
 
         assert hwm_response.status_code == 200
-        assert body["device_id"] == device_id
-        assert isinstance(body["response"], list)
-        assert len(body["response"]) > 0
+        assert isinstance(body, list)
+        assert len(body) > 0

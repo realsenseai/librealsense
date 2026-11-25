@@ -3,24 +3,28 @@ import { mockSensors } from './sensors'
 
 export const mockDevice: DeviceInfo = {
   device_id: '123456789',
-  name: 'RealSense D435',
-  serial_number: '123456789',
-  firmware_version: '5.16.0.1',
-  physical_port: '2-3',
-  usb_type: '3.2',
-  product_id: '0B07',
-  sensors: ['Stereo Module', 'RGB Camera', 'Motion Module'],
+  info: {
+    name: 'RealSense D435',
+    serial_number: '123456789',
+    firmware_update_id: '123456789',
+    firmware_version: '5.16.0.1',
+    physical_port: '2-3',
+    usb_type_descriptor: '3.2',
+    product_id: '0B07',
+  },
 }
 
 export const mockDevice2: DeviceInfo = {
   device_id: '987654321',
-  name: 'RealSense D455',
-  serial_number: '987654321',
-  firmware_version: '5.15.0.0',
-  physical_port: '2-4',
-  usb_type: '3.2',
-  product_id: '0B5C',
-  sensors: ['Stereo Module', 'RGB Camera', 'Motion Module'],
+  info: {
+    name: 'RealSense D455',
+    serial_number: '987654321',
+    firmware_update_id: '987654321',
+    firmware_version: '5.15.0.0',
+    physical_port: '2-4',
+    usb_type_descriptor: '3.2',
+    product_id: '0B5C',
+  },
 }
 
 export const mockStreamConfigs: StreamConfig[] = [

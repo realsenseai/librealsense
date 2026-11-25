@@ -9,7 +9,7 @@ import pyrealsense2 as rs
 from app.core.errors import RealSenseError
 from app.services.camera import Camera
 from app.services.events import Events
-from app.services.frame_sender import DISCONNECTED, FrameSender
+from app.services.frame_sender import FrameSender
 from app.services import firmware as fw
 
 
@@ -40,7 +40,6 @@ class RealSenseManager:
             gone = {i: c for i, c in self.cameras.items() if info.was_removed(c.dev)}
             for device_id in gone:
                 del self.cameras[device_id]
-                self.frame_sender.close(device_id, DISCONNECTED)
             added = self._add_cameras(info.get_new_devices())
         if added or gone:
             logging.info("devices_changed: +%s -%s", added, list(gone))
@@ -327,7 +326,6 @@ class RealSenseManager:
         # Cached refs will become invalid after enter_update_state.
         with self.lock:
             self.cameras.pop(device_id, None)
-        self.frame_sender.close(device_id, DISCONNECTED)
         self.events.emit(
             "devices_changed", {"added": [], "removed": [device_id]},
         )

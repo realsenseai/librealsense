@@ -30,11 +30,11 @@ export const test = base.extend<TestFixtures>({
   // A bench can have several cameras attached and their order is not stable, so without
   // DEVICE_SERIAL the tests would silently run against a camera nobody asked for.
   device: async ({ baseURL }, use) => {
-    const devices: DeviceInfo[] = await (await fetch(`${baseURL}/api/v1/devices/`)).json()
+    const infos: Record<string, string>[] = await (await fetch(`${baseURL}/api/v1/devices/`)).json()
     const serial = process.env.DEVICE_SERIAL
-    const device = serial ? devices.find(d => d.serial_number === serial) : devices[0]
-    expect(device, `DEVICE_SERIAL=${serial ?? '(first available)'} did not enumerate`).toBeTruthy()
-    await use(device!)
+    const info = serial ? infos.find(i => i.serial_number === serial) : infos[0]
+    expect(info, `DEVICE_SERIAL=${serial ?? '(first available)'} did not enumerate`).toBeTruthy()
+    await use({ device_id: info!.serial_number, info: info! })
   },
 })
 

@@ -1,15 +1,8 @@
 // API Types for RealSense REST API
 
 export interface DeviceInfo {
-  device_id: string
-  name: string
-  serial_number: string
-  firmware_version?: string
-  physical_port?: string
-  usb_type?: string
-  product_id?: string
-  sensors: string[]
-  metadata_enabled?: boolean | null
+  device_id: string  // its serial number: what the server knows it by
+  info: Record<string, string>  // every camera info it reports, by its SDK name: name, serial_number, product_line...
 }
 
 /** Display label for an SDK name: "deepSeaMedianThreshold" -> "Deep Sea Median Threshold". */
@@ -59,12 +52,6 @@ export interface FirmwareState {
   phase?: 'downloading' | 'installing'  // one-click update: download then install
   progress?: number
   last_error?: string | null
-}
-
-// Wire shape of GET/POST /devices/{id}/advanced_mode/
-export interface AdvancedModeStatus {
-  supported: boolean
-  enabled: boolean
 }
 
 export interface SensorInfo {
@@ -168,7 +155,6 @@ export type ViewMode = '2d' | '3d'
 export interface DeviceState {
   device: DeviceInfo
   firmware?: FirmwareState
-  advancedMode?: AdvancedModeStatus
   // Every control the device shows, keyed by the endpoint that writes it.
   controls: Record<string, ControlGroup>
   /**
@@ -182,7 +168,6 @@ export interface DeviceState {
   isLoading: boolean // loading sensors/options
   // Per-sensor streaming state (sensor API)
   sensorStreamingStatus: Record<number, SensorStreamStatus> // keyed by sensor_index
-  extrinsics?: StreamExtrinsics[] // the device's calibration between its streams
 }
 
 /** Whether any of its sensors streams */
@@ -205,13 +190,6 @@ export interface Intrinsics {
 export interface Extrinsics {
   rotation: number[]
   translation: number[]
-}
-
-/** From a stream to each stream of its device it is calibrated with */
-export interface StreamExtrinsics {
-  stream_type: string
-  stream_index: number
-  to: (Extrinsics & { stream_type: string; stream_index: number })[]
 }
 
 // Per-sensor streaming state, kept by the viewer

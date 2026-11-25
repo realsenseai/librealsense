@@ -36,8 +36,8 @@ ds.streamConfigs.filter(c => c.enable).forEach(config => {
 
         streams.push({
           deviceId: ds.device.device_id,
-          deviceName: ds.device.name,
-          serialNumber: ds.device.serial_number,
+          deviceName: ds.device.info.name,
+          serialNumber: ds.device.info.serial_number ?? 'Unknown',
           config,
           profile,
         })
