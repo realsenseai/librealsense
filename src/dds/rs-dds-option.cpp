@@ -130,6 +130,7 @@ void rs_dds_option::set( float value )
         throw invalid_value_exception( "option is read-only: " + _dds_opt->get_name() );
 
     _set_opt_cb( j_value );
+    _recording_function( *this );
 }
 
 
@@ -165,6 +166,7 @@ void rs_dds_option::set_value( json value )
         throw invalid_value_exception( "option is read-only: " + _dds_opt->get_name() );
 
     _set_opt_cb( std::move( value ) );
+    _recording_function( *this );
 }
 
 

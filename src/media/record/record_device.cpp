@@ -29,6 +29,7 @@ librealsense::record_device::record_device(std::shared_ptr<librealsense::device_
 
     m_device = device;
     m_ros_writer = serializer;
+    write_header();  // up front, so a recording that gets no frames still loads
     (*m_write_thread)->start(); //Start thread before creating the sensors (since they might write right away)
     m_sensors = create_record_sensors(m_device);
     LOG_DEBUG("Created record_device");
@@ -159,19 +160,6 @@ void librealsense::record_device::write_data(size_t sensor_index, librealsense::
         {
             return; //Recording is paused
         }
-        std::call_once(m_first_frame_flag, [&]()
-        {
-            try
-            {
-                write_header();
-            }
-            catch (const std::exception& e)
-            {
-                LOG_ERROR("Failed to write header. " << e.what());
-                on_error( std::string( "Failed to write header. " ) + e.what() );
-            }
-        });
-
         try
         {
             const uint32_t device_index = 0;
