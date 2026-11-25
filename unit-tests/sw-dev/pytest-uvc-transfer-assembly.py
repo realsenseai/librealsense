@@ -134,6 +134,24 @@ int main() {
     cloud.point_stride=13;cloud.profile_id=3;
     assert(check_cloud()==pcl_frame_check::profile_mismatch);
 
+    expected.point_format=1;expected.point_stride=16;
+    labels.resize(4*3*16);
+    cloud.point_format=1;cloud.point_stride=16;
+    cloud.payload_crc32=rsutils::number::calc_crc32(labels.data(),labels.size());
+    for (uint16_t profile : {3,4}) {
+        expected.profile_id=profile;cloud.profile_id=profile;
+        session=pcl_session{};
+        assert(check_cloud()==pcl_frame_check::ok);
+        cloud.point_format=0;
+        assert(check_cloud()==pcl_frame_check::format_mismatch);
+        cloud.point_format=1;cloud.point_stride=12;
+        assert(check_cloud()==pcl_frame_check::format_mismatch);
+        cloud.point_stride=16;
+        labels[0]^=1;
+        assert(check_cloud()==pcl_frame_check::crc_mismatch);
+        labels[0]^=1;
+    }
+
     expected.profile_id=0x0201;expected.point_stride=1;
     std::vector<uint8_t> cells(12,50);
     md_occupancy grid{};
