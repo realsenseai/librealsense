@@ -106,6 +106,8 @@ def first_depth_frame_delay(sensor_device, restart):
               and p.is_default())
 
     if restart:  # unmeasured start/stop, then measure the restart right after it
+        if "D585" in product_name:  # golden 7.59 restarts in over 1 s, fixed by 7.62
+            require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "D585 restart within 1 s")
         assert time_to_first_frame(ds, dp, max_delay) != -1, "Unmeasured start got no depth frames"
         if is_dds_dev(dev):
             time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
@@ -149,6 +151,8 @@ def first_color_frame_delay(sensor_device, restart):
               and p.is_default())
 
     if restart:  # unmeasured start/stop, then measure the restart right after it
+        if "D585" in product_name:  # golden 7.59 restarts in over 1 s, fixed by 7.62
+            require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "D585 restart within 1 s")
         assert time_to_first_frame(cs, cp, max_delay) != -1, "Unmeasured start got no color frames"
         if is_dds_dev(dev):
             time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
