@@ -254,6 +254,10 @@ void uvc_sensor::open( const stream_profiles & requests )
                 ++color_stream_count;
     const bool per_stream_color_fn = ( color_stream_count > 1 );
 
+    // A GMSL pin needs an owned buffer for padded rows and when callers retain driver buffers.
+    bool const reserve_capture_storage = ! _is_opened && capture_zerocopy_enabled()
+        && get_device().supports_info( RS2_CAMERA_INFO_CONNECTION_TYPE )
+        && get_device().get_info( RS2_CAMERA_INFO_CONNECTION_TYPE ) == "GMSL";
     for( auto && streams : group_by_pin( requests ) )
     {
         auto && pin_profile = streams.front().base;  // a multiplexed pin's streams share one backend profile
@@ -265,6 +269,17 @@ void uvc_sensor::open( const stream_profiles & requests )
             // it outlives the lambda if a frame is released later, on another thread.
             auto zc_inflight = std::make_shared< std::atomic< int > >( 0 );
             _zc_inflight.push_back( zc_inflight );  // close() drains this before buffers are freed
+            if( reserve_capture_storage )
+                for( auto const & stream : streams )
+                {
+                    auto const format = stream.base->get_format();
+                    if( format != RS2_FORMAT_NV12 && format != RS2_FORMAT_Y8I && format != RS2_FORMAT_Z16 )
+                        continue;
+                    auto const & video = dynamic_cast< video_stream_profile_interface const & >( *stream.profile );
+                    auto const type = stream.base->get_stream_type();
+                    _source.reserve_frame( { type, stream.base->get_stream_index(), frame_source::stream_to_frame_types( type ) },
+                                           compute_frame_expected_size( video.get_width(), video.get_height(), get_image_bpp( format ) ) );
+                }
             _device->probe_and_commit(
                 pin_profile->get_backend_profile(),
                 [this, streams, resolver, zc_inflight, per_stream_color_fn, reported_unnamed = false](

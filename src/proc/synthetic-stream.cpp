@@ -575,6 +575,15 @@ namespace librealsense
         configure_processing_callback();
     }
 
+    void interleaved_functional_processing_block::reserve_output_frames( const video_stream_profile_interface & raw )
+    {
+        // The interleaved converter writes both eyes even when the client subscribes to just one.
+        _source.reserve_frame( { _left_target_stream, _left_target_profile_idx, _left_extension_type },
+                               get_image_size( raw.get_width(), raw.get_height(), _left_target_format ) );
+        _source.reserve_frame( { _right_target_stream, _right_target_profile_idx, _right_extension_type },
+                               get_image_size( raw.get_width(), raw.get_height(), _right_target_format ) );
+    }
+
     void interleaved_functional_processing_block::configure_processing_callback()
     {
         // define and set the frame processing callback

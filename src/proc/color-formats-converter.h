@@ -13,6 +13,9 @@ namespace librealsense
 
     class LRS_EXTENSION_API color_converter : public functional_processing_block
     {
+    public:
+        void reserve_output_frame( const video_stream_profile_interface & profile );
+
     protected:
         color_converter(const char* name, rs2_format target_format, rs2_stream target_stream = RS2_STREAM_COLOR) :
             functional_processing_block(name, target_format, target_stream, RS2_EXTENSION_VIDEO_FRAME) {};
