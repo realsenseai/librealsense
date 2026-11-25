@@ -18,8 +18,7 @@ log = logging.getLogger(__name__)
 import time
 import platform
 from rspy.snippets import is_dds_dev
-import pyrsutils as rsutils
-from rspy.pytest.device_helpers import is_d585_on_gmsl, require_min_fw_version
+from rspy.pytest.device_helpers import is_d585_on_gmsl, parse_fw_version
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -76,8 +75,8 @@ def pipeline_first_depth_frame_delay(pipeline_device, restart):
     depth_cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
 
     if restart:  # unmeasured start/stop, then measure the restart right after it
-        if "D585" in product_name:  # golden 7.59 restarts in over 1 s, fixed by 7.62
-            require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "D585 restart within 1 s")
+        if "D585" in product_name and parse_fw_version(dev.get_info(rs.camera_info.firmware_version)) < (7, 62, 0, 0):
+            max_delay = 1.5  # golden 7.59 restarts in 1.2-1.4 s, fixed by 7.62
         time_to_first_frame(ctx, depth_cfg)
         if is_dds_dev(dev):
             time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
@@ -118,8 +117,8 @@ def pipeline_first_color_frame_delay(pipeline_device, restart):
     color_cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
     if restart:  # unmeasured start/stop, then measure the restart right after it
-        if "D585" in product_name:  # golden 7.59 restarts in over 1 s, fixed by 7.62
-            require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "D585 restart within 1 s")
+        if "D585" in product_name and parse_fw_version(dev.get_info(rs.camera_info.firmware_version)) < (7, 62, 0, 0):
+            max_delay = 1.5  # golden 7.59 restarts in 1.2-1.4 s, fixed by 7.62
         time_to_first_frame(ctx, color_cfg)
         if is_dds_dev(dev):
             time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
