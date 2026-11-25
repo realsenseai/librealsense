@@ -222,11 +222,10 @@ CAMERA_OWNED = [ { PD, PCL }, { PD, LPCL } ]   # the camera may refuse the secon
 PAIRS = [( a, b ) for a, b in itertools.permutations( ( PD, OCC, LPCL, PCL ), 2 ) if not { a, b } <= MAPPING]
 
 
+@pytest.mark.device_exclude( "D555" )   # concurrent Perception lifecycle checks are D585-only
 @pytest.mark.parametrize( 'first, second', PAIRS, ids=[f"{a}+{b}".replace( 'stream.', '' ) for a, b in PAIRS] )
 def test_add_and_close(device, first, second):
     """A stream added to the streaming Perception sensor streams beside the first; each then closes on its own."""
-    if "D555" in device.get_info( rs.camera_info.name ):
-        pytest.skip( "Concurrent Perception lifecycle checks are D585-only" )
     if { first, second } == { PD, OCC } and is_gmsl( device ):
         pytest.skip( "pytest-gmsl-perception-mux.py covers PD + Occupancy over GMSL" )
     for t in ( first, second ):

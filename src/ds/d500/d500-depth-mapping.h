@@ -106,7 +106,7 @@ namespace librealsense
         d500_depth_mapping* _owner;
     };
 
-    // D585S's and D585 legacy's own sensor for the Mapping streams
+    // The Mapping streams on a sensor of their own, answering the depth mapping sensor extension
     class d500_depth_mapping_camera : public d500_depth_mapping_sensor, public depth_mapping_sensor
     {
     public:
