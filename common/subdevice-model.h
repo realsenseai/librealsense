@@ -89,7 +89,7 @@ namespace rs2
     // True when a sensor exposes depth streams. Some sensors carries both, so this cannot be inferred from the absence of color.
     bool sensor_has_depth_stream( const std::vector< stream_profile > & profiles );
 
-    class subdevice_model
+    class subdevice_model : public std::enable_shared_from_this< subdevice_model >
     {
     public:
         void populate_options( const std::string & opt_base_label, bool * options_invalidated, std::string & error_message );
@@ -128,6 +128,8 @@ namespace rs2
         void resume();
         void wait_for_stop();
         bool is_stopping();
+        bool open_pending = false;  // a Start waits for a sensor's background stop
+        bool stop_requested = false;  // the last stream was unticked
 
         void update_ui(std::vector<stream_profile> profiles_vec);
         void get_sorted_profiles(std::vector<stream_profile>& profiles);
@@ -194,6 +196,13 @@ namespace rs2
         std::map<int, bool> stream_enabled;
         std::map<int, bool> prev_stream_enabled;
         std::map<int, std::string> stream_display_names;
+        bool perception = s->is< perception_sensor >();
+        bool incremental_streams = perception && ! dev.is< playback >()
+            && ! ( dev.supports( RS2_CAMERA_INFO_CONNECTION_TYPE )
+                   && dev.get_info( RS2_CAMERA_INFO_CONNECTION_TYPE ) == std::string( "DDS" ) );
+        std::set< rs2_stream > exclusive_streams = perception
+            ? std::set< rs2_stream >{ RS2_STREAM_OCCUPANCY, RS2_STREAM_LABELED_POINT_CLOUD, RS2_STREAM_POINT_CLOUD }
+            : std::set< rs2_stream >{};
 
         subdevice_ui_selection ui;
         subdevice_ui_selection last_valid_ui;
@@ -281,6 +290,9 @@ namespace rs2
 
         std::shared_ptr< dispatcher > set_dispatcher() const { return _set_dispatcher; }
 
+        rs2_stream stream_type_of(int unique_id) const;   // profile stream type for a unique id (ANY if not found)
+        void close_unticked();  // closes the running streams that are no longer ticked
+
     private:
         std::vector<int> get_common_fps() const;
         bool draw_resolutions(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1);
@@ -319,7 +331,6 @@ namespace rs2
         //   ISP / stereo   : color in YUYV/BGR8/RGBA8/BGRA8 (FW-processed). Coexists with IR1/IR2;
         //                    the raw-only Color 1 is unavailable.
         // Depth is a separate node and coexists with either mode.
-        rs2_stream stream_type_of(int unique_id) const;   // profile stream type for a unique id (ANY if not found)
         int        stream_index_of(int unique_id) const;  // profile stream index for a unique id (0 if not found)
         bool color_uid_is_raw(int unique_id) const;   // this color uid's selected format is RGB8
         // Raw dual-RGB mode is active iff the second color stream (Color 1, index >= 1) is enabled. A lone
