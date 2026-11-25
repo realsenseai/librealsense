@@ -77,7 +77,7 @@ def pipeline_first_depth_frame_delay(pipeline_device, restart):
     if restart:  # unmeasured start/stop, then measure the restart right after it
         time_to_first_frame(ctx, depth_cfg)
         if is_dds_dev(dev):
-            time.sleep(1)  # stream stops when DDS reader closure is detected by device
+            time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
 
     frame_delay = time_to_first_frame(ctx, depth_cfg)
 
@@ -117,7 +117,7 @@ def pipeline_first_color_frame_delay(pipeline_device, restart):
     if restart:  # unmeasured start/stop, then measure the restart right after it
         time_to_first_frame(ctx, color_cfg)
         if is_dds_dev(dev):
-            time.sleep(1)  # stream stops when DDS reader closure is detected by device
+            time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
 
     frame_delay = time_to_first_frame(ctx, color_cfg)
 

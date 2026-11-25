@@ -106,9 +106,9 @@ def first_depth_frame_delay(sensor_device, restart):
               and p.is_default())
 
     if restart:  # unmeasured start/stop, then measure the restart right after it
-        time_to_first_frame(ds, dp, max_delay)
+        assert time_to_first_frame(ds, dp, max_delay) != -1, "Unmeasured start got no depth frames"
         if is_dds_dev(dev):
-            time.sleep(1)  # stream stops when DDS reader closure is detected by device
+            time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
 
     delay = time_to_first_frame(ds, dp, max_delay)
 
@@ -149,9 +149,9 @@ def first_color_frame_delay(sensor_device, restart):
               and p.is_default())
 
     if restart:  # unmeasured start/stop, then measure the restart right after it
-        time_to_first_frame(cs, cp, max_delay)
+        assert time_to_first_frame(cs, cp, max_delay) != -1, "Unmeasured start got no color frames"
         if is_dds_dev(dev):
-            time.sleep(1)  # stream stops when DDS reader closure is detected by device
+            time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
 
     delay = time_to_first_frame(cs, cp, max_delay)
 
