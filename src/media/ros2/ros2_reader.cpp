@@ -1004,6 +1004,8 @@ namespace librealsense
             << ")").str();
         auto regex = std::regex(regex_str);
         auto filter_topics = filter_topics_by_regex(regex);
+        if (filter_topics.empty())  // an empty filter would make rosbag2 read all topics
+            throw io_exception("Invalid file: no device description found in recording");
 
         _storage->set_filter({filter_topics});
 
@@ -1064,6 +1066,8 @@ namespace librealsense
 
                 sensor_to_streams[stream_id.sensor_index].push_back(stream_profile);
             }
+            else
+                read_next_cached();  // skip unhandled topics so the loop always advances
         }
 
         // Build sensor descriptions from info and streams
