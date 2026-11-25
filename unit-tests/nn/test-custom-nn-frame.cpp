@@ -208,7 +208,7 @@ TEST_CASE( "custom nn error frames" )
     CHECK_THAT( nn::custom_nn_status_message( 4, 0 ), ContainsSubstring( "reset the camera" ) );
     CHECK_THAT( nn::custom_nn_status_message( 4, 0x56ECB061 ), ContainsSubstring( "Upload it again" ) );
     CHECK_THAT( nn::custom_nn_status_message( 5, 1 ), ContainsSubstring( "Inference failed" ) );
-    CHECK_THAT( nn::custom_nn_status_message( 6, 1 ), ContainsSubstring( "stopped the camera's DSP" ) );
+    CHECK_THAT( nn::custom_nn_status_message( 6, 1 ), ContainsSubstring( "stopped the camera's DSP" ) && ContainsSubstring( "Reset the camera" ) );
     auto dsp_fault = parse( make_frame( {}, 6 ) );
     CHECK( dsp_fault.payload.status == 6 );
     CHECK( dsp_fault.tensors.empty() );
