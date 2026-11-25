@@ -73,9 +73,8 @@ The other values of `rs2_point_cloud_label` are not used by D5x5 cameras.
 
 #### Stream rules
 
-* If the depth sensor is already streaming, the occupancy grid can start only if depth streams at 640x360 or 1280x720, at the occupancy grid's frame rate.
-* While the occupancy grid streams, depth can start only alone, at 640x360 and the occupancy grid's frame rate.
-* Over USB, the occupancy grid and color cannot stream at the same time.
+* Over USB on dual-RGB (2C) cameras, color cannot stream together with the occupancy grid or the labeled point cloud.
+* The SDK does not check other combinations; the camera decides which ones it supports.
 
 ### Options
 
