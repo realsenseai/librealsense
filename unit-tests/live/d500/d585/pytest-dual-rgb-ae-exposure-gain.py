@@ -226,8 +226,8 @@ def test_color_frame_metadata_reports_rgb_exposure_and_gain(test_device, depth_s
         assert metadata( f, rs.frame_metadata_value.gain_level ) == 48, f"color {index}"
 
 
-@pytest.mark.xfail( reason="the firmware reports a constant auto-exposure state in the color metadata", strict=False )
 def test_color_frame_metadata_reports_rgb_ae_state(test_device, depth_sensor):
+    require_min_fw_version( test_device[0], rsutils.version( 7, 62, 0, 0 ), "RGB auto-exposure state in the color metadata" )
     for ae in (1, 0):
         def is_settled( f ):
             return f.supports_frame_metadata( rs.frame_metadata_value.auto_exposure )                    and f.get_frame_metadata( rs.frame_metadata_value.auto_exposure ) == ae
