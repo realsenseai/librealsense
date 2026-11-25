@@ -141,6 +141,17 @@ def test_failed_second_open_preserves_first_mapping(mapping):
         mapping.close()
 
 
+def test_same_profile_reopen_has_no_previous_session_frame(mapping):
+    profile = select(mapping, rs.stream.point_cloud, rs.format.xyzrgb32f, 640, 480, 15)
+    for _ in range(3):
+        frames = capture(mapping, profile)
+        counters = [frame.get_frame_number() for frame in frames]
+        assert all(second > first for first, second in zip(counters, counters[1:])), counters
+        for frame in frames:
+            assert frame.get_frame_metadata(rs.frame_metadata_value.frame_counter) == frame.get_frame_number()
+            assert frame.get_frame_metadata(rs.frame_metadata_value.crc) == zlib.crc32(bytes(frame.get_data()))
+
+
 @pytest.mark.parametrize("width,height", [(640, 480), (1280, 720)])
 def test_xyzrgb_depth_peer_stop_restart(mapping, test_device, width, height):
     device, _ = test_device
@@ -163,7 +174,7 @@ def test_xyzrgb_depth_peer_stop_restart(mapping, test_device, width, height):
     finally:
         mapping.close()
     assert len(clouds) >= 6
-    assert all(second > first for first, second in zip(clouds, clouds[1:]))
+    assert all(second > first for first, second in zip(clouds, clouds[1:])), clouds
 
 
 def test_regular_streams_after_mapping_close(mapping, test_device):
