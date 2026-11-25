@@ -2,6 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import pytest
+from starlette.websockets import WebSocketDisconnect
 
 from .conftest import STREAM_CONFIG, client
 
@@ -120,3 +121,9 @@ def test_a_refused_open_leaves_the_other_owner_streaming(setup_mock_managers):
     response = client.post("/api/v1/devices/device1/sensors/0/open", json={"profiles": [row]})
     assert response.status_code == 400  # the SDK's error
     assert sensor.get_active_streams() == running
+
+
+def test_a_frame_socket_for_an_unknown_stream_name_is_refused(setup_mock_managers):
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/api/v1/devices/device1/frames/nope/0"):
+            pass

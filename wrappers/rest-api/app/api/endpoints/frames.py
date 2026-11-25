@@ -21,6 +21,7 @@ async def stream_frames(
     """The stream's frames as the SDK delivers them; see app/services/frame_sender.py for the message layout.
 
     stream_type and stream_index are as in the sensor's stream profiles, e.g. depth/0 or infrared/1.
+    A device or stream that isn't there yet is not refused: frames come once it is connected and streaming.
     """
     await websocket.accept()
     await rs_manager.frame_sender.serve(websocket, device_id, stream_type, stream_index)

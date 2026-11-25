@@ -32,7 +32,7 @@ export function createMockDevice(overrides: Partial<DeviceInfo> = {}): DeviceInf
     info: {
       name: 'RealSense D435',
       serial_number: '123456789',
-      firmware_update_id: overrides.device_id ?? 'test-device-1',  // its ID
+      firmware_update_id: overrides.device_id ?? 'test-device-1',
       firmware_version: '5.16.0.1',
       usb_type_descriptor: '3.2',
       product_line: 'D400',

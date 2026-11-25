@@ -21,6 +21,7 @@ def send_hwm_command(
     Send a hardware monitor (HWM) command to a specific RealSense device.
 
     Requires the device to support the ``RS2_EXTENSION_DEBUG`` extension.
-    Returns the firmware's raw reply, as bytes; 400 if the device does not support hardware monitor commands.
+    Returns the firmware's raw reply, as bytes, as the SDK's send_and_receive_raw_data: its first uint32 echoes the
+    opcode, or is the firmware's error code, for the caller to compare. 400 if the device has no hardware monitor.
     """
     return camera.send_hwm_command(request)

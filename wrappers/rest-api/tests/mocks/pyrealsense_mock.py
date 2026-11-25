@@ -141,12 +141,9 @@ class device:
         return isinstance(self, debug_protocol)
 
     def as_debug_protocol(self):
-        """Return self when the device supports the debug_protocol extension.
-
-        Mirrors the SDK model where debug_protocol IS-A device — callers must
-        check is_debug_protocol() first.
-        """
-        return self if isinstance(self, debug_protocol) else None
+        """Self when the device supports the debug_protocol extension; otherwise, as the SDK, an empty handle
+        whose calls raise"""
+        return self if isinstance(self, debug_protocol) else _EmptyDebugProtocol()
 
 # Mock for sensor base class
 class sensor:
@@ -613,6 +610,14 @@ class disparity_transform:
         return frame
 
 # Mock for debug_protocol (hardware monitor)
+class _EmptyDebugProtocol:
+    """What the SDK's as_debug_protocol() gives for a device without the extension: every call raises"""
+    def build_command(self, *args, **kwargs):
+        raise RuntimeError('null pointer passed for argument "device"')
+
+    send_and_receive_raw_data = build_command
+
+
 class debug_protocol(device):
     """Mock for the pyrealsense2 debug_protocol extension.
 

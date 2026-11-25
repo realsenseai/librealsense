@@ -1,7 +1,7 @@
 // API Types for RealSense REST API
 
 export interface DeviceInfo {
-  device_id: string  // its firmware-update ID: what the server knows it by, in every state
+  device_id: string  // its serial number: what the server knows it by
   info: Record<string, string>  // every camera info it reports, by its SDK name: name, serial_number, product_line...
 }
 
