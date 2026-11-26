@@ -24,7 +24,7 @@ LASER_OPTIONS = [rs.option.emitter_enabled, rs.option.laser_power, rs.option.emi
 
 @pytest.fixture
 def depth_sensor(test_device):
-    """The depth sensor, with Passive Depth restored to disabled when the test ends."""
+    """The depth sensor, with Passive Depth disabled and the emitter on when the test ends."""
     dev, _ = test_device
     sensor = dev.first_depth_sensor()
     if not sensor.supports(PASSIVE_DEPTH):
@@ -33,14 +33,17 @@ def depth_sensor(test_device):
     yield sensor
     try:
         sensor.set_option(PASSIVE_DEPTH, MODES.disabled)
+        sensor.set_option(rs.option.emitter_enabled, 1)
     except Exception as e:
-        log.warning("could not restore Passive Depth: %s", e)
+        log.warning("could not restore Passive Depth / emitter: %s", e)
 
 
 def depth_profile(sensor):
     # Alternating delivers twice the profile rate, so its 60/90 fps profiles stream nothing
-    return next(p for p in sensor.profiles
-                if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16 and p.fps() == 30)
+    profile = next((p for p in sensor.profiles
+                    if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16 and p.fps() == 30), None)
+    assert profile, "no 30 fps Z16 depth profile"
+    return profile
 
 
 def test_passive_depth_range(depth_sensor):
@@ -142,6 +145,8 @@ def test_alternating_passive_delivers_both_classes(depth_sensor):
     try:
         # turning the emitter off there stops the alternation, so it is locked while streaming
         assert depth_sensor.is_option_read_only(rs.option.emitter_enabled)
+        with pytest.raises(Exception):
+            depth_sensor.set_option(rs.option.emitter_enabled, 0)
         seen = set()
         for _ in range(50):
             frame = queue.wait_for_frame(5000)

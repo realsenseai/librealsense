@@ -294,8 +294,8 @@ namespace librealsense
             observer( aligned );
     }
 
-    // Full Passive Depth hands the laser and the AE policy to the firmware; an expired or unregistered mode
-    // option means the device has no such mode and nothing is gated.
+    // Full Passive Depth delivers only laser-off frames; an expired or unregistered mode option means the device
+    // has no such mode and nothing is gated.
     static bool in_full_passive_depth( const std::weak_ptr< passive_depth_mode_option > & mode )
     {
         auto strong = mode.lock();

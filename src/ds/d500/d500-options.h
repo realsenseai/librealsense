@@ -234,7 +234,8 @@ namespace librealsense
         std::weak_ptr< uvc_sensor > _raw_ep;
     };
 
-    // Auto-exposure policy of a dual-RGB depth sensor; Hybrid is refused in Full Passive Depth.
+    // Auto-exposure policy of a dual-RGB depth sensor; Hybrid is refused in Full Passive Depth, as the design requires
+    // and the firmware does not enforce yet.
     class colored_ir_ae_policy_option : public uvc_xu_option< uint8_t >
     {
     public:

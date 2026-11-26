@@ -344,7 +344,7 @@ extern "C" {
     /** \brief values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which depth frames are delivered to the host. */
     typedef enum rs2_passive_depth_mode
     {
-        RS2_PASSIVE_DEPTH_MODE_DISABLED = 0,  /**< Active (laser on) depth frames only */
+        RS2_PASSIVE_DEPTH_MODE_DISABLED = 0,  /**< Active depth frames only; the laser follows Emitter Enabled */
         RS2_PASSIVE_DEPTH_MODE_ALTERNATING = 1,  /**< Active and passive depth frames, told apart by the frame emitter mode metadata */
         RS2_PASSIVE_DEPTH_MODE_FULL = 2,  /**< Passive (laser off) depth frames only; the laser controls are locked */
         RS2_PASSIVE_DEPTH_MODE_COUNT        /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
