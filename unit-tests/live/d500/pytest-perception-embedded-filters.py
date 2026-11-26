@@ -15,6 +15,7 @@ import pytest
 import pyrealsense2 as rs
 import pyrsutils as rsutils
 from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.snippets import is_d585_dual_rgb
 import logging
 log = logging.getLogger(__name__)
 
@@ -127,8 +128,15 @@ def stop_perception(perception_sensor):
     perception_sensor.close()
 
 
+def skip_decimation_in_dual_rgb( dev, filter_type ):
+    # TODO: remove once the FW accepts the decimation DPP SET with perception open in dual RGB
+    if filter_type == rs.embedded_filter_type.decimation and is_d585_dual_rgb( dev.get_info( rs.camera_info.name ) ):
+        pytest.skip( "In dual RGB the FW rejects the decimation DPP SET while the perception sensor is open" )
+
+
 @pytest.mark.parametrize( "filter_type", EMBEDDED_FILTERS, ids=lambda t: t.name )
-def test_perception_starts_with_filter_enabled(perception_sensor, perception_profile, embedded_filter):
+def test_perception_starts_with_filter_enabled(test_device, filter_type, perception_sensor, perception_profile, embedded_filter):
+    skip_decimation_in_dual_rgb( test_device[0], filter_type )
     embedded_filter.set( 1.0 )
     start_perception( perception_sensor, perception_profile )
     try:
@@ -138,7 +146,8 @@ def test_perception_starts_with_filter_enabled(perception_sensor, perception_pro
 
 
 @pytest.mark.parametrize( "filter_type", EMBEDDED_FILTERS, ids=lambda t: t.name )
-def test_filter_toggles_while_perception_streams(perception_sensor, perception_profile, embedded_filter):
+def test_filter_toggles_while_perception_streams(test_device, filter_type, perception_sensor, perception_profile, embedded_filter):
+    skip_decimation_in_dual_rgb( test_device[0], filter_type )
     embedded_filter.set( 0.0 )
     start_perception( perception_sensor, perception_profile )
     try:
@@ -151,7 +160,8 @@ def test_filter_toggles_while_perception_streams(perception_sensor, perception_p
 
 
 @pytest.mark.parametrize( "filter_type", EMBEDDED_FILTERS, ids=lambda t: t.name )
-def test_filter_enables_while_perception_opened_not_streaming(perception_sensor, perception_profile, embedded_filter):
+def test_filter_enables_while_perception_opened_not_streaming(test_device, filter_type, perception_sensor, perception_profile, embedded_filter):
+    skip_decimation_in_dual_rgb( test_device[0], filter_type )
     # Covers the open()->start() window: the perception sensor is opened but not yet streaming
     embedded_filter.set( 0.0 )
     perception_sensor.open( perception_profile )
