@@ -83,8 +83,8 @@ int main( int argc, char * argv[] ) try
     loader.nn_upload( package, [&writing]( float progress )
     {
         std::cout << "\rProgress: " << int( progress * 100 + 0.001f ) << "%" << std::flush;
-        // The camera reports little progress while it writes the model to flash
-        if( progress >= 0.8999f && ! writing )
+        // Past 0.9 once the camera writes the model to flash, where it reports little progress
+        if( progress > 0.9005f && ! writing )
         {
             writing = true;
             std::cout << std::endl << "Writing the model to the camera, this can take about 15 seconds" << std::endl;

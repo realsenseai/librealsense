@@ -171,10 +171,11 @@ try
             std::cout << uploading << std::endl;
         started = true;
     };
-    // The camera reports little progress while it writes the model to flash (90-99%): say what it is doing
+    // Progress passes 0.9 only once the camera has validated the package and writes it to flash, where it reports
+    // little progress: say what it is doing
     auto note_writing = [&writing]( float progress )
     {
-        if( progress >= 0.8999f && ! writing )
+        if( progress > 0.9005f && ! writing )
         {
             writing = true;
             std::cout << std::endl << "Writing the model to the camera, this can take about 15 seconds..." << std::endl;

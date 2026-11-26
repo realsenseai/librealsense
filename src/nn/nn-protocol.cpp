@@ -60,7 +60,8 @@ static const char * custom_slot_message( int32_t code )
     case -5:
         return "the package is not a valid custom network for this camera. Check that it holds the network library as "
                "well as the weights, unzipped, that it was converted for this camera's firmware, that its input is at "
-               "most 416 x 416, and that every output is s16 and fits its buffer";
+               "most 416 x 416, and that every output is s16, has dense strides (no gaps, no zero stride) and fits its "
+               "buffer";
     case -10:
         return "the custom network exceeds this camera's limits: an output frame over 3 MiB, scratch memory over its "
                "budget, or a part larger than its flash slot";
@@ -113,12 +114,12 @@ std::string error_message( int32_t code, int slot )
 }
 
 
-void throw_error( int32_t code, int slot )
+void throw_error( int32_t code, int slot, bool model_unchanged )
 {
-    if( code == -1 && slot == CUSTOM_SLOT )
-        throw not_implemented_exception( "Custom NN upload is not supported by this camera's firmware (-1)" );
-    std::string msg = rsutils::string::from() << "NN upload failed: " << error_message( code, slot ) << " (" << code
-                                              << ")";
+    std::string msg = rsutils::string::from()
+                   << ( code == -1 && slot == CUSTOM_SLOT ? "Custom NN upload is not supported by this camera's firmware"
+                                                          : "NN upload failed: " + error_message( code, slot ) )
+                   << " (" << code << ")" << ( model_unchanged ? ". The model on the camera is unchanged" : "" );
     if( code == -1 || code == -4 || code == -12 || code == -19 || code == -34 )
         throw not_implemented_exception( msg );
     throw invalid_value_exception( msg );

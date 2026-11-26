@@ -127,8 +127,8 @@ TEST_CASE( "upload and commit" )
     CHECK( t.chunks[0].size == 1000 );
     CHECK( t.chunks[2].size == 501 );
 
-    // 90% for the chunks, the rest from the device's commit progress
-    std::vector< float > const expected = { 0.3f, 0.6f, 0.9f, 0.9f, 0.95f, 1.f };
+    // 90% for the chunks; past it only once the device writes flash, and 1.0 once done
+    std::vector< float > const expected = { 0.3f, 0.6f, 0.9f, 0.95f, 1.f };
     REQUIRE( progress.size() == expected.size() );
     for( size_t i = 0; i < expected.size(); ++i )
         CHECK( std::abs( progress[i] - expected[i] ) < 1e-5f );
@@ -169,7 +169,8 @@ TEST_CASE( "slot 2" )
         weights_only.statuses = { make_status( nn::upload_state::idle, 7 ),
                                   make_status( nn::upload_state::error, 8, 0, -5 ) };
         CHECK_THAT( upload( weights_only, 2501, nullptr, nn::slot_param( 2, true ) ),
-                    ContainsSubstring( "network library" ) && ContainsSubstring( "(-5)" ) );
+                    ContainsSubstring( "network library" ) && ContainsSubstring( "dense strides" )
+                        && ContainsSubstring( "(-5)" ) && ContainsSubstring( "unchanged" ) );
     }
     SECTION( "-1 on slot 0 keeps its message" )
     {
@@ -206,6 +207,19 @@ TEST_CASE( "device errors" )
         CHECK_THROWS_AS( t.send_table( nn::PACKAGE_TABLE_ID, 1, 0, make_table( 2501 ), {} ), invalid_value_exception );
         CHECK( t.chunks.size() == 2 );
         CHECK( t.status_reads == 1 );
+        t.chunks.clear();
+        CHECK_THAT( upload( t ), ContainsSubstring( "CRC mismatch (-6)" ) && ContainsSubstring( "model on the camera is unchanged" ) );
+    }
+    SECTION( "refused while validating: the model is kept, and progress stays at 0.9" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::validating, 8, 10 ),
+                       make_status( nn::upload_state::error, 8, 10, -6 ) };
+        std::vector< float > progress;
+        CHECK_THAT( upload( t, 2501, &progress ),
+                    ContainsSubstring( "CRC mismatch (-6)" ) && ContainsSubstring( "model on the camera is unchanged" ) );
+        REQUIRE( ! progress.empty() );
+        CHECK( progress.back() < 0.9005f );
     }
     SECTION( "device lost on a chunk: the model is unchanged" )
     {
@@ -228,7 +242,8 @@ TEST_CASE( "device errors" )
     {
         fake_transport t;
         t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::error, 8, 40, -15 ) };
-        CHECK_THAT( upload( t ), ContainsSubstring( "writing the model to the camera failed" ) && ContainsSubstring( "(-15)" ) );
+        CHECK_THAT( upload( t ), ContainsSubstring( "writing the model to the camera failed" ) && ContainsSubstring( "(-15)" )
+                                     && ! ContainsSubstring( "unchanged" ) );
     }
     SECTION( "after the commit progress reached 100: never reported as complete" )
     {
@@ -236,7 +251,8 @@ TEST_CASE( "device errors" )
         t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::activating, 8, 100 ),
                        make_status( nn::upload_state::error, 8, 100, -5 ) };
         std::vector< float > progress;
-        CHECK_THAT( upload( t, 2501, &progress ), ContainsSubstring( "(-5)" ) );
+        // Seen writing: the stored model may already be replaced
+        CHECK_THAT( upload( t, 2501, &progress ), ContainsSubstring( "(-5)" ) && ! ContainsSubstring( "unchanged" ) );
         REQUIRE( ! progress.empty() );
         CHECK( progress.back() < 1.f );
     }

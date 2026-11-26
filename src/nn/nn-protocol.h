@@ -93,7 +93,8 @@ inline uint32_t chunk_param( size_t n_chunks, size_t i ) { return static_cast< u
 std::string error_message( int32_t code, int slot = DETECTION_SLOT );
 
 // Throws the library exception matching a device error code. FW without slot 2 refuses a slot-2 upload with -1.
-[[noreturn]] void throw_error( int32_t code, int slot = DETECTION_SLOT );
+// model_unchanged: the device refused before writing flash, so the stored model is kept.
+[[noreturn]] void throw_error( int32_t code, int slot = DETECTION_SLOT, bool model_unchanged = false );
 
 }  // namespace nn
 }  // namespace librealsense

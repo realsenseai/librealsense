@@ -41,12 +41,12 @@ void nn_transport::send_table( uint16_t table_id, uint32_t param1, uint32_t para
                                 << e.what() << ")" );
         }
         if( err )
-            nn::throw_error( err, nn::slot_of( param3 ) );
+            nn::throw_error( err, nn::slot_of( param3 ), true );
         if( progress )
             progress( 0.9f * ( i + 1 ) / n_chunks );
     }
 
-    // The device checks the package only once it has all of it, so the package errors arrive in the commit
+    // The device validates the package after the last chunk, then writes it to flash
     wait_for_commit( before.upload_seq, nn::slot_of( param3 ), progress );
     if( progress )
         progress( 1.f );
@@ -71,6 +71,7 @@ void nn_transport::wait_for_commit( uint32_t seq_before, int slot, const progres
 {
     auto const start = std::chrono::steady_clock::now();
     std::string failure;
+    bool writing = false;
     while( true )
     {
         nn::status status;
@@ -93,11 +94,13 @@ void nn_transport::wait_for_commit( uint32_t seq_before, int slot, const progres
         {
             if( status.state == nn::upload_state::done )
                 return;
+            // Refused before the flash write (-15 is the write failing): the stored model is kept
             if( status.state == nn::upload_state::error )
-                nn::throw_error( status.error, slot );
-            // 1.0 only once done
-            if( progress )
-                progress( 0.9f + 0.001f * std::min< uint8_t >( status.progress, 99 ) );
+                nn::throw_error( status.error, slot, ! writing && status.error != -15 );
+            // Past 0.9 only once the device writes flash, and 1.0 only once done
+            writing = writing || status.state >= nn::upload_state::writing_flash;
+            if( writing && progress )
+                progress( 0.901f + 0.00098f * std::min< uint8_t >( status.progress, 99 ) );
         }
         if( std::chrono::steady_clock::now() - start > _timing.commit_timeout )
             throw io_exception( failure.empty() ? nn::INCOMPLETE_MESSAGE : nn::INCOMPLETE_MESSAGE + ( " (" + failure + ")" ) );
