@@ -21,12 +21,6 @@ def _mock_pipeline(monkeypatch):
 
 # --- Hot-plug: targeted register / per-device eviction ---
 
-def _make_mock_sensor(name="Stereo Module"):
-    sensor = MagicMock()
-    sensor.get_info.side_effect = lambda k: name if k == rs.camera_info.name else (_ for _ in ()).throw(RuntimeError())
-    return sensor
-
-
 def _make_mock_device(serial):
     info_map = {
         rs.camera_info.serial_number: serial,
@@ -35,13 +29,26 @@ def _make_mock_device(serial):
         rs.camera_info.physical_port: f"port-{serial}",
         rs.camera_info.usb_type_descriptor: "3.2",
         rs.camera_info.product_id: "0B5C",
+        rs.camera_info.firmware_update_id: serial,
     }
     dev = MagicMock()
     dev.supports.return_value = True
     dev.get_info.side_effect = lambda k: info_map.get(k) if k in info_map else (_ for _ in ()).throw(RuntimeError())
-    dev.sensors = [_make_mock_sensor()]
     dev.is_metadata_enabled.return_value = True
+    dev.is_update_device.return_value = False
     return dev
+
+
+def test_metadata_enabled_is_reread():
+    """Enabling metadata writes the registry while the device stays connected: the next read reports it"""
+    mgr = RealSenseManager()
+    dev = _make_mock_device("serial-A")
+    dev.is_metadata_enabled.return_value = False
+    with mgr.lock:
+        mgr._add_cameras([dev])
+    assert mgr.cameras["serial-A"].is_metadata_enabled() is False
+    dev.is_metadata_enabled.return_value = True
+    assert mgr.cameras["serial-A"].is_metadata_enabled() is True
 
 
 def test_a_device_the_sdk_cannot_open_is_skipped():
@@ -50,16 +57,6 @@ def test_a_device_the_sdk_cannot_open_is_skipped():
     with mgr.lock:
         assert mgr._add_cameras([_make_mock_device("serial-A")]) == []
     assert "serial-A" not in mgr.cameras
-
-
-def test_a_device_without_a_serial_number_is_not_listed():
-    """Such as one in recovery mode"""
-    mgr = RealSenseManager()
-    dfu = MagicMock()
-    info_map = {rs.camera_info.firmware_update_id: "UPD-1", rs.camera_info.name: "Intel RealSense D4XX Recovery"}
-    dfu.get_info.side_effect = lambda k: info_map.get(k) if k in info_map else (_ for _ in ()).throw(RuntimeError())
-    with mgr.lock:
-        assert mgr._add_cameras([dfu]) == []
 
 
 # --- Hardware reset ---
@@ -103,3 +100,35 @@ def test_on_devices_changed_remove_evicts_only_target():
     mgr._on_devices_changed(info_remove)
 
     assert "serial-A" not in mgr.cameras and "serial-B" in mgr.cameras
+
+
+def test_a_camera_in_recovery_mode_is_listed_by_its_firmware_update_id():
+    """No serial number and no sensors in recovery mode: listed so that a client can flash it back"""
+    mgr = RealSenseManager()
+    dfu = MagicMock()
+    dfu.is_update_device.return_value = True
+    info_map = {rs.camera_info.firmware_update_id: "UPD-1", rs.camera_info.name: "Intel RealSense D4XX Recovery"}
+    dfu.get_info.side_effect = lambda k: info_map.get(k) if k in info_map else (_ for _ in ()).throw(RuntimeError())
+    with mgr.lock:
+        assert mgr._add_cameras([dfu]) == ["UPD-1"]
+    camera = mgr.cameras["UPD-1"]
+    assert (camera.info.get("serial_number"), camera.info["firmware_update_id"]) == (None, "UPD-1")
+
+
+def test_a_camera_keeps_its_id_into_recovery_mode_and_back():
+    """As enter_update_state and update do: the camera leaves, returns in recovery mode, leaves, returns. The
+    firmware-update ID is the one it reports in both states, so clients keep addressing it the same"""
+    mgr = RealSenseManager()
+    normal = _make_mock_device("UPD-1")
+    dfu = MagicMock()
+    dfu.is_update_device.return_value = True
+    info_map = {rs.camera_info.firmware_update_id: "UPD-1", rs.camera_info.name: "Intel RealSense D4XX Recovery"}
+    dfu.get_info.side_effect = lambda k: info_map.get(k) if k in info_map else (_ for _ in ()).throw(RuntimeError())
+    states = []
+    for leaving, coming in ((None, normal), (normal, dfu), (dfu, normal)):
+        info = MagicMock()
+        info.get_new_devices.return_value = [coming]
+        info.was_removed.side_effect = lambda d, leaving=leaving: d is leaving
+        mgr._on_devices_changed(info)
+        states.append(("UPD-1" in mgr.cameras, mgr.cameras["UPD-1"].is_update_device()))  # a real camera may be listed too
+    assert states == [(True, False), (True, True), (True, False)]

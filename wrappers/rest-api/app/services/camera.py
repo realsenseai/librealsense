@@ -30,9 +30,10 @@ class Camera:
                     self.info[name] = dev.get_info(key)
             except RuntimeError:
                 pass
-        # Its serial number. A device without one, such as one in recovery (DFU) mode, raises, and is not listed
-        self.id: str = dev.get_info(rs.camera_info.serial_number)
-        self.pipeline = rs.pipeline(ctx)
+        # Its firmware-update ID: the one ID it has in every state, recovery (DFU) mode included, where it has no
+        # serial number. A device without one raises, and is not listed
+        self.id: str = dev.get_info(rs.camera_info.firmware_update_id)
+        self.pipeline = rs.pipeline(ctx)  # also for a camera in recovery mode: the SDK refuses to start it
         self.pipeline.set_device(dev)  # skips re-creating the device on start
         self._events = events
         self._frame_sender = frame_sender
@@ -51,8 +52,26 @@ class Camera:
 
     def is_metadata_enabled(self) -> bool:
         """False only where Windows keeps its frame metadata off until it is enabled (the SDK says True elsewhere);
-        read from the registry each call"""
+        read from the registry each call. In recovery mode, with no sensors, the SDK refuses the question"""
         return self.dev.is_metadata_enabled()
+
+    def is_update_device(self) -> bool:
+        return self.dev.is_update_device()
+
+    def check_firmware_compatibility(self, image: bytearray) -> bool:
+        return rs.updatable(self.dev).check_firmware_compatibility(image)
+
+    def enter_update_state(self) -> None:
+        rs.updatable(self.dev).enter_update_state()
+
+    def update_firmware(self, image: bytearray) -> None:
+        last = [-1]  # one firmware_progress event per percent: the SDK ticks far more often
+
+        def on_progress(progress: float) -> None:
+            if int(progress * 100) != last[0]:
+                last[0] = int(progress * 100)
+                self._events.emit("firmware_progress", {"device_id": self.id, "progress": progress})
+        self.dev.as_update_device().update(image, on_progress)
 
     def hardware_reset(self) -> None:
         """The devices-changed callback reports it leaving and coming back, as in the legacy viewer"""

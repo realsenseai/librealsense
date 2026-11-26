@@ -1,7 +1,7 @@
 // API Types for RealSense REST API
 
 export interface DeviceInfo {
-  device_id: string  // its serial number: what the server knows it by
+  device_id: string  // its firmware-update ID: what the server knows it by
   info: Record<string, string>  // every camera info it reports, by its SDK name: name, serial_number, product_line...
 }
 
@@ -46,10 +46,13 @@ export function firmwareStatus(current?: string, recommended?: string): Firmware
 }
 
 // No verdict stored: it would go stale as soon as the camera reports a different version.
+/** The step of a firmware update: the bar fills only while it is written ('installing') */
+export type FirmwarePhase = 'downloading' | 'checking' | 'recovery' | 'installing' | 'restarting'
+
 export interface FirmwareState {
   recommended?: string
   is_updating?: boolean
-  phase?: 'downloading' | 'installing'  // one-click update: download then install
+  phase?: FirmwarePhase
   progress?: number
   last_error?: string | null
 }

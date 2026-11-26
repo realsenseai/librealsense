@@ -1,6 +1,5 @@
 fastapi==0.120.1;        platform_machine != "aarch64"
 uvicorn==0.54.0;         platform_machine != "aarch64"
 pydantic==2.12.5;        platform_machine != "aarch64"
-python-multipart==0.0.29; platform_machine != "aarch64" # Used internally by FastAPI to parse file uploads (e.g. FW update endpoint)
 websockets==16.1.1;      platform_machine != "aarch64" # uvicorn's WebSocket support: the frame and event sockets; 17 needs Python 3.11
 #pyrealsense2==2.56.4.9191; platform_machine != "aarch64"

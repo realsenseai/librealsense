@@ -139,16 +139,40 @@ describe('API Client', () => {
   })
 
   describe('Firmware', () => {
-    it('fetches the recommended version for a device', async () => {
+    // A camera that goes to recovery mode on enter_update_state and back once written; the steps posted
+    function camera(compatible: boolean, recovery = false) {
+      const steps: string[] = []
       server.use(
-        http.get('/api/v1/devices/:deviceId/firmware/', () =>
-          HttpResponse.json({ recommended: '5.17.3.10' })
-        )
+        http.get('/api/v1/devices/:deviceId/is_update_device', () => HttpResponse.json(recovery)),
+        http.post('/api/v1/devices/:deviceId/firmware/:step', ({ params }) => {
+          steps.push(params.step as string)
+          if (params.step === 'check_firmware_compatibility') return HttpResponse.json(compatible)
+          recovery = params.step === 'enter_update_state'
+          return HttpResponse.json(null)
+        }),
       )
+      return steps
+    }
 
-      const { recommended } = await apiClient.getRecommendedFirmware(mockDevice.device_id)
+    it('updates through the SDK calls in turn: check, recovery mode, write, back', async () => {
+      const steps = camera(true)
+      const shown: string[] = []
+      await apiClient.updateFirmware(mockDevice.device_id, new Blob(['fw']), (phase) => shown.push(phase))
+      expect(steps).toEqual(['check_firmware_compatibility', 'enter_update_state', 'update'])
+      expect(shown).toEqual(['checking', 'recovery', 'installing', 'restarting'])
+    })
 
-      expect(recommended).toBe('5.17.3.10')
+    it('leaves a camera out of recovery mode when the image is refused', async () => {
+      const steps = camera(false)
+      await expect(apiClient.updateFirmware(mockDevice.device_id, new Blob(['fw'])))
+        .rejects.toThrow('Firmware is not compatible with this device')
+      expect(steps).toEqual(['check_firmware_compatibility'])
+    })
+
+    it('writes a camera already in recovery mode at once', async () => {
+      const steps = camera(true, true)
+      await apiClient.updateFirmware(mockDevice.device_id, new Blob(['fw']))
+      expect(steps).toEqual(['update'])
     })
   })
 

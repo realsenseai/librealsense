@@ -34,7 +34,7 @@ export const test = base.extend<TestFixtures>({
     const serial = process.env.DEVICE_SERIAL
     const info = serial ? infos.find(i => i.serial_number === serial) : infos[0]
     expect(info, `DEVICE_SERIAL=${serial ?? '(first available)'} did not enumerate`).toBeTruthy()
-    await use({ device_id: info!.serial_number, info: info! })
+    await use({ device_id: info!.firmware_update_id, info: info! })
   },
 })
 

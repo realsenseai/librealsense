@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { render, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { DevicePanel } from '@/components/DevicePanel'
 import { useAppStore } from '@/store'
+import { apiClient } from '@/api/client'
+import { VERSIONS_DB_URL } from '@/api/firmware'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
 
 describe('DevicePanel', () => {
   beforeEach(() => {
@@ -106,6 +110,16 @@ describe('DevicePanel', () => {
       
       expect(screen.getByText(/5\.16\.0\.1/)).toBeInTheDocument()
     })
+
+    it('shows a camera in recovery mode, which has no serial number, as legacy does', () => {
+      const dfu = createMockDevice({ device_id: 'UPD-1', info: { name: 'Intel RealSense D4XX Recovery' } })
+      delete dfu.info.serial_number
+
+      render(<DevicePanel />, { initialStoreState: { devices: [dfu], deviceStates: {} } })
+
+      expect(screen.getByText('Intel RealSense D4XX Recovery')).toBeInTheDocument()
+      expect(screen.getByText('S/N: Unknown')).toBeInTheDocument()
+    })
   })
 
   describe('Error Handling', () => {
@@ -200,16 +214,22 @@ describe('DevicePanel', () => {
       expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument()
     })
 
-    it('the toast Update action starts the recommended update for that device', async () => {
-      const updateFirmwareFromRecommended = vi.fn().mockResolvedValue(undefined)
-      useAppStore.setState({ updateFirmwareFromRecommended })
+    it('the toast Update action updates that device with the recommended image', async () => {
       const { device, ds } = outdated()
+      server.use(
+        http.get(VERSIONS_DB_URL, () => HttpResponse.json({ versions: [{ device_name: device.info.name,
+          policy_type: 'RECOMMENDED', component: 'FIRMWARE', version: '5.17.3.10', platform: '*',
+          link: 'https://example.test/fw.bin' }] })),
+        http.get('https://example.test/fw.bin', () => HttpResponse.arrayBuffer(new ArrayBuffer(2))),
+      )
+      const updateFirmware = vi.spyOn(apiClient, 'updateFirmware').mockResolvedValue()
       render(<DevicePanel />, {
         initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
       })
 
       await userEvent.click(await screen.findByRole('button', { name: 'Update' }))
-      expect(updateFirmwareFromRecommended).toHaveBeenCalledWith(device.device_id)
+      await waitFor(() => expect(updateFirmware).toHaveBeenCalledWith(device.device_id, expect.any(Blob), expect.any(Function)))
+      expect(await screen.findByText('✓ Update Complete')).toBeInTheDocument()
     })
 
     it('does not toast when firmware is up to date', async () => {

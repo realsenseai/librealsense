@@ -13,7 +13,6 @@ client = TestClient(app)
 
 STREAM_CONFIG = [{"stream": "depth", "index": 0, "width": 640, "height": 480, "format": "z16", "fps": 30}]
 OPTIONS_URL = "/api/v1/devices/device1/sensors/0/options"
-FIRMWARE_URL = "/api/v1/devices/device1/firmware/update_from_file"
 
 FAKE_DEVICES = setup_fake_devices()
 

@@ -7,7 +7,7 @@ It simplifies remote control and data streaming from RealSense devices by handli
 
 1.  **RESTful Operations:** For device discovery, configuration, and control.
 2.  **WebSocket frames:** Each stream's frames as the SDK gives them, one WebSocket per stream.
-3.  **WebSocket events:** `/api/v1/events` tells every client what changed (devices, streaming, firmware updates).
+3.  **WebSocket events:** `/api/v1/events` tells every client what changed (devices, streaming, firmware writes).
 
 Frames are sent raw (720p depth + color is about 1 Gbit/s), so a slower link drops the FPS; compression for remote viewing is planned (RSDEV-16485).
 
@@ -30,7 +30,7 @@ Frames are sent raw (720p depth + color is about 1 Gbit/s), so a slower link dro
     *   Each binary message is one frame: a JSON header (number, timestamp, metadata, profile, size, intrinsics) and the frame's bytes, unchanged; see `app/services/frame_sender.py`.
 *   **Events:**
     *   Open a plain WebSocket to `/api/v1/events`; each message is JSON, `{"event": name, ...fields}`.
-    *   `devices_changed`, `streaming_changed`, `firmware_progress`, `firmware_update_success`, `firmware_update_failed`, `options_changed`; see `app/services/events.py`.
+    *   `devices_changed`, `streaming_changed`, `firmware_progress`, `options_changed`; see `app/services/events.py`.
     *   Events are not replayed: read the current state through the REST API once connected.
 
 ## Changes from v2.59.2
@@ -47,12 +47,15 @@ The API now mirrors the SDK's own objects and calls. Breaking changes:
     *   A route to one option has no trailing slash: `.../options/{option_id}`, `.../filters/{name}/{field}`, `.../advanced_mode/controls/{group}/{field}`.
     *   Advanced-mode controls are `AdvancedControl` (`current_value`, `min_value`, `max_value`, `integer`) by group, instead of `OptionInfo` lists.
 *   **Devices and frames:**
-    *   A device is the SDK's camera info by name (`serial_number`, `firmware_version`, `advanced_mode`, ...) instead of `DeviceInfo`; its ID is its serial number. `force_refresh` and `POST /devices/refresh` are gone.
+    *   A device is the SDK's camera info by name (`serial_number`, `firmware_version`, `advanced_mode`, ...) instead of `DeviceInfo`; its ID is its firmware-update ID, which a camera in recovery mode also has. `force_refresh` and `POST /devices/refresh` are gone.
     *   `GET .../advanced_mode/` is gone: read the camera info `advanced_mode`, YES or NO.
     *   Metadata status is `GET .../is_metadata_enabled`; `POST /system/enable-metadata` is `enable_metadata` and answers nothing.
     *   `extrinsics` takes `from_stream`, `from_index`, `to_stream`, `to_index` and answers one `Extrinsics`.
     *   `POST .../hw_reset/` is `POST .../hardware_reset` and answers nothing.
     *   HWM answers the firmware's raw reply bytes instead of `HwmResponse`: its first uint32 echoes the opcode, or is the firmware's error code.
+*   **Firmware:**
+    *   `GET .../firmware/`, `POST .../firmware/update_from_file` and `update_from_recommended` are gone: the client finds and downloads the image itself, from the online versions list, as the legacy viewer does, and drives the SDK's calls: `POST .../firmware/check_firmware_compatibility`, `enter_update_state` and `update`, each taking the image as the request body, sent with `Content-Type: application/octet-stream` (without it the request is refused, 422).
+    *   A camera in recovery mode is listed, under the same ID; `GET .../is_update_device` says whether it is in recovery mode.
 
 ## Missing Features
 * Not all SDK capabilities are yet supported(e.g. Texture Mapping, Post processing filters,...)

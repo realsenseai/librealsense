@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import { VERSIONS_DB_URL } from '../../src/api/firmware'
 import { mockDeviceList, mockDevice } from './fixtures/devices'
 import { mockSensors, mockDepthOptions, mockColorOptions, mockMotionOptions, mockFilters } from './fixtures/sensors'
 
@@ -100,8 +101,8 @@ export const handlers = [
   http.get(`${API_BASE}/devices/:deviceId/extrinsics`, () =>
     HttpResponse.json({ rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], translation: [0.015, 0, 0] })),
 
-  // Recommended firmware (none, unless a test says otherwise)
-  http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),
+  // The online versions list: recommends nothing, unless a test says otherwise
+  http.get(VERSIONS_DB_URL, () => HttpResponse.json({ versions: [] })),
 
 ]
 

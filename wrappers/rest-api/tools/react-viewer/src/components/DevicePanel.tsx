@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MutableRefObject, ReactElement } from 'react'
 import { useAppStore } from '../store'
 import { apiClient } from '../api/client'
-import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState } from '../api/types'
+import { downloadFirmware, recommendedFirmware } from '../api/firmware'
+import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, FirmwarePhase } from '../api/types'
 import { SECTIONS, firmwareStatus, isStreaming, optionLabel } from '../api/types'
 import {
   applyFormat, applyFps, applyResolution, applyToggle, withStream,
@@ -134,14 +135,11 @@ export function DevicePanel() {
 startSensorStreaming,
     stopSensorStreaming,
     checkFirmwareUpdates,
-    updateFirmwareFromFile,
-    updateFirmwareFromRecommended,
     toggleAdvancedMode,
   } = useAppStore()
 
   const [toasts, setToasts] = useState<Toast[]>([])
-  // Only one FW update can run at a time, so a single-value state is enough.
-  // Snapshot, not a lookup: the camera leaves the device list while it is in DFU.
+  // Snapshot, not a lookup: the camera leaves the device list for a moment each way in and out of recovery mode.
   const [firmwareProgressDevice, setFirmwareProgressDevice] = useState<DeviceInfo | null>(null)
   const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
   const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
@@ -149,47 +147,48 @@ startSensorStreaming,
   // Counter, not just Date.now(): several cameras can raise a firmware proposal in the
   // same tick, and duplicate keys would make React drop all but one toast.
   const toastSeqRef = useRef(0)
-  const addToast = (type: ToastType, message: string, action?: ToastAction) => {
+  const addToast = useCallback((type: ToastType, message: string, action?: ToastAction) => {
     const id = `${Date.now()}-${toastSeqRef.current++}`
     setToasts((prev) => [...prev, { id, type, message, action }])
-  }
+  }, [])
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }
 
-  const handleFirmwareProgressUpdate = (progress: number, phase?: 'downloading' | 'installing') => {
+  const handleFirmwareProgressUpdate = useCallback((progress: number, phase?: FirmwarePhase) => {
     setFirmwareProgressState((prev) =>
       prev
         ? { ...prev, progress, ...(phase ? { phase } : {}) }
         : { is_updating: true, progress, phase }
     )
-  }
+  }, [])
 
-  const handleFirmwareSuccess = (fwVersion: string | null) => {
+  // A new step starts its bar at 0; only 'installing' then fills it, from the firmware_progress events
+  const handleFirmwareStep = useCallback((phase: FirmwarePhase) => handleFirmwareProgressUpdate(0, phase),
+    [handleFirmwareProgressUpdate])
+
+  const handleFirmwareSuccess = useCallback(() => {
     setFirmwareProgressState((prev) =>
       prev
-        ? { ...prev, progress: 1.0, is_updating: false }
+        ? { ...prev, progress: 1.0, is_updating: false, last_error: null }
         : { is_updating: false, progress: 1.0 }
     )
-    addToast('success', `Firmware update successful! Version: ${fwVersion || 'Unknown'}`)
-    // Backend has already refreshed the device list (in _refresh_until_device_returns)
-    // by the time it emits firmware_update_success; pull the new device_infos so
-    // the UI shows the updated firmware_version without a manual Refresh click.
+    addToast('success', 'Firmware update successful!')
+    // The camera is back by now: pull the new device list so it shows its new firmware_version
     fetchDevices()
-  }
+  }, [addToast, fetchDevices])
 
-  const handleFirmwareError = (error: string) => {
+  const handleFirmwareError = useCallback((error: string) => {
     setFirmwareProgressState((prev) =>
       prev
         ? { ...prev, is_updating: false, last_error: error }
         : { is_updating: false, progress: 0, last_error: error }
     )
     addToast('error', `Firmware update failed: ${error}`)
-    // Device may or may not have returned; refresh so the UI reflects the
-    // current connection state (e.g. stuck-in-DFU disappears from the list).
+    // It may be back, or left in recovery mode, where it is listed to be updated again
     fetchDevices()
-  }
+  }, [addToast, fetchDevices])
 
   const handleCloseFirmwareModal = () => {
     setFirmwareProgressDevice(null)
@@ -202,23 +201,26 @@ startSensorStreaming,
       setFirmwareFileName(label)
       setFirmwareProgressDevice(device)
       setFirmwareProgressState({ is_updating: true, phase, progress: 0, last_error: null })
-      // Rejected outright: no firmware event will arrive, so close the modal ourselves.
-      run(device.device_id).catch((error: Error) => {
-        handleCloseFirmwareModal()
-        addToast('error', error.message)
-      })
+      run(device.device_id).then(handleFirmwareSuccess, (err: any) =>
+        handleFirmwareError(err?.response?.data?.detail ?? err?.message ?? 'Firmware update failed'))
     },
-    [],
+    [handleFirmwareSuccess, handleFirmwareError],
   )
 
   const handleUpdateFirmwareFromFile = (device: DeviceInfo, file: File) =>
-    startFirmwareUpdate(device, file.name, undefined, (deviceId) => updateFirmwareFromFile(deviceId, file))
+    startFirmwareUpdate(device, file.name, undefined,
+      (deviceId) => apiClient.updateFirmware(deviceId, file, handleFirmwareStep))
 
   const handleUpdateFromRecommended = useCallback((device: DeviceInfo) => {
     const recommended = useAppStore.getState().deviceStates[device.device_id]?.firmware?.recommended
     const label = recommended ? `Firmware ${recommended}` : 'Recommended firmware'
-    startFirmwareUpdate(device, label, 'downloading', updateFirmwareFromRecommended)
-  }, [startFirmwareUpdate, updateFirmwareFromRecommended])
+    startFirmwareUpdate(device, label, 'downloading', async (deviceId) => {
+      const firmware = await recommendedFirmware(device.info.name)
+      if (!firmware) throw new Error('No recommended firmware for this camera')
+      const image = await downloadFirmware(firmware.link, handleFirmwareProgressUpdate)
+      await apiClient.updateFirmware(deviceId, image, handleFirmwareStep)
+    })
+  }, [startFirmwareUpdate, handleFirmwareProgressUpdate, handleFirmwareStep])
 
   const promptedSetRef = useRef<string>('')
   const enableInFlightRef = useRef<boolean>(false)
@@ -254,7 +256,7 @@ startSensorStreaming,
   const promptedFirmwareRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     showFirmwareUpdatePromptsIfNeeded(deviceStates, promptedFirmwareRef, addToast, removeToast, handleUpdateFromRecommended)
-  }, [deviceStates, handleUpdateFromRecommended])
+  }, [deviceStates, handleUpdateFromRecommended, addToast])
 
   return (
     <div className="p-4">
@@ -333,8 +335,6 @@ onStartSensorStreaming={(sensorIndex) => startSensorStreaming(device.device_id, 
           fileName={firmwareFileName || undefined}
           onClose={handleCloseFirmwareModal}
           onProgressUpdate={handleFirmwareProgressUpdate}
-          onSuccess={handleFirmwareSuccess}
-          onError={handleFirmwareError}
         />
       )}
 

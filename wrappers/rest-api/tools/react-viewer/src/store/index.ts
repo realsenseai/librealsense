@@ -1,4 +1,4 @@
-import { create, type StoreApi } from 'zustand'
+import { create } from 'zustand'
 import type {
   DeviceInfo,
   SensorInfo,
@@ -9,7 +9,6 @@ import type {
   AdvancedControls,
   ControlGroup,
   SensorFilters,
-  FirmwareState,
 SensorStreamStatus,
   SupportedStreamProfile,
 } from '../api/types'
@@ -114,6 +113,7 @@ for (const [key, listed] of Object.entries(active)) {
   return { sensorStreamingStatus, streamConfigs }
 }
 import { apiClient } from '../api/client'
+import { recommendedFirmware } from '../api/firmware'
 import { isStreaming, optionLabel, profilesAt, streamKey } from '../api/types'
 import {
   checkChatAvailability,
@@ -139,8 +139,6 @@ interface AppState {
   fetchDevices: () => Promise<void>
   enableMetadata: () => Promise<void>
   checkFirmwareUpdates: (deviceId: string) => Promise<string | undefined>
-  updateFirmwareFromFile: (deviceId: string, file: File) => Promise<void>
-  updateFirmwareFromRecommended: (deviceId: string) => Promise<void>
   toggleAdvancedMode: (deviceId: string, enable: boolean) => Promise<void>
   fetchDeviceControls: (deviceId: string) => Promise<void>
   /** One group of controls as the device now holds it, after any client wrote it */
@@ -213,40 +211,6 @@ interface AppState {
   clearError: () => void
 }
 
-// Shared driver for both firmware-update paths (user file + recommended download):
-// flips is_updating, runs the API call (progress arrives as events), refreshes
-// device info, and records any failure on the device's firmware state.
-async function performFirmwareUpdate(
-  set: StoreApi<AppState>['setState'],
-  get: StoreApi<AppState>['getState'],
-  deviceId: string,
-  apiCall: () => Promise<unknown>,
-): Promise<void> {
-  const setFirmwareState = (patch: Partial<FirmwareState>) =>
-    set((state) => {
-      const ds = state.deviceStates[deviceId]
-      if (!ds) return state
-      const prev = ds.firmware ?? {}
-      return { deviceStates: { ...state.deviceStates, [deviceId]: { ...ds, firmware: { ...prev, ...patch } } } }
-    })
-
-  setFirmwareState({ is_updating: true, progress: 0, last_error: null })
-
-  try {
-    await apiCall()
-    // The backend only responds once the flashed device has re-enumerated
-    // (_refresh_until_device_returns), so one forced fetch is enough to pick it up.
-    await get().fetchDevices()
-    setFirmwareState({ is_updating: false, progress: 1 })
-  } catch (error) {
-    const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-    const message = detail || (error instanceof Error ? error.message : 'Firmware update failed')
-    setFirmwareState({ is_updating: false, last_error: message })
-    // A request rejected outright emits no firmware event, so only the caller can react.
-    throw new Error(message)
-  }
-}
-
 export type { AppState }
 
 export const useAppStore = create<AppState>()((set, get, api) => ({
@@ -292,12 +256,6 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       })
     }
   },
-
-  updateFirmwareFromFile: (deviceId: string, file: File) =>
-    performFirmwareUpdate(set, get, deviceId, () => apiClient.updateFirmwareFromFile(deviceId, file)),
-
-  updateFirmwareFromRecommended: (deviceId: string) =>
-    performFirmwareUpdate(set, get, deviceId, () => apiClient.updateFirmwareFromRecommended(deviceId)),
 
   enableMetadata: async () => {
     await apiClient.enableMetadata()
@@ -433,7 +391,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
   // Returns the recommendation too: a device that isn't activated has no state to store it
   // in. Rejects on failure — reporting is the caller's business.
   checkFirmwareUpdates: async (deviceId: string) => {
-    const { recommended } = await apiClient.getRecommendedFirmware(deviceId)
+    const name = get().devices.find((d) => d.device_id === deviceId)?.info.name ?? ''
+    const recommended = (await recommendedFirmware(name))?.version
     set((state) => {
       const ds = state.deviceStates[deviceId]
       if (!ds) return state
@@ -465,7 +424,6 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       // Activate: create device state and fetch sensors
       const deviceState: DeviceState = {
         device,
-        firmware: { is_updating: false, progress: undefined, last_error: null },
         sensors: [],
         controls: {},
         streamConfigs: [],

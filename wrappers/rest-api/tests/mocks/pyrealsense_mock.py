@@ -50,7 +50,8 @@ class camera_info(enum.Enum):
     usb_type_descriptor = 9
     product_line_usb_type = 10
     recommended_firmware_version = 11
-    count = 12
+    firmware_update_id = 12
+    count = 13
 
 # Define option enums used in the options system
 class option(enum.Enum):
@@ -112,6 +113,7 @@ class device:
         self.sensors = []
         self._info = {
             camera_info.serial_number: serial_number,
+            camera_info.firmware_update_id: serial_number,
             camera_info.name: name,
             camera_info.firmware_version: "1.0.0",
             camera_info.physical_port: "USB1",
@@ -135,6 +137,9 @@ class device:
 
     def is_metadata_enabled(self):
         return True
+
+    def is_update_device(self):
+        return False
 
     def is_debug_protocol(self):
         """Return True if this device exposes the RS2_EXTENSION_DEBUG extension."""

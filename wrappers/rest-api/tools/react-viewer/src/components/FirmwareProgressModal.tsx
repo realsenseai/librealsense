@@ -1,6 +1,15 @@
 import { useEffect } from 'react'
-import { apiClient } from '../api/client'
-import type { DeviceInfo, FirmwareState } from '../api/types'
+import { onEvent } from '../api/events'
+import type { DeviceInfo, FirmwarePhase, FirmwareState } from '../api/types'
+
+// What each step of an update shows: its title, and what the user waits for
+const STEPS: Record<FirmwarePhase, [string, string]> = {
+  downloading: ['Downloading firmware…', 'Fetching the recommended image. This can be slow on some networks.'],
+  checking: ['Checking the image…', 'The SDK checks that this image fits the camera.'],
+  recovery: ['Switching to recovery mode…', 'The camera disconnects and comes back as a recovery device.'],
+  installing: ['Installing firmware…', 'This may take 1-2 minutes. Please do not disconnect the device.'],
+  restarting: ['Restarting the camera…', 'Written. Waiting for the camera to come back with its new firmware.'],
+}
 
 interface FirmwareProgressModalProps {
   isOpen: boolean
@@ -8,9 +17,7 @@ interface FirmwareProgressModalProps {
   firmware: FirmwareState
   fileName?: string
   onClose: () => void
-  onProgressUpdate: (progress: number, phase?: 'downloading' | 'installing') => void
-  onSuccess: (firmwareVersion: string | null) => void
-  onError: (error: string) => void
+  onProgressUpdate: (progress: number) => void
 }
 
 export function FirmwareProgressModal({
@@ -20,36 +27,19 @@ export function FirmwareProgressModal({
   fileName,
   onClose,
   onProgressUpdate,
-  onSuccess,
-  onError,
 }: FirmwareProgressModalProps) {
   useEffect(() => {
     if (!isOpen) return
 
-    const unsubscribeProgress = apiClient.onFirmwareProgress(device.device_id, onProgressUpdate)
-
-    const unsubscribeSuccess = apiClient.onFirmwareSuccess(device.device_id, (fwVersion: string | null) => {
-      onSuccess(fwVersion)
-    })
-
-    const unsubscribeError = apiClient.onFirmwareError(device.device_id, (error: string) => {
-      onError(error)
-    })
-
-    return () => {
-      unsubscribeProgress()
-      unsubscribeSuccess()
-      unsubscribeError()
-    }
-  }, [isOpen, device.device_id, onProgressUpdate, onSuccess, onError])
+    return onEvent<{ device_id: string; progress: number }>('firmware_progress',
+      (m) => m.device_id === device.device_id && onProgressUpdate(m.progress))
+  }, [isOpen, device.device_id, onProgressUpdate])
 
   if (!isOpen) return null
 
-  // Download and install each report 0..1; give them one shared 0-20/20-100 scale so the
-  // bar never rewinds between the two phases.
-  const fraction = firmware.progress || 0
-  const progress = Math.round((firmware.phase === 'downloading' ? fraction * 0.2 : 0.2 + fraction * 0.8) * 100)
-  // Only a terminal event means done: the SDK hits 100% long before the camera is back.
+  // Each phase fills the bar once; its label says which one it is
+  const progress = Math.round((firmware.progress || 0) * 100)
+  // Only the update's outcome means done: the SDK hits 100% long before the camera is back.
   const done = firmware.is_updating === false && !firmware.last_error
 
   return (
@@ -76,15 +66,10 @@ export function FirmwareProgressModal({
                 <div className="font-semibold">✓ Update Complete</div>
                 <div className="text-sm mt-1">Firmware has been successfully installed</div>
               </div>
-            ) : firmware.phase === 'downloading' ? (
-              <div className="text-gray-300 text-sm">
-                <div className="font-semibold mb-1">Downloading firmware…</div>
-                <div className="text-gray-400">Fetching the recommended image. This can be slow on some networks.</div>
-              </div>
             ) : (
               <div className="text-gray-300 text-sm">
-                <div className="font-semibold mb-1">Installing firmware...</div>
-                <div className="text-gray-400">This may take 1-2 minutes. Please do not disconnect the device.</div>
+                <div className="font-semibold mb-1">{STEPS[firmware.phase ?? 'installing'][0]}</div>
+                <div className="text-gray-400">{STEPS[firmware.phase ?? 'installing'][1]}</div>
               </div>
             )}
           </div>
