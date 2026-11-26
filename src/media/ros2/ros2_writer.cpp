@@ -113,7 +113,7 @@ namespace librealsense
         bool _stop = false;
     };
 
-    // Half the cores, between 2 and 4: enough to encode 30 fps of 1280x720 depth on a Jetson without taking it over
+    // Half the cores, clamped to 2-4
     static size_t encoder_thread_count()
     {
         return std::min< size_t >( 4, std::max< size_t >( 2, std::thread::hardware_concurrency() / 2 ) );
