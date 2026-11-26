@@ -76,7 +76,6 @@ namespace librealsense
 
         std::mutex m_mutex;
         bool m_is_recording;
-        std::once_flag m_first_frame_flag;
         uint64_t m_cached_data_size;
         std::once_flag m_first_call_flag;
         void initialize_recording();

@@ -19,7 +19,7 @@ using namespace librealsense;
 librealsense::record_sensor::record_sensor( device_interface& device,
                                             sensor_interface& sensor) :
     m_sensor(sensor),
-    m_is_recording(false),
+    m_is_recording(true),  // option changes are recorded from creation, not only once streaming
     m_parent_device(device),
     m_is_sensor_hooked(false),
     m_register_notification_to_base(true),
@@ -385,7 +385,8 @@ void record_sensor::enable_sensor_options_recording()
                 }
                 options_container options;
                 std::shared_ptr< librealsense::option > option_snapshot;
-                option.create_snapshot( option_snapshot );
+                try { option.create_snapshot( option_snapshot ); }
+                catch( std::exception const & ) { return; }  // not a float value (e.g. a DDS string option)
                 options.register_option( id, option_snapshot );
                 std::shared_ptr< options_interface > options_snapshot;
                 options.create_snapshot( options_snapshot );

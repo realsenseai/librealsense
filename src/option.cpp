@@ -78,6 +78,7 @@ void float_option::set(float value)
         throw invalid_value_exception( rsutils::string::from()
                                        << "set(...) failed! " << value << " is not a valid value" );
     _value = value;
+    _recording_function( *this );
 }
 
 

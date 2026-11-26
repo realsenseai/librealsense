@@ -1004,6 +1004,8 @@ namespace librealsense
             << ")").str();
         auto regex = std::regex(regex_str);
         auto filter_topics = filter_topics_by_regex(regex);
+        if (filter_topics.empty())  // no device description - not a valid recording
+            throw io_exception("Invalid file: no device description found in recording");
 
         _storage->set_filter({filter_topics});
 
@@ -1032,12 +1034,14 @@ namespace librealsense
             else if (std::regex_match(msg->topic_name, std::regex(sensor_option_regex_str)))
             {
                 uint32_t sensor_index = ros2_topic::get_sensor_index(msg->topic_name);
-                // An option re-written mid-recording starts a second, partial scan; keep the first, full
-                // snapshot - later changes still reach playback as serialized_option messages.
+                // A later, partial scan is an option change: one at time 0 (set before the first frame) is part of
+                // the initial state; later ones still reach playback as serialized_option messages.
                 auto options = read_sensor_options({ get_device_index(), sensor_index });
                 auto & recorded_options = sensors_options[sensor_index];
                 if( ! recorded_options )
                     recorded_options = options;
+                else if( msg->time_stamp == 0 )
+                    recorded_options->update( options );
             }
             else if (std::regex_match(msg->topic_name, std::regex(post_processing_blocks_regex_str)))
             {
@@ -1064,6 +1068,8 @@ namespace librealsense
 
                 sensor_to_streams[stream_id.sensor_index].push_back(stream_profile);
             }
+            if (peek_next_cached() == msg)
+                read_next_cached();  // skip anything no branch consumed so the loop always advances
         }
 
         // Build sensor descriptions from info and streams
