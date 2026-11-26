@@ -144,7 +144,7 @@ extern "C" {
         RS2_OPTION_DUAL_RGB_RECTIFICATION, /**< D585 2C: enable/disable firmware rectification of the dual-RGB pair (pre-stream only) */
         RS2_OPTION_EMITTER_MODE, /**< Emitter mode, mutually exclusive values: Off, On, Always On (constant laser), On Off (alternating per frame) */
         RS2_OPTION_ENABLE_ALIGNED_DEPTH, /**< Device-side depth-to-color alignment: the depth stream returns Z16 aligned to the color viewport. */
-        RS2_OPTION_PASSIVE_DEPTH_MODE, /**< D585 2C: which exposure classes produce depth, see rs2_passive_depth_mode for values (pre-stream only) */
+        RS2_OPTION_PASSIVE_DEPTH_MODE, /**< D585 2C: which depth frames are delivered, active (laser on) and / or passive (laser off), see rs2_passive_depth_mode for values (set with the streams stopped) */
         RS2_OPTION_DUAL_RGB_ENABLE_AUTO_EXPOSURE, /**< D585 2C: enable / disable auto-exposure of the RGB cameras, independent of the depth auto-exposure */
         RS2_OPTION_DUAL_RGB_EXPOSURE, /**< D585 2C: RGB exposure time in 100 microsecond units, like other color sensors. Setting any value disables RGB auto-exposure */
         RS2_OPTION_DUAL_RGB_GAIN, /**< D585 2C: RGB gain. Setting any value disables RGB auto-exposure */
@@ -341,12 +341,12 @@ extern "C" {
     } rs2_colored_ir_auto_exposure_mode;
     const char* rs2_colored_ir_auto_exposure_mode_to_string( rs2_colored_ir_auto_exposure_mode mode );
 
-    /** \brief values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which exposure classes produce depth. */
+    /** \brief values for RS2_OPTION_PASSIVE_DEPTH_MODE option, selecting which depth frames are delivered to the host. */
     typedef enum rs2_passive_depth_mode
     {
-        RS2_PASSIVE_DEPTH_MODE_DISABLED = 0,  /**< Laser on: active depth only */
-        RS2_PASSIVE_DEPTH_MODE_ALTERNATING = 1,  /**< Laser alternates per frame: active and passive depth are both delivered */
-        RS2_PASSIVE_DEPTH_MODE_FULL = 2,  /**< Laser forced off: passive depth only */
+        RS2_PASSIVE_DEPTH_MODE_DISABLED = 0,  /**< Active depth frames only; the laser follows Emitter Enabled */
+        RS2_PASSIVE_DEPTH_MODE_ALTERNATING = 1,  /**< Active and passive depth frames, told apart by the frame emitter mode metadata */
+        RS2_PASSIVE_DEPTH_MODE_FULL = 2,  /**< Passive (laser off) depth frames only; the laser controls are locked */
         RS2_PASSIVE_DEPTH_MODE_COUNT        /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_passive_depth_mode;
     const char * rs2_passive_depth_mode_to_string( rs2_passive_depth_mode mode );

@@ -240,7 +240,7 @@ namespace librealsense
             if( auto laser = depth_sensor.get_option_handler( id ) )
                 depth_sensor.register_option( id, std::make_shared< passive_depth_locked_option >( laser, _passive_depth_mode ) );
 
-        // The emitter is part of the exposure schedule the firmware fixes at stream start, so it locks there too.
+        // The emitter also locks while streaming in Alternating, see passive_depth_locked_option.
         if( auto emitter = depth_sensor.get_option_handler( RS2_OPTION_EMITTER_ENABLED ) )
             depth_sensor.register_option( RS2_OPTION_EMITTER_ENABLED,
                                           std::make_shared< passive_depth_locked_option >( emitter, _passive_depth_mode,
