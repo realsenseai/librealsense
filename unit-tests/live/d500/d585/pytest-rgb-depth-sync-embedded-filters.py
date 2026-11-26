@@ -9,6 +9,7 @@ import pytest
 import pyrealsense2 as rs
 import pyrsutils as rsutils
 from rspy.pytest.device_helpers import require_min_fw_version
+from rspy.snippets import is_d585_dual_rgb
 import logging
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ class FilterToggle:
 @pytest.fixture
 def filter_setup( test_device, request ):
     dev, _ = test_device
+    if request.param == "none" and is_d585_dual_rgb( dev.get_info( rs.camera_info.name ) ):
+        pytest.skip( "In dual RGB the color is stamped half a frame period off depth, so the 2 ms sync KPI cannot be met" )
     if dev.get_info( rs.camera_info.connection_type ) == "GMSL":
         require_min_fw_version( dev, rsutils.version( "7.62.0.0" ), "temporal DPP and pipeline start/stop on GMSL" )
     if request.param == "temporal":
