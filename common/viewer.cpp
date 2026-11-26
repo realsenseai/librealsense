@@ -369,7 +369,7 @@ namespace rs2
         // Initialize and prepare depth and texture sources
         auto const depth_sources_count = init_depth_uid();
 
-        int selected_tex_source = -1;  // menu index of the checkmark, resolved after the loop
+        int selected_tex_source = 0;
         std::vector<std::string> tex_sources_str;
         std::vector<int> tex_sources;
         std::vector<rs2::stream_profile> tex_profiles;
@@ -426,37 +426,20 @@ namespace rs2
             }
         }
 
-        auto const is_device_cloud = []( rs2::stream_profile const & p )
-        {
-            return p.stream_type() == RS2_STREAM_POINT_CLOUD || p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD;
-        };
-        auto const cloud_it = std::find_if( tex_profiles.begin(), tex_profiles.end(), is_device_cloud );
-        auto const cloud_idx = cloud_it == tex_profiles.end() ? size_t( -1 ) : size_t( cloud_it - tex_profiles.begin() );
-
-        // The cloud's own colors are the default selection (-1), and a started IR takes over from them like RGB
-        auto const cloud_colors_selected = [&]()
-        {
-            return cloud_it != tex_profiles.end()
-                && ( selected_tex_source_uid == -1 || selected_tex_source_uid == tex_sources[cloud_idx] );
-        };
-
-        // The checkmark belongs on the cloud item, not on whichever stream happens to be first in the list
-        if( selected_tex_source < 0 )
-            selected_tex_source = cloud_colors_selected() ? int( cloud_idx ) : 0;
-
         for (int i = 0; i < tex_sources.size(); i++)
         {
             auto id = tex_sources[i];
             auto it = std::find(begin(last_tex_sources), end(last_tex_sources), id);
+            if( selected_tex_source_uid == -1 && tex_profiles[i].stream_type() == RS2_STREAM_INFRARED )
+                selected_tex_source_uid = id;  // nothing selected: IR textures the cloud, whichever starts first
             if (it == last_tex_sources.end())
             {
-                // Don't auto-switch to a Y8 stream (except IR over the cloud's colors), to depth (it would override the
-                // user's texture), nor to the device cloud's own colors
-                bool const ir_over_cloud_colors
-                    = tex_profiles[i].stream_type() == RS2_STREAM_INFRARED && cloud_colors_selected();
-                if( ( tex_profiles[i].format() != RS2_FORMAT_Y8 || ir_over_cloud_colors )
+                // Don't auto-switch to IR stream, to depth (when the source changes it would override the user's texture),
+                // nor to the device cloud's own depth colors
+                if (tex_profiles[i].format() != RS2_FORMAT_Y8
                     && tex_profiles[i].stream_type() != RS2_STREAM_DEPTH
-                    && ! is_device_cloud( tex_profiles[i] ) )
+                    && tex_profiles[i].stream_type() != RS2_STREAM_POINT_CLOUD
+                    && tex_profiles[i].stream_type() != RS2_STREAM_LABELED_POINT_CLOUD)
                     selected_tex_source_uid = id;
                 texture_update_time = glfwGetTime();
             }
