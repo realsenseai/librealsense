@@ -3,7 +3,8 @@
 
 """
 Test time-to-first-frame for pipeline API. Measures startup time from
-pipeline.start() to first frame for depth and color streams.
+pipeline.start() to first frame for depth and color streams,
+on a cold start and on a restart right after stop.
 
 Note: Using Windows Media Foundation to handle power management between USB actions
 can add ~27ms to the startup time.
@@ -17,7 +18,7 @@ log = logging.getLogger(__name__)
 import time
 import platform
 from rspy.snippets import is_dds_dev
-from rspy.pytest.device_helpers import is_d585_on_gmsl
+from rspy.pytest.device_helpers import is_d585_on_gmsl, parse_fw_version
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -26,12 +27,12 @@ pytestmark = [
 
 
 MAX_DELAY = 1.0  # [sec]
-MAX_DELAY_D585_GMSL = 2.0  # [sec] first stream after a reset takes 1.1-1.6 s on D585 over GMSL
+MAX_DELAY_D585_GMSL = 2.0  # [sec] first stream after a reset takes 1.1-1.6 s on D585 over GMSL; not on restart
 MAX_DELAY_COLOR_FROM_DEPTH = 2.0  # [sec] D401/D405 color powers up the RGB ISP on start: ~0.4 s more than depth, 1.2-1.4 s on Jetson GMSL
 
 
-def max_delay_for(dev):
-    return MAX_DELAY_D585_GMSL if is_d585_on_gmsl(dev) else MAX_DELAY
+def max_delay_for(dev, restart):
+    return MAX_DELAY_D585_GMSL if is_d585_on_gmsl(dev) and not restart else MAX_DELAY
 
 
 @pytest.fixture(scope="module")
@@ -59,10 +60,10 @@ def time_to_first_frame(ctx, config):
     return delay
 
 
-def test_pipeline_first_depth_frame_delay(pipeline_device):
+def pipeline_first_depth_frame_delay(pipeline_device, restart):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = max_delay_for(dev)
+    max_delay = max_delay_for(dev, restart)
     os_name = platform.system()
 
     log.info(f"Testing pipeline first depth frame delay on {product_name} device - {os_name} OS")
@@ -72,6 +73,13 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
     # connected device; without enable_device(sn) the pipeline picks the first match.
     depth_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     depth_cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
+
+    if restart:  # unmeasured start/stop, then measure the restart right after it
+        if "D585" in product_name and parse_fw_version(dev.get_info(rs.camera_info.firmware_version)) < (7, 62, 0, 0):
+            max_delay = 1.5  # golden 7.59 restarts in 1.2-1.4 s, fixed by 7.62
+        time_to_first_frame(ctx, depth_cfg)
+        if is_dds_dev(dev):
+            time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
 
     frame_delay = time_to_first_frame(ctx, depth_cfg)
 
@@ -86,13 +94,18 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
         time.sleep(1)
 
 
-# D421/D430 have no color
-@pytest.mark.device_exclude("D421")
-@pytest.mark.device_exclude("D430")
-def test_pipeline_first_color_frame_delay(pipeline_device):
+def test_pipeline_first_depth_frame_delay(pipeline_device):
+    pipeline_first_depth_frame_delay(pipeline_device, restart=False)
+
+
+def test_pipeline_restart_depth_frame_delay(pipeline_device):
+    pipeline_first_depth_frame_delay(pipeline_device, restart=True)
+
+
+def pipeline_first_color_frame_delay(pipeline_device, restart):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = MAX_DELAY_COLOR_FROM_DEPTH if any(m in product_name for m in ('D401', 'D405')) else max_delay_for(dev)
+    max_delay = MAX_DELAY_COLOR_FROM_DEPTH if any(m in product_name for m in ('D401', 'D405')) else max_delay_for(dev, restart)
     os_name = platform.system()
 
     log.info(f"Testing pipeline first color frame delay on {product_name} device - {os_name} OS")
@@ -103,6 +116,13 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
     color_cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     color_cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
+    if restart:  # unmeasured start/stop, then measure the restart right after it
+        if "D585" in product_name and parse_fw_version(dev.get_info(rs.camera_info.firmware_version)) < (7, 62, 0, 0):
+            max_delay = 1.5  # golden 7.59 restarts in 1.2-1.4 s, fixed by 7.62
+        time_to_first_frame(ctx, color_cfg)
+        if is_dds_dev(dev):
+            time.sleep(1)  # DDS stream stops only once the device sees the reader close; DDS restart is measured after that
+
     frame_delay = time_to_first_frame(ctx, color_cfg)
 
     log.info(f"Delay from pipeline.start() until first color frame is: {frame_delay:.3f} [sec] "
@@ -110,3 +130,19 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
 
     assert frame_delay < max_delay, \
         f"Color frame delay {frame_delay:.3f}s exceeds maximum {max_delay:.1f}s"
+
+    if is_dds_dev(dev):
+        time.sleep(1)  # let the DDS stream close before the next start
+
+
+# D421/D430 have no color
+@pytest.mark.device_exclude("D421")
+@pytest.mark.device_exclude("D430")
+def test_pipeline_first_color_frame_delay(pipeline_device):
+    pipeline_first_color_frame_delay(pipeline_device, restart=False)
+
+
+@pytest.mark.device_exclude("D421")
+@pytest.mark.device_exclude("D430")
+def test_pipeline_restart_color_frame_delay(pipeline_device):
+    pipeline_first_color_frame_delay(pipeline_device, restart=True)
