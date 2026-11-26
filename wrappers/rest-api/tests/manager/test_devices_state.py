@@ -113,3 +113,22 @@ def test_a_camera_in_recovery_mode_is_listed_by_its_firmware_update_id():
         assert mgr._add_cameras([dfu]) == ["UPD-1"]
     camera = mgr.cameras["UPD-1"]
     assert (camera.info.get("serial_number"), camera.info["firmware_update_id"]) == (None, "UPD-1")
+
+
+def test_a_camera_keeps_its_id_into_recovery_mode_and_back():
+    """As enter_update_state and update do: the camera leaves, returns in recovery mode, leaves, returns. The
+    firmware-update ID is the one it reports in both states, so clients keep addressing it the same"""
+    mgr = RealSenseManager()
+    normal = _make_mock_device("UPD-1")
+    dfu = MagicMock()
+    dfu.is_update_device.return_value = True
+    info_map = {rs.camera_info.firmware_update_id: "UPD-1", rs.camera_info.name: "Intel RealSense D4XX Recovery"}
+    dfu.get_info.side_effect = lambda k: info_map.get(k) if k in info_map else (_ for _ in ()).throw(RuntimeError())
+    states = []
+    for leaving, coming in ((None, normal), (normal, dfu), (dfu, normal)):
+        info = MagicMock()
+        info.get_new_devices.return_value = [coming]
+        info.was_removed.side_effect = lambda d, leaving=leaving: d is leaving
+        mgr._on_devices_changed(info)
+        states.append(("UPD-1" in mgr.cameras, mgr.cameras["UPD-1"].is_update_device()))  # a real camera may be listed too
+    assert states == [(True, False), (True, True), (True, False)]

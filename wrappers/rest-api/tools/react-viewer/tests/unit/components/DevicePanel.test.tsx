@@ -228,7 +228,7 @@ describe('DevicePanel', () => {
       })
 
       await userEvent.click(await screen.findByRole('button', { name: 'Update' }))
-      await waitFor(() => expect(updateFirmware).toHaveBeenCalledWith(device.device_id, expect.any(Blob)))
+      await waitFor(() => expect(updateFirmware).toHaveBeenCalledWith(device.device_id, expect.any(Blob), expect.any(Function)))
       expect(await screen.findByText('✓ Update Complete')).toBeInTheDocument()
     })
 

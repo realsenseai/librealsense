@@ -11,6 +11,7 @@ import type {
   OptionInfo,
   Extrinsics,
   SupportedStreamProfile,
+  FirmwarePhase,
 } from './types'
 
 const API_BASE = `${BACKEND_ORIGIN}/api/v1`
@@ -103,15 +104,19 @@ class ApiClient {
    * switch to recovery mode, write it, wait for the camera back. One already in recovery mode is written at once.
    * The write's progress comes as firmware_progress events.
    */
-  async updateFirmware(deviceId: string, image: Blob): Promise<void> {
+  async updateFirmware(deviceId: string, image: Blob, onStep: (phase: FirmwarePhase) => void = () => {}): Promise<void> {
     if (!(await this.isUpdateDevice(deviceId))) {
+      onStep('checking')
       if (!(await this.postImage<boolean>(deviceId, 'check_firmware_compatibility', image))) {
         throw new Error('Firmware is not compatible with this device')
       }
+      onStep('recovery')
       await this.client.post(`/devices/${deviceId}/firmware/enter_update_state`)
       await this.waitForUpdateDevice(deviceId, true, 'Recovery device did not connect in time')
     }
+    onStep('installing')
     await this.postImage(deviceId, 'update', image)
+    onStep('restarting')
     await this.waitForUpdateDevice(deviceId, false, 'Original device did not reconnect in time')
   }
 

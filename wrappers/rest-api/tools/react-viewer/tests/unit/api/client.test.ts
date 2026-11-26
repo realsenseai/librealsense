@@ -156,8 +156,10 @@ describe('API Client', () => {
 
     it('updates through the SDK calls in turn: check, recovery mode, write, back', async () => {
       const steps = camera(true)
-      await apiClient.updateFirmware(mockDevice.device_id, new Blob(['fw']))
+      const shown: string[] = []
+      await apiClient.updateFirmware(mockDevice.device_id, new Blob(['fw']), (phase) => shown.push(phase))
       expect(steps).toEqual(['check_firmware_compatibility', 'enter_update_state', 'update'])
+      expect(shown).toEqual(['checking', 'recovery', 'installing', 'restarting'])
     })
 
     it('leaves a camera out of recovery mode when the image is refused', async () => {

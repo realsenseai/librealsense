@@ -1,6 +1,15 @@
 import { useEffect } from 'react'
 import { onEvent } from '../api/events'
-import type { DeviceInfo, FirmwareState } from '../api/types'
+import type { DeviceInfo, FirmwarePhase, FirmwareState } from '../api/types'
+
+// What each step of an update shows: its title, and what the user waits for
+const STEPS: Record<FirmwarePhase, [string, string]> = {
+  downloading: ['Downloading firmware…', 'Fetching the recommended image. This can be slow on some networks.'],
+  checking: ['Checking the image…', 'The SDK checks that this image fits the camera.'],
+  recovery: ['Switching to recovery mode…', 'The camera disconnects and comes back as a recovery device.'],
+  installing: ['Installing firmware…', 'This may take 1-2 minutes. Please do not disconnect the device.'],
+  restarting: ['Restarting the camera…', 'Written. Waiting for the camera to come back with its new firmware.'],
+}
 
 interface FirmwareProgressModalProps {
   isOpen: boolean
@@ -57,15 +66,10 @@ export function FirmwareProgressModal({
                 <div className="font-semibold">✓ Update Complete</div>
                 <div className="text-sm mt-1">Firmware has been successfully installed</div>
               </div>
-            ) : firmware.phase === 'downloading' ? (
-              <div className="text-gray-300 text-sm">
-                <div className="font-semibold mb-1">Downloading firmware…</div>
-                <div className="text-gray-400">Fetching the recommended image. This can be slow on some networks.</div>
-              </div>
             ) : (
               <div className="text-gray-300 text-sm">
-                <div className="font-semibold mb-1">Installing firmware...</div>
-                <div className="text-gray-400">This may take 1-2 minutes. Please do not disconnect the device.</div>
+                <div className="font-semibold mb-1">{STEPS[firmware.phase ?? 'installing'][0]}</div>
+                <div className="text-gray-400">{STEPS[firmware.phase ?? 'installing'][1]}</div>
               </div>
             )}
           </div>

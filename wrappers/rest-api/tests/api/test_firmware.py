@@ -48,3 +48,9 @@ def test_update_writes_the_image_reporting_each_percent_once(setup_mock_managers
 
 def test_a_camera_tells_whether_it_is_in_recovery_mode(setup_mock_managers):
     assert client.get("/api/v1/devices/device1/is_update_device").json() is False
+
+
+def test_a_camera_in_recovery_mode_says_so(setup_mock_managers, monkeypatch):
+    camera = setup_mock_managers["rs_manager"].cameras["device1"]
+    monkeypatch.setattr(camera.dev, "is_update_device", lambda: True)
+    assert client.get("/api/v1/devices/device1/is_update_device").json() is True

@@ -46,10 +46,13 @@ export function firmwareStatus(current?: string, recommended?: string): Firmware
 }
 
 // No verdict stored: it would go stale as soon as the camera reports a different version.
+/** The step of a firmware update: the bar fills only while it is written ('installing') */
+export type FirmwarePhase = 'downloading' | 'checking' | 'recovery' | 'installing' | 'restarting'
+
 export interface FirmwareState {
   recommended?: string
   is_updating?: boolean
-  phase?: 'downloading' | 'installing'  // one-click update: download then install
+  phase?: FirmwarePhase
   progress?: number
   last_error?: string | null
 }

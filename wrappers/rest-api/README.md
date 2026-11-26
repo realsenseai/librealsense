@@ -54,7 +54,7 @@ The API now mirrors the SDK's own objects and calls. Breaking changes:
     *   `POST .../hw_reset/` is `POST .../hardware_reset` and answers nothing.
     *   HWM answers the firmware's raw reply bytes instead of `HwmResponse`: its first uint32 echoes the opcode, or is the firmware's error code.
 *   **Firmware:**
-    *   `GET .../firmware/`, `POST .../firmware/update_from_file` and `update_from_recommended` are gone: the client finds and downloads the image itself, from the online versions list, as the legacy viewer does, and drives the SDK's calls: `POST .../firmware/check_firmware_compatibility`, `enter_update_state` and `update`, each taking the image as the request body (`application/octet-stream`).
+    *   `GET .../firmware/`, `POST .../firmware/update_from_file` and `update_from_recommended` are gone: the client finds and downloads the image itself, from the online versions list, as the legacy viewer does, and drives the SDK's calls: `POST .../firmware/check_firmware_compatibility`, `enter_update_state` and `update`, each taking the image as the request body, sent with `Content-Type: application/octet-stream` (without it the request is refused, 422).
     *   A camera in recovery mode is listed, under the same ID; `GET .../is_update_device` says whether it is in recovery mode.
 
 ## Missing Features
