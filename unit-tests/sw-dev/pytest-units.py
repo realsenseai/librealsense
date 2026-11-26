@@ -9,6 +9,12 @@ import sw_device as sw
 log = logging.getLogger(__name__)
 
 
+def test_option_range_order():
+    r = rs.option_range( 0, 100, 5, 20 )
+    check.equal( r.step, 5 )
+    check.equal( r.default, 20 )
+
+
 def test_depth_units():
     with sw.sensor( "Stereo Module" ) as sensor:
         depth = sensor.video_stream( "Depth", rs.stream.depth, rs.format.z16 )
