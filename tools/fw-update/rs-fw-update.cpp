@@ -483,7 +483,7 @@ try
             return EXIT_FAILURE;
         }
 
-        if (devs.size() != 1)
+        if (!selected_serial_number.empty())
         {
             auto sn = d.get_info(d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? RS2_CAMERA_INFO_SERIAL_NUMBER
                 : RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
