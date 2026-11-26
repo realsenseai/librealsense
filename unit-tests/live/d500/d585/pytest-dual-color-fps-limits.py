@@ -143,8 +143,10 @@ def full_passive_stereo_and_colors(sensor, stream_type, fps):
 
 
 @pytest.mark.parametrize( "stream_type", [rs.stream.depth, rs.stream.infrared] )
-def test_full_passive_60_fps_accepted(depth_sensor, passive_depth_restored, stream_type):
+def test_full_passive_60_fps_accepted(test_device, depth_sensor, passive_depth_restored, stream_type):
     """Full Passive Depth lifts depth/IR + both colors to 60 FPS."""
+    if test_device[0].get_info( rs.camera_info.connection_type ) == "GMSL":
+        pytest.skip( "GMSL streams depth/IR with color only at 30 FPS (VIDIOC_STREAMON fails with EAGAIN above it)" )
     open_and_close( depth_sensor, full_passive_stereo_and_colors( depth_sensor, stream_type, 60 ) )
 
 
