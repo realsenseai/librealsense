@@ -430,6 +430,8 @@ namespace rs2
         {
             auto id = tex_sources[i];
             auto it = std::find(begin(last_tex_sources), end(last_tex_sources), id);
+            if( selected_tex_source_uid == -1 && tex_profiles[i].stream_type() == RS2_STREAM_INFRARED )
+                selected_tex_source_uid = id;  // nothing selected: IR textures the cloud, whichever starts first
             if (it == last_tex_sources.end())
             {
                 // Don't auto-switch to IR stream, to depth (when the source changes it would override the user's texture),
