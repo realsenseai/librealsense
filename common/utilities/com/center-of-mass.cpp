@@ -438,6 +438,7 @@ bool center_of_mass_calculator::calculate(
     bool  status = calculate_com_with_depth_range(depth_8u, roi, depth_mean, center_mass_point);
 
     if (status) {
+        result.is_primary = true;
         result.mean_body_depth = (depth_mean <= MIN_DEPTH) ? 0.0f : depth_mean;
 
         if (intrinsics && depth_mean > MIN_DEPTH) {
@@ -463,25 +464,28 @@ bool center_of_mass_calculator::calculate(
 
 bool center_of_mass_calculator::is_minz_violation(
     const depth_image_16& raw_depth, const rect& roi,
-    const camera_intrinsics& intrinsics, float estimated_depth_mm)
+    const camera_intrinsics& intrinsics, float estimated_depth_mm,
+    bool check_center_hole)
 {
     if (estimated_depth_mm <= 0.f) return false;  // already invalid; nothing to flag
     if (!raw_depth.data || intrinsics.fx <= 0.f) return false;  // can't evaluate without valid input
 
-    // A genuine hole: almost no raw depth at the ROI's own center.
-    int const center_half_w = std::max(1, roi.width  / CENTER_REGION_DIV);
-    int const center_half_h = std::max(1, roi.height / CENTER_REGION_DIV);
-    int const center_x = roi.x + roi.width  / 2;
-    int const center_y = roi.y + roi.height / 2;
-    int valid = 0, total = 0;
-    for (int y = center_y - center_half_h; y < center_y + center_half_h; ++y)
-        for (int x = center_x - center_half_w; x < center_x + center_half_w; ++x)
-        {
-            if (x < 0 || x >= raw_depth.width || y < 0 || y >= raw_depth.height) continue;
-            ++total;
-            if (raw_depth.data[y * raw_depth.width + x] > 0) ++valid;
-        }
-    if (total > 0 && float(valid) / total < MIN_CENTER_FILL_RATE) return true;
+    if (check_center_hole) {
+        // A genuine hole: almost no raw depth at the ROI's own center.
+        int const center_half_w = std::max(1, roi.width  / CENTER_REGION_DIV);
+        int const center_half_h = std::max(1, roi.height / CENTER_REGION_DIV);
+        int const center_x = roi.x + roi.width  / 2;
+        int const center_y = roi.y + roi.height / 2;
+        int valid = 0, total = 0;
+        for (int y = center_y - center_half_h; y < center_y + center_half_h; ++y)
+            for (int x = center_x - center_half_w; x < center_x + center_half_w; ++x)
+            {
+                if (x < 0 || x >= raw_depth.width || y < 0 || y >= raw_depth.height) continue;
+                ++total;
+                if (raw_depth.data[y * raw_depth.width + x] > 0) ++valid;
+            }
+        if (total > 0 && float(valid) / total < MIN_CENTER_FILL_RATE) return true;
+    }
 
     // A confidently-measured background: implies an impossibly large real-world width.
     float const implied_width_mm = estimated_depth_mm * roi.width / intrinsics.fx;
