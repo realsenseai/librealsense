@@ -2,4 +2,4 @@
 from .pyrealsense2 import *
 # `from ... import *` skips dunder names, so re-export them explicitly
 # to make `pyrealsense2.__version__` work instead of `pyrealsense2.pyrealsense2.__version__`.
-from .pyrealsense2 import __version__, __full_version__
+from .pyrealsense2 import __version__ as __version__, __full_version__ as __full_version__
