@@ -13,13 +13,20 @@ pytestmark = [
 FPS = 30
 DURATION = 10.0
 
-def test_actual_fps_within_tolerance_from_startup(test_device):
+@pytest.mark.parametrize("global_time", [True, False], ids=["global-clock", "hardware-clock"])
+def test_actual_fps_within_tolerance_from_startup(test_device, global_time, request):
     dev, ctx = test_device
+    sensor = dev.first_depth_sensor()
+    clock = rs.option.global_time_enabled
+    previous = sensor.get_option(clock)
+    request.addfinalizer(lambda: sensor.set_option(clock, previous))
+    sensor.set_option(clock, global_time)
     cfg = rs.config()
     cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, FPS)
     pipe = rs.pipeline(ctx)
-    pipe.start(cfg)  # global time on by default - no warmup sleep on purpose
+    pipe.set_device(dev)  # Use the device whose clock option we just set.
+    pipe.start(cfg)  # Capture from the first frame.
 
     md = rs.frame_metadata_value.actual_fps
     frames = 0

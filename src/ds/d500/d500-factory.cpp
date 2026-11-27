@@ -12,6 +12,7 @@
 
 #include "d500-info.h"
 #include "d500-private.h"
+#include "d585-mipi-matching-time.h"
 #include "ds/ds-options.h"
 #include "ds/ds-timestamp.h"
 #include "d500-active.h"
@@ -38,6 +39,7 @@
 #include <rsutils/string/hexdump.h>
 using rsutils::string::hexdump;
 
+#include <atomic>
 #include <mutex>
 #include <chrono>
 #include <vector>
@@ -47,7 +49,8 @@ using rsutils::string::hexdump;
 
 namespace librealsense
 {
-    std::shared_ptr< matcher > create_default_matcher( std::vector < std::shared_ptr< stream_interface > > const & streams )
+    std::shared_ptr< matcher > create_default_matcher( std::vector < std::shared_ptr< stream_interface > > const & streams,
+                                                       matcher_factory::matching_clock const & clock = {} )
     {
         // Create default matcher for all non-null streams
         std::vector< stream_interface * > streams_to_match;
@@ -56,7 +59,7 @@ namespace librealsense
             if( stream )
                 streams_to_match.push_back( stream.get() );
         }
-        return matcher_factory::create( RS2_MATCHER_DEFAULT, streams_to_match );
+        return matcher_factory::create( RS2_MATCHER_DEFAULT, streams_to_match, clock );
     }
 
     // default d500 device
@@ -145,6 +148,29 @@ namespace librealsense
 
             register_dpp_embedded_filters();
 
+            if( _is_mipi_device && _passive_depth_mode
+                && ( get_pid() == ds::D585_2C_PID || get_pid() == ds::D585_2C_PROTO_PID ) )
+            {
+                auto mode = std::make_shared< std::atomic< int > >( RS2_PASSIVE_DEPTH_MODE_COUNT );
+                auto control = _passive_depth_mode;
+                get_depth_sensor().register_before_streaming_changes_callback( [mode, control]( bool starting )
+                {
+                    if( ! starting )
+                        return;
+                    try
+                    {
+                        mode->store( static_cast< int >( control->query() ) );
+                    }
+                    catch( invalid_value_exception const & e )
+                    {
+                        // Some firmware advertises passive depth but cannot read its XU.
+                        mode->store( RS2_PASSIVE_DEPTH_MODE_COUNT );
+                        LOG_WARNING( "Using SDK timestamps for D585 synchronization: " << e.what() );
+                    }
+                } );
+                _matching_clock = [mode]( frame_interface const & f ) { return ds::d585_mipi_matching_time( f, mode->load() ); };
+            }
+
             // Dual-RGB rectification toggle. Depth and both color streams share the depth sensor here,
             // so its streaming state gates the option.
             if( ( get_pid() == ds::D585_2C_PID || get_pid() == ds::D585_2C_PROTO_PID )
@@ -176,7 +202,7 @@ namespace librealsense
                                                                            _object_detection_stream };
             d500_depth_mapping::add_streams_if_active( streams );
             add_motion_streams( _ds_motion_common, streams );
-            return create_default_matcher( streams );
+            return create_default_matcher( streams, _matching_clock );
         }
 
         // Color may run at a resolution of its own, shared by both color streams; every stream shares the frame rate.
@@ -218,6 +244,8 @@ namespace librealsense
 
             return tags;
         };
+    private:
+        matcher_factory::matching_clock _matching_clock;
     };
 
 

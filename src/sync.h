@@ -4,6 +4,7 @@
 
 #include "callback-invocation.h"
 #include "core/frame-holder.h"
+#include "core/matcher-factory.h"
 
 #include <librealsense2/h/rs_sensor.h>
 #include <rsutils/concurrency/concurrency.h>
@@ -87,7 +88,8 @@ namespace librealsense {
     class composite_matcher : public matcher
     {
     public:
-        composite_matcher(std::vector<std::shared_ptr<matcher>> const & matchers, std::string const & name);
+        composite_matcher(std::vector<std::shared_ptr<matcher>> const & matchers, std::string const & name,
+                           matcher_factory::matching_clock clock = {} );
 
 
         virtual bool are_equivalent(frame_holder& a, frame_holder& b) = 0;
@@ -109,6 +111,9 @@ namespace librealsense {
         std::string matchers_to_string( std::vector< matcher* > const& );
 
     protected:
+        matcher_factory::matching_clock const _clock;
+        double matching_timestamp( frame_interface const & f ) const;
+
         virtual void update_next_expected( std::shared_ptr< matcher > const & matcher,
                                            const frame_holder & f )
             = 0;
@@ -182,7 +187,8 @@ namespace librealsense {
     class timestamp_composite_matcher : public composite_matcher
     {
     public:
-        timestamp_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers );
+        timestamp_composite_matcher( std::vector< std::shared_ptr< matcher > > const & matchers,
+                                     matcher_factory::matching_clock clock = {} );
         bool are_equivalent(frame_holder& a, frame_holder& b) override;
         bool is_smaller_than(frame_holder& a, frame_holder& b) override;
         virtual void update_last_arrived(frame_holder& f, matcher* m) override;
@@ -195,6 +201,7 @@ namespace librealsense {
                                    const frame_holder & f ) override;
 
     private:
+        std::pair< double, double > extract_timestamps( frame_holder & a, frame_holder & b ) const;
         double get_fps( frame_interface const * f );
         bool are_equivalent( double a, double b, double fps );
         std::map<matcher*, double> _last_arrived;
