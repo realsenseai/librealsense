@@ -1,0 +1,174 @@
+<!-- License: Apache 2.0. See LICENSE file in root directory. -->
+<!-- Copyright(c) 2026 RealSense, Inc. All Rights Reserved. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ticket-to-pr flow</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1f24; --muted:#5c6670; --line:#59636e;
+          --user-f:#e3f6e8; --user-s:#2e7d32; --main-f:#e3f0ff; --main-s:#1f5fa8;
+          --sub-f:#fff1e0; --sub-s:#a85a1f; --gate-f:#f3e5f5; --gate-s:#6a1b9a; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --bg:#14171b; --fg:#e8ecf0; --muted:#98a2ad; --line:#9aa5b1;
+          --user-f:#173323; --user-s:#6fcf7c; --main-f:#14283f; --main-s:#6aaaf0;
+          --sub-f:#3a2614; --sub-s:#f0a964; --gate-f:#2b1a33; --gate-s:#c58be0; } }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:24px 16px 40px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.sub { margin:0 0 18px; color:var(--muted); }
+  svg { width:100%; height:auto; display:block; }
+  text { fill:var(--fg); font-family:inherit; }
+  .t { font-size:13px; } .b { font-weight:600; } .m { fill:var(--muted); font-size:12px; }
+  .ph { font-size:13px; font-weight:700; letter-spacing:.04em; fill:var(--muted); }
+  .user rect, .user polygon { fill:var(--user-f); stroke:var(--user-s); }
+  .main rect { fill:var(--main-f); stroke:var(--main-s); }
+  .sub rect  { fill:var(--sub-f);  stroke:var(--sub-s); }
+  .gate polygon { fill:var(--gate-f); stroke:var(--gate-s); }
+  .user rect, .user polygon, .main rect, .sub rect, .gate polygon { stroke-width:1.6; }
+  .ln { stroke:var(--line); stroke-width:1.6; fill:none; }
+  .band { fill:none; stroke:var(--line); stroke-dasharray:4 5; stroke-width:1; opacity:.6; }
+  .legend { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:14px; font-size:13px; color:var(--muted); }
+  .legend span::before { content:""; display:inline-block; width:12px; height:12px; border-radius:3px;
+                         margin-right:6px; vertical-align:-1px; border:1.6px solid; }
+  .l-user::before { background:var(--user-f); border-color:var(--user-s); }
+  .l-main::before { background:var(--main-f); border-color:var(--main-s); }
+  .l-sub::before  { background:var(--sub-f);  border-color:var(--sub-s); }
+  .l-gate::before { background:var(--gate-f); border-color:var(--gate-s); }
+  ul.notes { margin:16px 0 0; padding-left:20px; color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+<h1>/ticket-to-pr &mdash; target flow</h1>
+<p class="sub">The user is asked for input only at the very end. Everything before that is a loop between the main agent and the two sub-agents.</p>
+
+<svg viewBox="0 0 900 1090" role="img" aria-label="Flow: user starts ticket-to-pr, main agent implements, reviewer loop, tester and reviewer loop, then the user accepts or rejects the PR">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--line)"/>
+    </marker>
+  </defs>
+
+  <!-- START -->
+  <g class="user"><rect x="180" y="14" width="300" height="48" rx="10"/>
+    <text class="t b" x="330" y="35" text-anchor="middle">User runs /ticket-to-pr &lt;ticket&gt;</text>
+    <text class="m" x="330" y="52" text-anchor="middle">only input until the final decision</text></g>
+  <path class="ln" d="M330 62V90" marker-end="url(#a)"/>
+
+  <g class="main"><rect x="150" y="90" width="360" height="74" rx="10"/>
+    <text class="t b" x="330" y="112" text-anchor="middle">Main agent</text>
+    <text class="t" x="330" y="131" text-anchor="middle">read Jira ticket &middot; write design.html</text>
+    <text class="t" x="330" y="148" text-anchor="middle">implement &middot; commit &middot; pin base commit</text></g>
+  <path class="ln" d="M330 164V210" marker-end="url(#a)"/>
+
+  <!-- PHASE 1 -->
+  <rect class="band" x="20" y="186" width="860" height="240" rx="12"/>
+  <text class="ph" x="36" y="206">PHASE 1 &mdash; REVIEW LOOP</text>
+
+  <g class="sub"><rect x="180" y="214" width="300" height="50" rx="10"/>
+    <text class="t b" x="330" y="235" text-anchor="middle">lrs-reviewer</text>
+    <text class="t" x="330" y="252" text-anchor="middle">reviews the diff against project skills</text></g>
+  <path class="ln" d="M330 264V300" marker-end="url(#a)"/>
+
+  <g class="gate"><polygon points="330,300 450,342 330,384 210,342"/>
+    <text class="t b" x="330" y="338" text-anchor="middle">Open blocking</text>
+    <text class="t b" x="330" y="354" text-anchor="middle">findings?</text></g>
+
+  <path class="ln" d="M450 342H540" marker-end="url(#a)"/>
+  <text class="m" x="494" y="334" text-anchor="middle">yes</text>
+  <g class="main"><rect x="540" y="312" width="300" height="60" rx="10"/>
+    <text class="t b" x="690" y="334" text-anchor="middle">Main agent fixes</text>
+    <text class="t" x="690" y="352" text-anchor="middle">fix or rebut, rebuild, commit</text></g>
+  <path class="ln" d="M690 312V239H480" marker-end="url(#a)"/>
+  <text class="m" x="700" y="270">review again (fresh reviewer)</text>
+
+  <path class="ln" d="M330 384V452" marker-end="url(#a)"/>
+  <text class="m" x="342" y="414">no &mdash; OPEN: 0</text>
+
+  <!-- PHASE 2 -->
+  <rect class="band" x="20" y="430" width="860" height="388" rx="12"/>
+  <text class="ph" x="36" y="450">PHASE 2 &mdash; TEST + REVIEW LOOP</text>
+
+  <g class="sub"><rect x="150" y="458" width="360" height="86" rx="10"/>
+    <text class="t b" x="330" y="480" text-anchor="middle">lrs-tester</text>
+    <text class="t" x="330" y="499" text-anchor="middle">does a test already exist? &rarr; COVERED</text>
+    <text class="t" x="330" y="516" text-anchor="middle">close but a gap? &rarr; EXTEND &nbsp;&middot;&nbsp; none? &rarr; NEW</text>
+    <text class="t" x="330" y="533" text-anchor="middle">writes it, runs it, commits unit-tests/</text></g>
+  <path class="ln" d="M330 544V578" marker-end="url(#a)"/>
+
+  <g class="gate"><polygon points="330,578 440,614 330,650 220,614"/>
+    <text class="t b" x="330" y="619" text-anchor="middle">Tests pass?</text></g>
+
+  <path class="ln" d="M440 614H540" marker-end="url(#a)"/>
+  <text class="m" x="490" y="606" text-anchor="middle">fail</text>
+  <g class="main"><rect x="540" y="584" width="300" height="60" rx="10"/>
+    <text class="t b" x="690" y="606" text-anchor="middle">Main agent fixes</text>
+    <text class="t" x="690" y="624" text-anchor="middle">product code, commit</text></g>
+  <path class="ln" d="M690 584V501H510" marker-end="url(#a)"/>
+  <text class="m" x="700" y="542">re-run tester</text>
+
+  <path class="ln" d="M330 650V684" marker-end="url(#a)"/>
+  <text class="m" x="342" y="672">pass</text>
+
+  <g class="sub"><rect x="150" y="684" width="360" height="50" rx="10"/>
+    <text class="t b" x="330" y="705" text-anchor="middle">lrs-reviewer</text>
+    <text class="t" x="330" y="722" text-anchor="middle">reviews the code and the test changes</text></g>
+  <path class="ln" d="M330 734V756" marker-end="url(#a)"/>
+
+  <g class="gate"><polygon points="330,756 440,780 330,804 220,780" /></g>
+  <text class="t b" x="330" y="777" text-anchor="middle">Open</text>
+  <text class="t b" x="330" y="792" text-anchor="middle">findings?</text>
+
+  <path class="ln" d="M440 780H540" marker-end="url(#a)"/>
+  <text class="m" x="490" y="772" text-anchor="middle">yes</text>
+  <g class="main"><rect x="540" y="754" width="300" height="52" rx="10"/>
+    <text class="t b" x="690" y="775" text-anchor="middle">Main agent fixes</text>
+    <text class="t" x="690" y="792" text-anchor="middle">then back to the tester</text></g>
+  <path class="ln" d="M840 780H868V478H510" marker-end="url(#a)"/>
+
+  <path class="ln" d="M330 804V858" marker-end="url(#a)"/>
+  <text class="m" x="342" y="834">no &mdash; all green</text>
+
+  <!-- PHASE 3 -->
+  <rect class="band" x="20" y="826" width="860" height="236" rx="12"/>
+  <text class="ph" x="36" y="846">PHASE 3 &mdash; HAND-OFF</text>
+
+  <g class="main"><rect x="150" y="858" width="360" height="44" rx="10"/>
+    <text class="t b" x="330" y="878" text-anchor="middle">Main agent prepares the PR</text>
+    <text class="t" x="330" y="894" text-anchor="middle">title and description (pr-create skill)</text></g>
+  <path class="ln" d="M330 902V924" marker-end="url(#a)"/>
+
+  <g class="user"><polygon points="330,924 460,966 330,1008 200,966"/>
+    <text class="t b" x="330" y="962" text-anchor="middle">User decision</text>
+    <text class="t b" x="330" y="978" text-anchor="middle">accept the PR?</text></g>
+
+  <path class="ln" d="M460 966H540" marker-end="url(#a)"/>
+  <text class="m" x="500" y="958" text-anchor="middle">no</text>
+  <g class="main"><rect x="540" y="940" width="300" height="52" rx="10"/>
+    <text class="t b" x="690" y="961" text-anchor="middle">Main agent applies feedback</text>
+    <text class="t" x="690" y="978" text-anchor="middle">then repeats from Phase 1</text></g>
+
+  <path class="ln" d="M330 1008V1030" marker-end="url(#a)"/>
+  <text class="m" x="342" y="1022">yes</text>
+  <g class="user"><rect x="170" y="1030" width="320" height="26" rx="8"/>
+    <text class="t b" x="330" y="1048" text-anchor="middle">push to fork + open the PR</text></g>
+</svg>
+
+<div class="legend">
+  <span class="l-user">User</span>
+  <span class="l-main">Main agent (holds design context, does all fixing)</span>
+  <span class="l-sub">Sub-agent (fresh context, independent)</span>
+  <span class="l-gate">Decision</span>
+</div>
+
+<ul class="notes">
+  <li>Each loop is capped (review 4 rounds, test 3). If findings are still open at the cap, the flow stops and asks the user instead of looping forever.</li>
+  <li>A tester result of NOT RUN (no device available) is not a pass. It goes to the user, who can claim a lab machine.</li>
+  <li>The sub-agents never edit product code. Only the main agent does; the tester may edit only <code>unit-tests/</code>.</li>
+</ul>
+</main>
+</body>
+</html>
