@@ -53,7 +53,7 @@ _debug_requested = '--debug' in sys.argv
 from rspy import python_path
 python_path.block_user_site_for({'pyrealsense2', 'pyrealdds', 'pyrsutils'})
 
-from rspy import devices, repo
+from rspy import devices, repo, d585_config
 from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
@@ -360,6 +360,10 @@ def pytest_configure(config):
         "markers", "device_type_exclude(type): skip test if device connection type matches (e.g., GMSL, USB, DDS)"
     )
     config.addinivalue_line(
+        "markers", "extras_type_exclude(type): skip the extra configuration runs (e.g. D585 dual RGB) of cameras with this "
+                   "connection type; the base run stays"
+    )
+    config.addinivalue_line(
         "markers", "requires(fw=, option=, sensor=): module-level, when every test needs it; skips a camera that "
                    "lacks the FW / option / sensor before powering it"
     )
@@ -407,6 +411,7 @@ def pytest_configure(config):
             hub_reset = config.getoption("--hub-reset", default=False)
             enable_dds = 'dds' in context_list
             devices.query(hub_reset=hub_reset, disable_dds=not enable_dds)
+            d585_config.adopt_dedicated_sensor_names()
             devices.map_unknown_ports()
         except Exception as e:
             log.warning(f"Failed to query devices during configuration: {e}")
@@ -446,6 +451,7 @@ def pytest_collection_modifyitems(session, config, items):
         config.hook.pytest_deselected(items=[item for item in items if item not in included])
         items[:] = included
     filter_and_sort_items(config, items)
+    items.sort(key=lambda item: d585_config.runs_last(getattr(getattr(item, 'callspec', None), 'params', {}).get('_test_device_serial')))
 
 
 def _emit_test_header(nodeid):
@@ -642,6 +648,7 @@ def session_setup_teardown(request):
         print("-I- Pytest Session Ending")
         print(f"-I- {'=' * 80}")
         try:
+            d585_config.restore_all()
             _cleanup_devices()
         except Exception as e:
             print(f"-W- Error during cleanup: {e}")
@@ -824,7 +831,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     they get their port powered only because this fixture runs automatically for every
     device-marked module.
     """
-    serial_number = _test_device_serial
+    serial_number = d585_config.real_serial(_test_device_serial)
 
     if serial_number is None:
         log.debug(f"Module {request.node.name} has no device requirements")
@@ -848,9 +855,11 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     #  hub, port OFF         -> don't recycle; enabling it here IS the power-on (teardown-off +
     #                           setup-on = the cycle). Avoids re-disabling an already-off port.
     serials = serial_number if isinstance(serial_number, list) else [serial_number]
-    # Checked while the port is still off, so a camera that lacks a requirement costs no power cycle
+    # Checked while the port is still off, so a camera that lacks a requirement costs no power cycle.
+    # Not when the module switches the camera's configuration: its handle is the previous one's, checked after the switch.
     requires = list(request.node.iter_markers("requires"))
-    unmet = next(filter(None, (unmet_requirement(devices.get(sn), requires) for sn in serials)), None)
+    switching = d585_config.mode_changes(_test_device_serial)
+    unmet = None if switching else next(filter(None, (unmet_requirement(devices.get(sn), requires) for sn in serials)), None)
     if unmet:
         _emit_test_header(item_id)
         pytest.skip(unmet)
@@ -933,6 +942,19 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         except Exception as cleanup_err:
             log.warning(f"Cleanup after failed enable raised: {cleanup_err}")
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
+
+    try:
+        d585_config.setup(_test_device_serial)
+    except Exception as e:
+        _emit_test_header(item_id)
+        _teardown([serial_number])
+        pytest.fail(f"Failed to set up {_test_device_serial}: {e}")
+
+    unmet = switching and unmet_requirement(devices.get(serial_number), requires)
+    if unmet:
+        _emit_test_header(item_id)
+        _teardown([serial_number])
+        pytest.skip(unmet)
 
     yield serial_number
     _teardown([serial_number])

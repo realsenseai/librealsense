@@ -19,7 +19,7 @@ from rspy.pytest.device_helpers import require_min_fw_version, is_d585_on_gmsl, 
 log = logging.getLogger(__name__)
 import time
 import platform
-from rspy.snippets import is_dds_dev
+from rspy.snippets import is_dds_dev, is_d585_dual_rgb, first_color_stream_sensor
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -90,6 +90,12 @@ def test_device_creation_time(module_device_setup):
         f"Device creation time {creation_time:.3f}s exceeds maximum {max_time:.1f}s"
 
 
+def default_fps(dev):
+    # The D585 dual RGB default profiles are 25 fps over USB (30 over GMSL); every other default is 30
+    on_usb = dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "USB"
+    return 25 if on_usb and is_d585_dual_rgb(dev.get_info(rs.camera_info.name)) else 30
+
+
 def first_depth_frame_delay(sensor_device, restart):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
@@ -100,7 +106,7 @@ def first_depth_frame_delay(sensor_device, restart):
 
     ds = dev.first_depth_sensor()
     dp = next(p for p in ds.profiles
-              if p.fps() == 30
+              if p.fps() == default_fps(dev)
               and p.stream_type() == rs.stream.depth
               and p.format() == rs.format.z16
               and p.is_default())
@@ -143,9 +149,9 @@ def first_color_frame_delay(sensor_device, restart):
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")
 
-    cs = dev.first_depth_sensor() if color_from_depth else dev.first_color_sensor()
+    cs = dev.first_depth_sensor() if color_from_depth else first_color_stream_sensor(dev)
     cp = next(p for p in cs.profiles
-              if p.fps() == 30
+              if p.fps() == default_fps(dev)
               and p.stream_type() == rs.stream.color
               and p.format() == rs.format.rgb8
               and p.is_default())

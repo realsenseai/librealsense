@@ -20,6 +20,7 @@ import pyrealsense2 as rs
 log = logging.getLogger(__name__)
 
 pytestmark = [
+    pytest.mark.extras_type_exclude("GMSL"),   # the USB dual RGB and GMSL dedicated sensor runs cover it
     pytest.mark.device("D400*"),
     pytest.mark.device_each("D500*"),
 ]

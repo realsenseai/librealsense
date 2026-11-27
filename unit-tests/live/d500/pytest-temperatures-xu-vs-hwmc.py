@@ -12,6 +12,7 @@ import logging
 log = logging.getLogger(__name__)
 
 pytestmark = [
+    pytest.mark.extras_type_exclude("GMSL"),   # the USB dual RGB and GMSL dedicated sensor runs cover it
     pytest.mark.device_each("D500*"),
     pytest.mark.context("nightly"),
 ]

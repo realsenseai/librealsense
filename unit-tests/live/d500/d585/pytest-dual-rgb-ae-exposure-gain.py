@@ -8,10 +8,12 @@
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 import math
 import platform
 import time
 import logging
+from rspy.pytest.device_helpers import require_min_fw_version
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -146,6 +148,7 @@ def test_rgb_and_depth_values_are_independent(depth_sensor):
 def test_rgb_options_work_while_streaming(test_device, depth_sensor):
     # Hybrid streaming: depth and both color streams at once
     dev, ctx = test_device
+    require_min_fw_version( dev, rsutils.version( 7, 62, 0, 0 ), "hybrid depth + 2 color streaming" )
     cfg = rs.config()
     cfg.enable_device( dev.get_info( rs.camera_info.serial_number ) )
     cfg.enable_stream( rs.stream.depth, 640, 480, rs.format.z16, 30 )
@@ -223,8 +226,8 @@ def test_color_frame_metadata_reports_rgb_exposure_and_gain(test_device, depth_s
         assert metadata( f, rs.frame_metadata_value.gain_level ) == 48, f"color {index}"
 
 
-@pytest.mark.xfail( reason="the firmware reports a constant auto-exposure state in the color metadata", strict=False )
 def test_color_frame_metadata_reports_rgb_ae_state(test_device, depth_sensor):
+    require_min_fw_version( test_device[0], rsutils.version( 7, 62, 0, 0 ), "RGB auto-exposure state in the color metadata" )
     for ae in (1, 0):
         def is_settled( f ):
             return f.supports_frame_metadata( rs.frame_metadata_value.auto_exposure )                    and f.get_frame_metadata( rs.frame_metadata_value.auto_exposure ) == ae

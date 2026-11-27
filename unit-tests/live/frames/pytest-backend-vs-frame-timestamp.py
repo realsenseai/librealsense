@@ -11,7 +11,7 @@ import pyrealsense2 as rs
 import time
 import threading
 import logging
-from rspy.snippets import is_dds_dev
+from rspy.snippets import is_dds_dev, first_color_stream_sensor
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -88,7 +88,7 @@ def test_depth_backend_vs_frame_timestamp(test_device):
 def test_color_backend_vs_frame_timestamp(test_device):
     dev, ctx = test_device
 
-    cs = dev.first_color_sensor()
+    cs = first_color_stream_sensor(dev)
     cp = next(p for p in cs.profiles
               if p.fps() == FPS
               and p.stream_type() == rs.stream.color

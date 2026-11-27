@@ -17,6 +17,8 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
+    pytest.mark.device_exclude("D585 Dual RGB"),   # no firmware commands in dual RGB
+    pytest.mark.device_exclude("D585 Proto Dual RGB"),
     pytest.mark.context("nightly"),
 ]
 
