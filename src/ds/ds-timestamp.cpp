@@ -138,14 +138,14 @@ namespace librealsense
 
         uint32_t counter = 0;
         uint64_t timestamp = 0;
-        _has_metadata[0] = get_mapping_capture_timing( *f, counter, timestamp );
-        if( _has_metadata[0] )
+        if( get_mapping_capture_timing( *f, counter, timestamp ) )
         {
             return double( timestamp ) * MICROSEC_TO_MILLISEC;
         }
         else
         {
-            if (!one_time_note)
+            // Object Detection frames on the Perception sensor carry no Mapping capture block
+            if( ! one_time_note && f->get_stream()->get_stream_type() != RS2_STREAM_OBJECT_DETECTION )
             {
                 LOG_INFO("UVC metadata payloads not available. Please refer to the installation chapter for details.");
                 one_time_note = true;
@@ -169,6 +169,15 @@ namespace librealsense
             return counter;
 
         return _backup_timestamp_reader->get_frame_counter(frame);
+    }
+
+    rs2_timestamp_domain ds_timestamp_reader_from_metadata_depth_mapping::get_frame_timestamp_domain( const std::shared_ptr< frame_interface > & frame ) const
+    {
+        auto f = std::dynamic_pointer_cast< librealsense::frame >( frame );
+        uint32_t counter = 0;
+        uint64_t timestamp = 0;
+        return f && get_mapping_capture_timing( *f, counter, timestamp ) ? RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK
+                                                                        : _backup_timestamp_reader->get_frame_timestamp_domain( frame );
     }
 
     ds_timestamp_reader_from_metadata_safety::ds_timestamp_reader_from_metadata_safety(std::unique_ptr<frame_timestamp_reader> backup_timestamp_reader)

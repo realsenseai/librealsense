@@ -705,7 +705,7 @@ float rs2_get_max_usable_depth_range(rs2_sensor const * sensor, rs2_error** erro
 
 /**
 * Get the occupancy grid and labeled point cloud params of a depth mapping sensor
-* \param[in] sensor      depth mapping sensor
+* \param[in] sensor      depth mapping or perception sensor
 * \param[out] error      if non-null, receives any error that occurs during this call, otherwise, errors are ignored
 * \return                the params as a JSON string in a rs2_raw_data_buffer, which should be released by rs2_delete_raw_data
 */
@@ -714,7 +714,7 @@ const rs2_raw_data_buffer* rs2_get_depth_mapping_params(rs2_sensor const* sensor
 /**
 * Set occupancy grid and labeled point cloud params of a depth mapping sensor. Only the named fields change.
 * Blocks until the device has applied the params, and fails with the device's message if it rejects them.
-* \param[in] sensor                depth mapping sensor
+* \param[in] sensor                depth mapping or perception sensor
 * \param[in] params_json_str       partial params as a JSON string
 * \param[out] error                if non-null, receives any error that occurs during this call, otherwise, errors are ignored
 */

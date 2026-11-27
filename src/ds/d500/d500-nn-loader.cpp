@@ -4,6 +4,7 @@
 #include "d500-nn-loader.h"
 #include "d500-info.h"
 #include "d500-private.h"
+#include "d500-depth-mapping.h"
 
 #include <src/perception-sensor.h>
 #include <src/uvc-sensor.h>
@@ -80,8 +81,9 @@ namespace librealsense
         for( size_t i = 0; i < get_sensors_count(); ++i )
         {
             auto & sensor = get_sensor( i );
-            if( dynamic_cast< perception_sensor * >( &sensor ) && sensor.is_streaming() )
-                throw wrong_api_call_sequence_exception( "NN upload: stop the Perception sensor before uploading" );
+            if( dynamic_cast< perception_sensor * >( &sensor ) && sensor.is_streaming()
+                && find_stream( sensor.get_active_streams(), RS2_STREAM_OBJECT_DETECTION ) )
+                throw wrong_api_call_sequence_exception( "NN upload: stop Object Detection before uploading" );
         }
         if( is_locked_now() )
             throw not_implemented_exception( locked_reason() );

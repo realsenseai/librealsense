@@ -1,8 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Device point cloud (RS2_STREAM_POINT_CLOUD) on the Depth Mapping sensor: frame shape, no texture
-# coordinates, one Mapping stream at a time, and PCL refused by the FW while Depth streams (Depth after PCL is allowed).
+# Device point cloud (RS2_STREAM_POINT_CLOUD) on the Perception sensor: frame shape, no texture
+# coordinates, and PCL refused by the FW while Depth streams (Depth after PCL is allowed).
 # Skips when the FW exposes no PCL profile.
 
 import pytest
@@ -17,16 +17,15 @@ pytestmark = [
     pytest.mark.device_each( "D585" ),
     pytest.mark.device_exclude( "D585S" ),
     pytest.mark.context( "nightly" ),
-    pytest.mark.requires( fw="7.61.47150", sensor="Depth Mapping Camera" ),  # older FW publishes the PCL profiles but delivers no frames
+    pytest.mark.requires( fw="7.61.47150", sensor="Perception" ),  # older FW publishes the PCL profiles but delivers no frames
 ]
 
-MAPPING_SENSOR_NAME = "Depth Mapping Camera"
 FRAMES_TO_CHECK = 10
 TIMEOUT = 5  # [sec]
 
 
 def mapping_sensor( dev ):
-    return next( s for s in dev.query_sensors() if s.get_info( rs.camera_info.name ) == MAPPING_SENSOR_NAME )
+    return next( s for s in dev.query_sensors() if s.is_perception_sensor() )
 
 
 def pcl_profile( sensor ):
@@ -67,15 +66,6 @@ def test_pcl_frames( pcl ):
         check.equal( pts.size(), vsp.width() * vsp.height() )
         check.equal( f.get_data_size(), vsp.width() * vsp.height() * 12 )
         check.is_none( pts.get_texture_coordinates() )
-
-
-def test_one_mapping_stream_at_a_time( pcl ):
-    _, sensor, profile = pcl
-    other = next( ( p for p in sensor.profiles if p.stream_type() != rs.stream.point_cloud ), None )
-    if not other:
-        pytest.skip( "no second Mapping stream" )
-    with pytest.raises( Exception ):
-        sensor.open( [profile, other] )
 
 
 def test_pcl_refused_while_depth_streams( pcl ):

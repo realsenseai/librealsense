@@ -2,8 +2,8 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # GMSL Perception MUX: Object Detection (PD), Occupancy (OCC) and the Labeled Point Cloud (LPCL) time-share the GMSL
-# IR channel and are told apart by their metadata. Each stream is still its own sensor and opens and closes
-# independently; the camera starts the shared capture with the first and stops it with the last.
+# IR channel and are told apart by their metadata. They are streams of the one Perception sensor, each added with
+# open(p) and removed with close([p]); the camera starts the shared capture with the first and stops it with the last.
 # PD runs with OCC only: the camera refuses PD with LPCL.
 # This file covers what is specific to the MUX; the stream lifecycles and the Occupancy input rules on every
 # transport are in pytest-perception-streams.py.
@@ -53,6 +53,10 @@ def sensor(dev, name):
     return None
 
 
+def perception(dev):
+    return next( ( s for s in dev.query_sensors() if s.is_perception_sensor() ), None )
+
+
 def is_3c(dev):
     return sensor( dev, 'RGB Camera' ) is not None   # 2C carries its colors on the Stereo Module
 
@@ -67,17 +71,17 @@ def profile(s, stream_type, fmt, w=1280, h=720, index=None):
 
 
 def pd_profile(dev):
-    return next( p for p in sensor( dev, 'Perception' ).get_stream_profiles()
+    return next( p for p in perception( dev ).get_stream_profiles()
                  if p.stream_type() == rs.stream.object_detection and p.fps() == 30 )
 
 
 def occ_profile(dev):
-    return next( p for p in sensor( dev, 'Depth Mapping Camera' ).get_stream_profiles()
+    return next( p for p in perception( dev ).get_stream_profiles()
                  if p.stream_type() == rs.stream.occupancy )
 
 
 def lpcl_profile(dev):
-    return next( p for p in sensor( dev, 'Depth Mapping Camera' ).get_stream_profiles()
+    return next( p for p in perception( dev ).get_stream_profiles()
                  if p.stream_type() == rs.stream.labeled_point_cloud )
 
 
@@ -165,7 +169,7 @@ def test_perception_sensors_enumerate(device):
 
 
 def test_detection_distance(device):
-    pd = sensor( device, 'Perception' )
+    pd = perception( device )
     if not pd.supports( rs.option.detection_distance ):
         pytest.skip( "No Detection Distance on this FW" )
     inputs = start_inputs( device )
@@ -183,11 +187,11 @@ def test_detection_distance(device):
 
 def test_lpcl_refused_on_a_smaller_capture(device):
     """LPCL's capture is sized only when it starts first; it cannot join one PD already sized."""
-    pd, frames = sensor( device, 'Perception' ), Collector()
+    pd, frames = perception( device ), Collector()
     pd.open( pd_profile( device ) )
     pd.start( frames )
     with pytest.raises( RuntimeError, match="larger GMSL capture" ):
-        sensor( device, 'Depth Mapping Camera' ).open( lpcl_profile( device ) )
+        pd.open( lpcl_profile( device ) )
     frames.wait( rs.stream.object_detection, time.monotonic(), MIN_PD_FRAMES )
     assert mux_state( device, LPCL_ID )[0] == 0
     stop( [pd] )
@@ -197,14 +201,12 @@ def test_pd_refused_with_lpcl(device):
     """PD + LPCL is not a supported MUX combination: the camera refuses PD joining a running LPCL, which keeps streaming.
     PD started first is refused before the camera (test_lpcl_refused_on_a_smaller_capture)."""
     require_min_fw_version( device, rsutils.version( "7.62.0.0" ), "PD + LPCL refusal" )   # older FW lets PD join
-    pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
-    frames = Collector()
+    mapping, frames = perception( device ), Collector()
     mapping.open( lpcl_profile( device ) )
     mapping.start( frames )
     frames.wait( rs.stream.labeled_point_cloud, time.monotonic(), MIN_LPCL_FRAMES )
     with pytest.raises( RuntimeError, match="refused to start Object Detection" ):
-        pd.open( pd_profile( device ) )
-        pd.start( frames )
+        mapping.open( pd_profile( device ) )
     assert mux_state( device, PD_ID )[:2] == ( 0, 0 )
     since = time.monotonic() + SWITCH_S
     frames.wait( rs.stream.labeled_point_cloud, since, MIN_LPCL_FRAMES )
@@ -223,8 +225,7 @@ def test_pd_refused_with_lpcl(device):
 def test_pd_and_occ_independent(device, occ_first):
     """Each MUX member starts and stops on its own while the other keeps streaming, in either start order."""
     inputs = start_inputs( device )
-    pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
-    frames = Collector()
+    s, frames = perception( device ), Collector()
 
     def step(action, pd_on, occ_on):
         action()
@@ -241,20 +242,12 @@ def test_pd_and_occ_independent(device, occ_first):
         assert wait_state( device, PD_ID, ( int( pd_on ), int( pd_on ), active ) ) == ( int( pd_on ), int( pd_on ), active )
         assert wait_state( device, OCC_ID, ( int( occ_on ), int( occ_on ), active ) ) == ( int( occ_on ), int( occ_on ), active )
 
-    def start(s, p):
-        s.open( p )
-        s.start( frames )
-
-    if occ_first:
-        step( lambda: start( mapping, occ_profile( device ) ), False, True )
-        step( lambda: start( pd, pd_profile( device ) ), True, True )
-        step( lambda: stop( [mapping] ), True, False )
-        step( lambda: stop( [pd] ), False, False )
-    else:
-        step( lambda: start( pd, pd_profile( device ) ), True, False )
-        step( lambda: start( mapping, occ_profile( device ) ), True, True )
-        step( lambda: stop( [pd] ), False, True )
-        step( lambda: stop( [mapping] ), False, False )
+    first, second = ( occ_profile( device ), pd_profile( device ) ) if occ_first else ( pd_profile( device ), occ_profile( device ) )
+    pd_only, occ_only = ( False, True ) if occ_first else ( True, False )   # (PD on, OCC on) with the first stream alone
+    step( lambda: ( s.open( first ), s.start( frames ) ), pd_only, occ_only )
+    step( lambda: s.open( second ), True, True )   # joins the streaming sensor without another start()
+    step( lambda: s.close( [first] ), occ_only, pd_only )
+    step( lambda: s.close( [second] ), False, False )   # the last stream stops and closes the sensor
     stop( inputs )
 
     pd_frames, occ = frames.frames[rs.stream.object_detection], frames.frames[rs.stream.occupancy]
@@ -272,7 +265,7 @@ def test_stale_request_cleared(device):
     dp.send_and_receive_raw_data( dp.build_command( MUX_CONTROL, 1, MUX_SET_ENABLE, OCC_ID, 1 ) )
     assert mux_state( device, OCC_ID )[0] == 1
     inputs = start_inputs( device )
-    pd = sensor( device, 'Perception' )
+    pd = perception( device )
     pd.open( pd_profile( device ) )
     pd.start( lambda f: None )
     assert mux_state( device, OCC_ID )[0] == 0   # cleared before the capture starts
@@ -286,7 +279,7 @@ def test_ir_only_rejected_while_occupancy_runs(device, width, height):
     """The shared GMSL capture owner rejects IR before committing it; OCCG keeps streaming."""
     stereo = device.first_depth_sensor()
     ir = profile( stereo, rs.stream.infrared, rs.format.y8, w=width, h=height, index=1 )
-    mapping, frames = sensor( device, 'Depth Mapping Camera' ), Collector()
+    mapping, frames = perception( device ), Collector()
     mapping.open( occ_profile( device ) )
     mapping.start( frames )
     frames.wait( rs.stream.occupancy, time.monotonic(), MIN_OCC_FRAMES )
@@ -304,12 +297,12 @@ def test_ir_and_perception_exclude_each_other(device):
     ir = profile( stereo, rs.stream.infrared, rs.format.y8, index=1 )   # same resolution as depth
     inputs = start_inputs( device, [ir] )
     with pytest.raises( RuntimeError, match="IR channel" ):
-        sensor( device, 'Perception' ).open( pd_profile( device ) )
+        perception( device ).open( pd_profile( device ) )
     assert mux_state( device, PD_ID ) == ( 0, 0, 0 )
     stop( inputs )
 
     inputs = start_inputs( device )
-    pd = sensor( device, 'Perception' )
+    pd = perception( device )
     pd.open( pd_profile( device ) )
     pd.start( lambda f: None )
     stop( inputs )

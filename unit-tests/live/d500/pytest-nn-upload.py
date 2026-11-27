@@ -129,7 +129,7 @@ def test_size_limits( loader ):
 def test_refused_while_streaming( unlocked_loader, perception ):
     sensor, profile = perception
     def upload():
-        with pytest.raises( RuntimeError, match="stop the Perception sensor" ):
+        with pytest.raises( RuntimeError, match="stop Object Detection" ):
             unlocked_loader.nn_upload( GARBAGE )
     assert frames_for( sensor, profile, 2, upload ) > 0
 

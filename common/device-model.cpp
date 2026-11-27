@@ -396,25 +396,53 @@ namespace rs2
         return false;
     }
 
-    bool device_model::subdevice_has_perception( const subdevice_model & sub ) const
+    const char * device_model::stream_blocker( const subdevice_model & sub, int unique_id ) const
     {
-        return subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION )
-            || subdevice_has_stream_enabled( sub, RS2_STREAM_OCCUPANCY );
+        auto const type = sub.stream_type_of( unique_id );
+        if( type == RS2_STREAM_OBJECT_DETECTION && ! is_stream_active( RS2_STREAM_COLOR ) )
+            return "Object detection needs a Color stream running; detections are drawn on it";
+        // Over GMSL perception and infrared share the IR channel
+        if( sub.perception && fw_update::is_mipi_device( dev )
+            && is_stream_active( RS2_STREAM_INFRARED ) )
+            return "Stop the Infrared streams before starting perception (they share the GMSL IR channel)";
+        // The camera streams no Perception Point Cloud next to the Stereo Module, whichever starts first
+        for( auto const & other : subdevices )
+        {
+            if( ! other->streaming )
+                continue;
+            if( type == RS2_STREAM_POINT_CLOUD && sub.perception && other->s->is< depth_stereo_sensor >() )
+                return "Stereo Module is streaming";
+            if( sub.s->is< depth_stereo_sensor >() && other->perception && subdevice_has_stream_enabled( *other, RS2_STREAM_POINT_CLOUD ) )
+                return "Point Cloud is streaming";
+        }
+        return nullptr;
     }
 
-    bool device_model::subdevice_needs_color( const subdevice_model & sub ) const
-    {
-        // Object detection results are drawn on the color stream
-        return subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION );
-    }
-
-    void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
+    void device_model::stop_perception_if_video_stopped( viewer_model & viewer, std::string & error_message )
     {
         bool const color_active = is_stream_active( RS2_STREAM_COLOR );
         for( auto & sub : subdevices )
         {
-            if( sub->streaming && ! color_active && subdevice_needs_color( *sub ) )
+            if( ! sub->streaming || color_active || ! subdevice_has_stream_enabled( *sub, RS2_STREAM_OBJECT_DETECTION ) )
+                continue;
+            // Next to other streams of an incremental sensor only object detection closes
+            if( ! sub->incremental_streams
+                || std::count_if( sub->stream_enabled.begin(), sub->stream_enabled.end(), []( const std::pair< const int, bool > & kv ) { return kv.second; } ) == 1 )
                 sub->stop( viewer.not_model );
+            else
+            {
+                for( auto & kv : sub->stream_enabled )
+                    if( sub->stream_type_of( kv.first ) == RS2_STREAM_OBJECT_DETECTION )
+                        kv.second = false;
+                try
+                {
+                    sub->close_unticked();
+                }
+                catch( const std::exception & e )
+                {
+                    error_message = e.what();
+                }
+            }
         }
     }
 
@@ -2638,7 +2666,8 @@ namespace rs2
                             can_stream = true;
                         else
                         {
-                            profiles = sub->get_supported_profiles();
+                            if( ! sub->perception )  // a Perception selection is never rewritten for the user
+                                profiles = sub->get_supported_profiles();
                             if (!profiles.empty())
                                 can_stream = true;
                             else
@@ -2663,16 +2692,25 @@ namespace rs2
                         }
                         if (can_stream)
                         {
-                            // Object detection overlays need Color. Over GMSL perception and infrared share the IR channel.
-                            bool blocking_ir_active = subdevice_has_perception( *sub ) && fw_update::is_mipi_device( dev )
-                                                   && is_stream_active( RS2_STREAM_INFRARED );
-                            bool missing_color = subdevice_needs_color( *sub ) && ! is_stream_active( RS2_STREAM_COLOR );
-                            bool disable_perception = missing_color || blocking_ir_active;
-                            if( disable_perception )
+                            const char * blocker = nullptr;
+                            for( auto const & kv : sub->stream_enabled )
+                                if( kv.second && ! blocker )
+                                    blocker = stream_blocker( *sub, kv.first );
+                            if( blocker )
+                                sub->open_pending = false;  // a waiting Start that is no longer allowed is dropped
+                            bool const disabled = blocker || sub->open_pending;
+                            if( disabled )
                                 ImGui::BeginDisabled();
 
-                            if( ImGui::Button( label.c_str(), button_size ) )
+                            bool const stopping = sub->perception
+                                               && std::any_of( subdevices.begin(), subdevices.end(), []( const std::shared_ptr< subdevice_model > & other ) { return other->is_stopping(); } );
+                            bool const clicked = ImGui::Button( label.c_str(), button_size );
+                            // The Perception sensor's rules depend on the other sensors: its Start waits until a stopped one has closed
+                            if( clicked && stopping )
+                                sub->open_pending = true;
+                            else if( clicked || ( sub->open_pending && ! stopping ) )
                             {
+                                sub->open_pending = false;
                                 if (profiles.empty()) // profiles might be already filled
                                     profiles = sub->get_selected_profiles();
                                 try
@@ -2704,13 +2742,11 @@ namespace rs2
                                     viewer.begin_stream(sub, profile);
                                 }
                             }
-                            if( disable_perception )
+                            if( disabled )
                             {
                                 ImGui::EndDisabled();
-                                if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                                    RsImGui::CustomTooltip( blocking_ir_active
-                                        ? "Stop the Infrared streams before starting perception (they share the GMSL IR channel)"
-                                        : "Object detection needs a Color stream running; detections are drawn on it" );
+                                if( blocker && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                                    RsImGui::CustomTooltip( blocker );
                             }
                             else if (ImGui::IsItemHovered())
                             {
@@ -2727,10 +2763,10 @@ namespace rs2
                         RsImGui_ScopePushStyleColor(ImGuiCol_Text, light_blue);
                         RsImGui_ScopePushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
 
-                        if( ImGui::Button( label.c_str(), button_size ) )
+                        if( ImGui::Button( label.c_str(), button_size ) || sub->stop_requested )
                         {
                             sub->stop(viewer.not_model);
-                            stop_perception_if_video_stopped( viewer );
+                            stop_perception_if_video_stopped( viewer, error_message );
                             std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
                             if ((friendly_name.find("Tracking") != std::string::npos) ||
                                 (friendly_name.find("Motion") != std::string::npos))
@@ -3387,7 +3423,7 @@ namespace rs2
         {
             if (depth_mapping_camera_streaming_alone)
             {
-                record_button_hover_text = "To record Depth Mapping Camera also stream Stereo Module";
+                record_button_hover_text = "To record Mapping streams also stream Stereo Module";
             }
             else
             { 
@@ -3406,7 +3442,7 @@ namespace rs2
             bool depth_stereo_sensor_streaming = false;
             for (auto&& sub : subdevices)
             {
-                if (sub->s->is<rs2::depth_mapping_sensor>() && sub->streaming)
+                if ((sub->s->is<rs2::depth_mapping_sensor>() || sub->perception) && sub->streaming)
                 {
                     // The device point cloud is self-contained; only LPC and occupancy need depth to be viewed in 3D
                     if( subdevice_has_stream_enabled( *sub, RS2_STREAM_LABELED_POINT_CLOUD )

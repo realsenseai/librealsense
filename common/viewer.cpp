@@ -1092,7 +1092,7 @@ namespace rs2
         for (auto&& kvp : streams)
         {
             if (!kvp.second.is_stream_visible() &&
-                (!kvp.second.dev || (!kvp.second.dev->is_paused() && !kvp.second.dev->streaming)))
+                !is_stream_streaming(kvp.first))
             {
                 if (kvp.first == selected_depth_source_uid)
                 {

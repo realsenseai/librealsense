@@ -356,6 +356,7 @@ namespace rs2
         bool disable_record_button_logic(bool is_streaming, bool is_playback_device);
         std::string get_record_button_hover_text(bool is_streaming);
         bool is_depth_mapping_camera_streaming_alone();
+        const char * stream_blocker( const subdevice_model & sub, int unique_id ) const;  // why the Viewer greys this stream, or null
 
         void open_hdr_config_tool_window();
 
@@ -395,9 +396,7 @@ namespace rs2
         
         bool subdevice_has_stream_enabled( const subdevice_model & sub, rs2_stream type ) const;
         bool is_stream_active( rs2_stream type ) const;  // enabled on a streaming subdevice
-        bool subdevice_has_perception( const subdevice_model & sub ) const;  // object detection or occupancy enabled
-        bool subdevice_needs_color( const subdevice_model & sub ) const;
-        void stop_perception_if_video_stopped( viewer_model & viewer );
+        void stop_perception_if_video_stopped( viewer_model & viewer, std::string & error_message );
 
         void draw_info_icon(ux_window& window, ImFont* font, const ImVec2& size);
         int draw_seek_bar(float extra_width);

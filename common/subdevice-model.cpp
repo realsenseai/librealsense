@@ -104,6 +104,7 @@ namespace rs2
     {
         return type == RS2_STREAM_OCCUPANCY
             || type == RS2_STREAM_LABELED_POINT_CLOUD
+            || type == RS2_STREAM_POINT_CLOUD
             || type == RS2_STREAM_OBJECT_DETECTION;
     }
 
@@ -912,9 +913,10 @@ namespace rs2
 
             auto formats_chars = get_string_pointers(f.second);
             const bool beta = is_beta_stream(stream_type_of(f.first));
-            if (!streaming || (streaming && stream_enabled[f.first]))
+            const bool live_toggle = streaming && incremental_streams;
+            if (!streaming || stream_enabled[f.first] || live_toggle)
             {
-                if (streaming)
+                if (streaming && !live_toggle)
                 {
                     label = rsutils::string::from()
                         << stream_display_names[f.first] << (show_single_fps_list ? "" : " stream:");
@@ -933,9 +935,50 @@ namespace rs2
                         stream_enabled[f.first] = false;
                         res = true;
                     }
-                    const bool mode_locked = is_stream_mode_locked(f.first) || aligned_off;
+                    const char * const blocker = live_toggle && ! stream_enabled[f.first] ? dev_model->stream_blocker( *this, f.first ) : nullptr;
+                    const bool mode_locked = is_stream_mode_locked(f.first) || aligned_off || blocker;
                     if (mode_locked) ImGui::BeginDisabled();
-                    if (ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]))
+                    const bool toggled = ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]);
+                    if (blocker && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                        RsImGui::CustomTooltip(blocker);
+                    // Exclusive streams run one at a time: ticking one unticks the others, like radio buttons
+                    if (toggled && stream_enabled[f.first] && exclusive_streams.count(stream_type_of(f.first)))
+                        for (auto& kv : stream_enabled)
+                            if (kv.first != f.first && exclusive_streams.count(stream_type_of(kv.first)))
+                                kv.second = false;
+                    if (toggled && live_toggle)
+                    {
+                        auto const uid = f.first;
+                        try
+                        {
+                            if (stream_enabled[uid])
+                            {
+                                close_unticked();
+                                auto const selected = get_selected_profiles(false);
+                                auto const it = std::find_if(selected.begin(), selected.end(), [uid](const stream_profile& p) { return p.unique_id() == uid; });
+                                if (it == selected.end())
+                                    throw std::runtime_error("Selected value is not supported");
+                                // Closing a sensor's last stream closes the sensor, so the new one starts it again
+                                if (s->get_active_streams().empty())
+                                    play({ *it }, viewer, dev_model->dev_syncer);
+                                else
+                                    s->open(*it);
+                                viewer.begin_stream(shared_from_this(), *it);
+                            }
+                            else if (std::none_of(stream_enabled.begin(), stream_enabled.end(), [](const std::pair<const int, bool>& kv) { return kv.second; }))
+                                stop_requested = true;  // the sensor's Stop code turns it off
+                            else
+                                close_unticked();
+                        }
+                        catch (const std::exception& e)
+                        {
+                            error_message = e.what();
+                            stream_enabled[uid] = !stream_enabled[uid];
+                            if (s->get_active_streams().empty())
+                                stop_requested = true;
+                        }
+                    }
+                    else if (toggled)
                     {
                         prev_stream_enabled = tmp;
                         res = true;
@@ -1362,7 +1405,8 @@ namespace rs2
         }
         else
         {
-            res |= draw_resolutions(error_message, label, streaming_tooltip, col0, col1);
+            if (!perception)
+                res |= draw_resolutions(error_message, label, streaming_tooltip, col0, col1);
 
             if (draw_fps_selector)
             {
@@ -1882,6 +1926,16 @@ namespace rs2
         }
     }
 
+    void subdevice_model::close_unticked()
+    {
+        std::vector< stream_profile > closing;
+        for( auto && p : s->get_active_streams() )
+            if( ! stream_enabled[p.unique_id()] )
+                closing.push_back( p );
+        if( ! closing.empty() )
+            s->close( closing );
+    }
+
     bool subdevice_model::is_stream_mode_locked(int unique_id) const
     {
         if (!is_dual_color_subdevice())
@@ -2191,7 +2245,10 @@ namespace rs2
                                 {
                                     if (!ui.is_multiple_resolutions)
                                     {
-                                        if (vid_prof.width() == width && vid_prof.height() == height)
+                                        // A perception stream runs at its own size: the first shown one at this rate and format
+                                        if (perception ? std::none_of(results.begin(), results.end(),
+                                                             [&](const stream_profile& r) { return r.unique_id() == stream; })
+                                                       : vid_prof.width() == width && vid_prof.height() == height)
                                             results.push_back(p);
                                     }
                                     else
@@ -2260,6 +2317,7 @@ namespace rs2
         // --- Immediate UI state (synchronous) ---
         streaming = false;
         _pause = false;
+        stop_requested = false;
 
         if (ui.is_multiple_resolutions)
         {
@@ -2289,8 +2347,11 @@ namespace rs2
             {
                 if (prev_stop.valid())
                     prev_stop.get();
+                // Closing a sensor's last stream live already closed it
+                bool const opened = ! sensor_ptr->get_active_streams().empty();
 
-                sensor_ptr->stop();
+                if (opened)
+                    sensor_ptr->stop();
 
                 queues.foreach([&](frame_queue& q)
                     {
@@ -2298,7 +2359,8 @@ namespace rs2
                         while (q.poll_for_frame(&f));
                     });
 
-                sensor_ptr->close();
+                if (opened)
+                    sensor_ptr->close();
 
                 // Invalidate after close() so options whose read-only depends on is_opened() refresh correctly.
                 _options_invalidated = true;
@@ -2636,7 +2698,7 @@ namespace rs2
     void subdevice_model::set_extrinsics_from_depth_if_needed()
     {
         std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
-        if (device_has_depth_mapping(dev) && sensor_name == "Depth Mapping Camera")
+        if (device_has_depth_mapping(dev) && (sensor_name == "Depth Mapping Camera" || perception))
         {
             //_labeled_point_cloud_to_depth_extrinsics
             stream_profile depth_profile;

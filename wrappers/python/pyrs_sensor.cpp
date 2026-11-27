@@ -151,7 +151,12 @@ void init_sensor(py::module &m) {
     fisheye_sensor.def(py::init<rs2::sensor>(), "sensor"_a);
 
     py::class_<rs2::perception_sensor, rs2::sensor, py_holder<rs2::perception_sensor>> perception_sensor(m, "perception_sensor"); // No docstring in C++
-    perception_sensor.def(py::init<rs2::sensor>(), "sensor"_a);
+    perception_sensor.def(py::init<rs2::sensor>(), "sensor"_a)
+        .def("get_depth_mapping_params", &rs2::perception_sensor::get_depth_mapping_params,
+            "Get the occupancy grid and labeled point cloud params as a JSON string", py::call_guard<py::gil_scoped_release>())
+        .def("set_depth_mapping_params", &rs2::perception_sensor::set_depth_mapping_params,
+            "Set occupancy grid and labeled point cloud params from a partial JSON string; only the named fields change",
+            "params_json_str"_a, py::call_guard<py::gil_scoped_release>());
 
     py::class_<rs2::depth_mapping_sensor, rs2::sensor, py_holder<rs2::depth_mapping_sensor>> depth_mapping_sensor(m, "depth_mapping_sensor"); // No docstring in C++
     depth_mapping_sensor.def(py::init<rs2::sensor>(), "sensor"_a)

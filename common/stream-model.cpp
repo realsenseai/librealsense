@@ -192,10 +192,11 @@ namespace rs2
         if (profile.stream_type() == RS2_STREAM_OBJECT_DETECTION)
             return false;
 
+        auto const uid = original_profile.unique_id();
         if (dev &&
             (dev->is_paused() ||
             (dev->streaming && dev->dev.is<playback>()) ||
-                (dev->streaming /*&& texture->get_last_frame()*/)))
+                (dev->streaming && (!dev->incremental_streams || (dev->stream_enabled.count(uid) && dev->stream_enabled.at(uid))) /*&& texture->get_last_frame()*/)))
         {
             return true;
         }

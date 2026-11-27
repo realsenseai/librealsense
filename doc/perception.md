@@ -19,36 +19,35 @@ D500 Pro cameras process depth on the camera itself and stream perception output
 
 ## Sensors
 
-The perception features are split today between two sensors:
+All the perception streams are on one sensor:
 
 | Sensor | Name | Extension | Streams |
 | --- | --- | --- | --- |
-| `rs2::depth_mapping_sensor` | `Depth Mapping Camera` | `RS2_EXTENSION_DEPTH_MAPPING_SENSOR` | Occupancy grid, labeled point cloud, point cloud |
-| `rs2::perception_sensor` | `Perception` | `RS2_EXTENSION_PERCEPTION_SENSOR` | Object detection |
+| `rs2::perception_sensor` | `Perception` | `RS2_EXTENSION_PERCEPTION_SENSOR` | Object detection, occupancy grid, labeled point cloud, point cloud |
 
-> **Note:** The depth mapping sensor will be merged into the perception sensor. This document describes the API as it is today. Expect the class, extension and method names in the [Depth Mapping](#depth-mapping) section to change.
+D585S and D585 legacy (PID 0x0B6A) keep their own `rs2::depth_mapping_sensor` (`Depth Mapping Camera`, `RS2_EXTENSION_DEPTH_MAPPING_SENSOR`) for the occupancy grid and labeled point cloud; on D585 legacy the Perception sensor carries object detection only.
 
-Getting the sensors:
+Getting the sensor:
 
 ```cpp
 rs2::device dev = rs2::context().query_devices().front();
-auto depth_mapping_sensor = dev.first< rs2::depth_mapping_sensor >();
 auto perception_sensor = dev.first< rs2::perception_sensor >();
 ```
 
 ```python
 dev = rs.context().query_devices()[0]
-depth_mapping_sensor = dev.first_depth_mapping_sensor()
 perception_sensor = dev.first_perception_sensor()
 ```
 
-A camera with FW that predates depth mapping has no depth mapping sensor. The SDK logs a warning and the rest of the device works as usual.
+A stream the camera's FW does not expose is not offered. The SDK logs a warning and the rest of the device works as usual.
+
+Over USB and GMSL, `open()` on the Perception sensor while it is open or streaming adds streams, and `close( profiles )` removes only those; the other streams keep streaming.
 
 ## Depth Mapping
 
 ### Streams
 
-The camera builds the depth mapping streams from its depth. The depth mapping interface carries one stream at a time.
+The camera builds the depth mapping streams from its depth. One depth mapping stream runs at a time; object detection can run beside it.
 
 | Stream | `rs2_stream` | Description |
 | --- | --- | --- |
@@ -74,6 +73,8 @@ The other values of `rs2_point_cloud_label` are not used by D5x5 cameras.
 #### Stream rules
 
 * Over USB on dual-RGB (2C) cameras, color cannot stream together with the occupancy grid or the labeled point cloud.
+* Object detection cannot start while dual RGB rectification is on.
+* Over GMSL, infrared and the perception streams cannot stream together.
 * The SDK does not check other combinations; the camera decides which ones it supports.
 
 ### Options
@@ -101,13 +102,13 @@ import json
 import pyrealsense2 as rs
 
 dev = rs.context().query_devices()[0]
-depth_mapping_sensor = dev.first_depth_mapping_sensor()
+perception_sensor = dev.first_perception_sensor()
 
 # Read all the params
-params = json.loads(depth_mapping_sensor.get_depth_mapping_params())
+params = json.loads(perception_sensor.get_depth_mapping_params())
 
 # Change one param; the camera keeps the rest
-depth_mapping_sensor.set_depth_mapping_params('{"occupancy_grid_params": {"surface_height": 0.15}}')
+perception_sensor.set_depth_mapping_params('{"occupancy_grid_params": {"surface_height": 0.15}}')
 ```
 
 #### How a write works

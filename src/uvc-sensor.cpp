@@ -268,7 +268,7 @@ void uvc_sensor::open( const stream_profiles & requests )
         {
             try
             {
-                _device->close( profile );
+                adding ? _device->close_pin( profile ) : _device->close( profile );  // the other pins keep streaming
             }
             catch( ... )
             {
@@ -712,7 +712,7 @@ void uvc_sensor::close_streams( const stream_profiles & profiles )
     {
         try  // Handle disconnect event
         {
-            _device->close( profile );
+            _device->close_pin( profile );
         }
         catch( ... )
         {
