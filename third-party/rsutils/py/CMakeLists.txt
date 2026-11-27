@@ -9,7 +9,7 @@ set( PYRSUTILS_FILES
     "pyrsutils.cpp"
     )
 
-pybind11_add_module( ${PROJECT_NAME} SHARED ${PYRSUTILS_FILES} )
+pybind11_add_module( ${PROJECT_NAME} MODULE ${PYRSUTILS_FILES} )
 
 target_link_libraries( ${PROJECT_NAME} PRIVATE ${DEPENDENCIES} )
 set_target_properties( ${PROJECT_NAME}

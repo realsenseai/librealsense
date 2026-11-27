@@ -26,7 +26,7 @@ Users who wish to create a python package (wheel) can create it from this folder
 
 Windows users can install the RealSense SDK 2.0 from the release tab to get pre-compiled binaries of the wrapper, for both x86 and x64 architectures. (Python versions 3.10, 3.11, 3.12, 3.13 and 3.14 are supported).
 
-> **NVIDIA Jetson users:** the `aarch64` wheels are CUDA builds, one per JetPack line, and the wheel's Python version selects the JetPack it was built for. Install with the Python version that matches your JetPack — see the table on the [PyPI project page](https://pypi.org/project/pyrealsense2/).
+> **NVIDIA Jetson users:** the `aarch64` wheels are CUDA builds, one per JetPack line, and the wheel's Python version selects the JetPack it was built for. Install with the Python version that matches your JetPack — see the table on the [PyPI project page](https://pypi.org/project/pyrealsense2/). The source build below is not limited to the wheel matrix: it supports Python 3.9 through 3.15 on JetPack, with or without CUDA.
 
 > **Note:**
 > EOL Python 3.9 distributables can be found for pyrealsense2 versions <= 2.57.4
@@ -48,7 +48,7 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
 4. Configure and make:
   * `mkdir build`
   * `cd build`
-  * `cmake ../ -DBUILD_PYTHON_BINDINGS:bool=true -DPYTHON_EXECUTABLE=$(which python3)`
+  * `cmake ../ -DBUILD_PYTHON_BINDINGS:bool=true -DPython_EXECUTABLE=$(which python3)`
   * `make -j4`
   * `sudo make install`
   > **Note**: For building a self-contained (statically compiled) pyrealsense2 library add the CMake flag:
@@ -57,7 +57,11 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
   >
   > **Note**: To force compilation with a specific version on a system with a few Python versions installed, add the following flag to CMake command:
   >
-  >`-DPYTHON_EXECUTABLE=[full path to the exact python executable]`
+  >`-DPython_EXECUTABLE=[full path to the exact python executable]`
+  >
+  > The historical `-DPYTHON_EXECUTABLE=[...]` spelling is still accepted as an alias.
+  >
+  > **Note**: Building the Python bindings requires CMake 3.15 or newer. Python 3.14 and 3.15 support comes from pybind11 3.1 (Python 3.9 through 3.15 are supported).
   
 5. update your PYTHONPATH environment variable to add the path to the pyrealsense library
   * `export PYTHONPATH=$PYTHONPATH:/usr/local/lib`
@@ -65,6 +69,24 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
 	`export PYTHONPATH=$PYTHONPATH:/usr/local/lib/[python version]/pyrealsense2`
 6. Alternatively, copy the build output (`librealsense2.so` and `pyrealsense2.so`) next to your script.
   **Note:** Python 3 module filenames may contain additional information, e.g. `pyrealsense2.cpython-35m-arm-linux-gnueabihf.so`)
+
+#### Building wheels for every installed Python
+`build_wheels.py` is the multi-interpreter companion to `build_wheel.py`. It discovers every Python 3.9+ interpreter on `PATH` (and interpreters installed by `uv`) and builds one wheel per version:
+
+```bash
+python3 wrappers/python/build_wheels.py
+```
+
+Select interpreters explicitly, or force the RSUSB backend on Jetson where the native kernel patches are not installed:
+
+```bash
+python3 wrappers/python/build_wheels.py \
+    --python /usr/bin/python3.14 \
+    --python /usr/bin/python3.15 \
+    --rsusb
+```
+
+Each interpreter needs its development headers (`python3-dev`, or the matching `python3.X-dev` package). Build trees go to `build/python-wheels/py3.X` by default and wheels are written to `wrappers/python/dist`.
 
 
 
@@ -77,8 +99,8 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
 
       `-DBUILD_SHARED_LIBS=false`
 
-3. If you have multiple python installations on your machine you can use: `-DPYTHON_EXECUTABLE=<path to python executable>`
-  For example: `-DPYTHON_EXECUTABLE=C:/Python310/python.exe`
+3. If you have multiple python installations on your machine you can use: `-DPython_EXECUTABLE=<path to python executable>` (`-DPYTHON_EXECUTABLE=` is still accepted as an alias)
+  For example: `-DPython_EXECUTABLE=C:/Python310/python.exe`
 > The precompiled binaries shipped with [the installer](https://github.com/realsenseai/librealsense/releases) assume **Python 3.11**.
 >The error `ImportError: DLL load failed: The specified module could not be found` might indicate versions mismatch or architecture (x86 vs x64) mismatch.
 
