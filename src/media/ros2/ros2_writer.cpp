@@ -30,6 +30,10 @@
 #include <src/object-detection-frame.h>
 
 #include <fstream>
+#include <algorithm>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 namespace librealsense
 {
@@ -40,6 +44,79 @@ namespace librealsense
         if (!is_db3_file(file))
             throw std::runtime_error("Output file must have .db3 extension: '" + file + "'");
         return file.substr(0, file.size() - 4);
+    }
+
+    class ros2_writer::encode_pool
+    {
+    public:
+        explicit encode_pool( size_t threads )
+        {
+            try
+            {
+                for( size_t i = 0; i < threads; ++i )
+                    _threads.emplace_back( [this]() { run(); } );
+            }
+            catch( ... )
+            {
+                stop();  // a constructor that throws does not run the destructor
+                throw;
+            }
+        }
+
+        ~encode_pool() { stop(); }
+
+        std::future< encoded_frame > submit( std::function< encoded_frame() > job )
+        {
+            auto task = std::make_shared< std::packaged_task< encoded_frame() > >( std::move( job ) );
+            auto result = task->get_future();
+            {
+                std::lock_guard< std::mutex > lock( _mutex );
+                _jobs.push_back( [task]() { ( *task )(); } );
+            }
+            _wake.notify_one();
+            return result;
+        }
+
+    private:
+        void stop()
+        {
+            {
+                std::lock_guard< std::mutex > lock( _mutex );
+                _stop = true;
+            }
+            _wake.notify_all();
+            for( auto & t : _threads )
+                t.join();
+        }
+
+        void run()
+        {
+            for( ;; )
+            {
+                std::function< void() > job;
+                {
+                    std::unique_lock< std::mutex > lock( _mutex );
+                    _wake.wait( lock, [this]() { return _stop || ! _jobs.empty(); } );
+                    if( _jobs.empty() )
+                        return;
+                    job = std::move( _jobs.front() );
+                    _jobs.pop_front();
+                }
+                job();
+            }
+        }
+
+        std::mutex _mutex;
+        std::condition_variable _wake;
+        std::deque< std::function< void() > > _jobs;
+        std::vector< std::thread > _threads;
+        bool _stop = false;
+    };
+
+    // Half the cores, clamped to 2-4
+    static size_t encoder_thread_count()
+    {
+        return std::min< size_t >( 4, std::max< size_t >( 2, std::thread::hardware_concurrency() / 2 ) );
     }
 
     ros2_writer::ros2_writer(const std::string& file, bool compress_while_record) : m_file_path(file)
@@ -67,8 +144,30 @@ namespace librealsense
                 << "' using storage id 'sqlite3'");
 
         _compress = compress_while_record;
+        if( _compress )
+        {
+            auto const threads = encoder_thread_count();
+            _encoders = std::make_unique< encode_pool >( threads );
+            _max_pending = 2 * threads;
+        }
 
         write_file_version();
+    }
+
+    ros2_writer::~ros2_writer()
+    {
+        // A failing frame is dropped from the queue before it throws, so this ends
+        while( ! _pending.empty() )
+        {
+            try
+            {
+                commit_encoded_frames( 0 );
+            }
+            catch( const std::exception & e )
+            {
+                LOG_ERROR( "Failed to write queued frames. " << e.what() );
+            }
+        }
     }
 
     void ros2_writer::ensure_topic(const std::string& name, const std::string& type, const std::string& offered_qos)
@@ -84,7 +183,7 @@ namespace librealsense
         _topics.emplace(name, md);
     }
 
-    void ros2_writer::compress_zstd(const uint8_t* data, size_t size, std::vector<uint8_t>& out)
+    static void compress_zstd( const uint8_t * data, size_t size, std::vector< uint8_t > & out )
     {
         out.resize(ZSTD_compressBound(size));
 
@@ -113,9 +212,9 @@ namespace librealsense
         return size_t( f->get_stride() ) * f->get_height();
     }
 
-    void ros2_writer::write_compressed_video_frame(const stream_identifier& stream_id,
-                                                   const nanoseconds& timestamp,
-                                                   frame_interface* frame)
+    ros2_writer::encoded_frame ros2_writer::encode_compressed_frame( const stream_identifier & stream_id,
+                                                                       const nanoseconds & timestamp,
+                                                                       frame_interface * frame )
     {
         const uint8_t* pixels;
         uint32_t width, height, stride;
@@ -143,7 +242,7 @@ namespace librealsense
         }
         else
         {
-            throw invalid_value_exception("write_compressed_video_frame: unsupported frame type");
+            throw invalid_value_exception("encode_compressed_frame: unsupported frame type");
         }
 
         auto stream_name = ros2_topic::stream_name(stream_id.stream_type, stream_id.stream_index);
@@ -155,15 +254,15 @@ namespace librealsense
 
         ros2_image_codec::png_layout layout{};
         bool png_ok = ros2_image_codec::png_layout_for_format(format, layout);
-        _frame_buf.clear();
+        std::vector< uint8_t > frame_buf;
         if (png_ok)
         {
             if (layout.is_depth)
             {
                 // compressed_depth_image_transport expects a ConfigHeader before the PNG
                 ros2_image_codec::config_header hdr;
-                _frame_buf.resize(sizeof(hdr));
-                std::memcpy(_frame_buf.data(), &hdr, sizeof(hdr));
+                frame_buf.resize(sizeof(hdr));
+                std::memcpy(frame_buf.data(), &hdr, sizeof(hdr));
                 msg.format(rsutils::string::from() << layout.ros_encoding << "; compressedDepth png");
             }
             else
@@ -171,25 +270,64 @@ namespace librealsense
                 msg.format(rsutils::string::from() << layout.ros_encoding << "; png compressed "
                                                    << decoded_png_encoding(layout));
             }
-            ros2_image_codec::encode_png(layout, pixels, width, height, stride, _frame_buf);
+            ros2_image_codec::encode_png(layout, pixels, width, height, stride, frame_buf);
         }
         else
         {
             // Formats PNG can't represent losslessly (YUYV-class packed formats):
             // zstd the raw pixels; the format string carries the layout for external consumers.
-            compress_zstd(pixels, size, _frame_buf);
+            compress_zstd(pixels, size, frame_buf);
             if( format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264 )  // entropy-coded: no rows, so no geometry to describe
                 msg.format( rsutils::string::from() << rs2_format_to_string( format ) << "; zstd; size=" << size );
             else
                 msg.format(rsutils::string::from() << rs2_format_to_string(format) << "; zstd; "
                                                    << width << "x" << height << " step=" << stride);
         }
-        msg.data(std::move(_frame_buf));
+        msg.data( std::move( frame_buf ) );
 
-        write_message(ros2_topic::compressed_frame_data_topic(stream_id, png_ok && layout.is_depth),
-                      "sensor_msgs/msg/CompressedImage", timestamp, msg);
-        _frame_buf = std::move(msg.data()); // reclaim the buffer's capacity for the next frame
-        write_additional_frame_messages(stream_id, timestamp, frame);
+        return { ros2_topic::compressed_frame_data_topic( stream_id, png_ok && layout.is_depth ), std::move( msg ), {} };
+    }
+
+    void ros2_writer::queue_compressed_frame( const stream_identifier & stream_id,
+                                              const nanoseconds & timestamp,
+                                              frame_holder && frame )
+    {
+        // std::function needs a copyable job, so the frame travels in a shared holder and the job takes it out
+        auto holder = std::make_shared< frame_holder >( std::move( frame ) );
+        auto encoded = _encoders->submit( [stream_id, timestamp, holder]()
+        {
+            frame_holder source( std::move( *holder ) );  // released on every path, including a throw
+            auto result = encode_compressed_frame( stream_id, timestamp, source.frame );
+            result.extras = make_frame_extras( source.frame );
+            return result;
+        } );
+        _pending.push_back( { stream_id, timestamp, std::move( encoded ) } );
+        commit_encoded_frames( _max_pending );
+    }
+
+    void ros2_writer::commit_encoded_frames( size_t max_pending )
+    {
+        while( ! _pending.empty() )
+        {
+            if( _pending.size() <= max_pending
+                && _pending.front().encoded.wait_for( std::chrono::seconds( 0 ) ) != std::future_status::ready )
+                break;
+
+            pending_frame done = std::move( _pending.front() );
+            _pending.pop_front();
+            encoded_frame encoded;
+            try
+            {
+                encoded = done.encoded.get();
+            }
+            catch( const std::exception & e )
+            {
+                LOG_ERROR( "Failed to encode a " << done.stream_id.stream_type << " frame, dropping it. " << e.what() );
+                continue;
+            }
+            write_message( encoded.topic, "sensor_msgs/msg/CompressedImage", done.timestamp, encoded.msg );
+            write_additional_frame_messages( done.stream_id, done.timestamp, encoded.extras );
+        }
     }
 
     void ros2_writer::write_string(std::string const& topic, const nanoseconds& ts, std::string const& payload)
@@ -245,7 +383,7 @@ namespace librealsense
             auto vid_frame = As<video_frame>(frame.frame);
             if (_compress)
             {
-                write_compressed_video_frame(stream_id, timestamp, frame.frame);
+                queue_compressed_frame( stream_id, timestamp, std::move( frame ) );
                 return;
             }
             sensor_msgs::msg::Image img;
@@ -320,7 +458,7 @@ namespace librealsense
             // Labeled point cloud and device point cloud: the raw frame buffer, no 2D geometry
             if (_compress)
             {
-                write_compressed_video_frame(stream_id, timestamp, frame.frame);
+                queue_compressed_frame( stream_id, timestamp, std::move( frame ) );
                 return;
             }
             sensor_msgs::msg::Image img;
@@ -389,7 +527,7 @@ namespace librealsense
             return;
         }
 
-        write_additional_frame_messages(stream_id, timestamp, frame);
+        write_additional_frame_messages( stream_id, timestamp, make_frame_extras( frame.frame ) );
     }
 
     void ros2_writer::write_snapshot(uint32_t device_index, const nanoseconds& timestamp, rs2_extension type, const std::shared_ptr<extension_snapshot>& snapshot)
@@ -413,7 +551,7 @@ namespace librealsense
         write_message(ros2_topic::file_version_topic(), "std_msgs/msg/UInt32", nanoseconds(0), version_msg);
     }
 
-    void ros2_writer::write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
+    static std::string make_frame_metadata( frame_interface * frame )
     {
         std::string system_time = std::to_string(frame->get_frame_system_time());
         std::string timestamp_domain = librealsense::get_string(frame->get_frame_timestamp_domain());
@@ -445,8 +583,7 @@ namespace librealsense
             }
         }
 
-        auto metadata_topic = ros2_topic::frame_metadata_topic(stream_id);
-        write_string(metadata_topic, timestamp, metadata_payload);
+        return metadata_payload;
     }
 
     // rs2_extrinsics rotation is a column-major 3x3 matrix; standard trace-based conversion
@@ -580,12 +717,12 @@ namespace librealsense
     }
 
 
-    void ros2_writer::write_camera_info(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
+    void ros2_writer::write_camera_info(const stream_identifier& stream_id, const nanoseconds& timestamp, const std::shared_ptr<stream_profile_interface>& stream)
     {
         auto it = m_camera_info_msgs.find(stream_id);
         if (it == m_camera_info_msgs.end())
         {
-            auto profile = std::dynamic_pointer_cast<video_stream_profile_interface>(frame->get_stream());
+            auto profile = std::dynamic_pointer_cast<video_stream_profile_interface>(stream);
             if (!profile)
                 return;
             auto intr = profile->get_intrinsics(); // may throw — caller logs and skips
@@ -612,11 +749,28 @@ namespace librealsense
         write_message(ros2_topic::frame_camera_info_topic(stream_id), "sensor_msgs/msg/CameraInfo", timestamp, it->second);
     }
 
-    void ros2_writer::write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
+    ros2_writer::frame_extras ros2_writer::make_frame_extras( frame_interface * frame )
+    {
+        frame_extras extras;
+        try
+        {
+            extras.metadata = make_frame_metadata( frame );
+        }
+        catch (std::exception const& e)
+        {
+            LOG_WARNING("Failed to get frame metadata. Exception: " << e.what());
+        }
+        extras.stream = frame->get_stream();
+        extras.sensor = frame->get_sensor();
+        return extras;
+    }
+
+    void ros2_writer::write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, const frame_extras& extras)
     {
         try
         {
-            write_frame_metadata(stream_id, timestamp, frame);
+            if (!extras.metadata.empty())
+                write_string(ros2_topic::frame_metadata_topic(stream_id), timestamp, extras.metadata);
         }
         catch (std::exception const& e)
         {
@@ -625,7 +779,7 @@ namespace librealsense
 
         try
         {
-            write_camera_info(stream_id, timestamp, frame);
+            write_camera_info(stream_id, timestamp, extras.stream);
         }
         catch (std::exception const& e)
         {
@@ -637,13 +791,13 @@ namespace librealsense
         {
             try
             {
-                auto sensor = frame->get_sensor();
+                auto const & sensor = extras.sensor;
                 if (sensor)
                 {
                     auto& dev = sensor->get_device();
                     uint32_t reference_id = 0;
                     rs2_extrinsics ext;
-                    std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
+                    std::tie(reference_id, ext) = dev.get_extrinsics(*extras.stream);
                     write_extrinsics(stream_id, reference_id, ext);
                 }
             }

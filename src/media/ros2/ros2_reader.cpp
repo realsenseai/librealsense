@@ -161,7 +161,7 @@ namespace librealsense
         return std::make_shared<serialized_end_of_file>();
     }
 
-    // Reverses write_compressed_video_frame: zstd payloads carry the raw pixels; PNG payloads
+    // Reverses ros2_writer::encode_compressed_frame: zstd payloads carry the raw pixels; PNG payloads
     // (optionally behind a compressedDepth ConfigHeader) are decoded and restored to the
     // source channel order.
     static std::vector<uint8_t> decode_compressed_image(const sensor_msgs::msg::CompressedImage& ci)
