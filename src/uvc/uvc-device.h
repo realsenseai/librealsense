@@ -80,7 +80,8 @@ namespace librealsense
             usb_status query_stream_ctrl(const std::shared_ptr<uvc_stream_ctrl_t>& control, uint8_t probe, int req);
             std::vector<uvc_format_t> get_available_formats_all() const;
 
-            bool uvc_get_ctrl(uint8_t unit, uint8_t ctrl, void *data, int len, uvc_req_code req_code) const;
+            bool uvc_get_ctrl(uint8_t unit, uint8_t ctrl, void *data, int len, uvc_req_code req_code,
+                              bool require_full_payload = false) const;
             bool uvc_set_ctrl(uint8_t unit, uint8_t ctrl, void *data, int len);
 
             int32_t rs2_value_translate(uvc_req_code action, rs2_option option, int32_t value) const;
