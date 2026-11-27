@@ -72,7 +72,7 @@ Recovery done
 |Flag   |Description   |
 |---|---|
 |`-b`|Create a backup to the camera flash and saved it to the given path|
-|`-s`|The serial number of the device to be update, this is mandetory if more than one device is connected|
+|`-s`|Serial number of the device to update; only that device is updated, and the tool fails if it is not connected. Mandatory if more than one device is connected|
 |`-f`|Path of the firmware image file|
 |`-u`|Update unsigned firmware, available only for unlocked cameras|
 |`-r`|Recover all connected devices which are in recovery mode|

@@ -379,7 +379,7 @@ try
     cli::flag unsigned_arg('u', "unsigned", "Update unsigned firmware, available only for unlocked cameras");
     cli::value<std::string> backup_arg('b', "backup", "path", "", "Create a backup to the camera flash and saved it to the given path");
     cli::value<std::string> file_arg('f', "file", "path", "", "Path of the firmware image file");
-    cli::value<std::string> serial_number_arg('s', "serial_number", "string", "", "The serial number of the device to be update, this is mandatory if more than one device is connected");
+    cli::value<std::string> serial_number_arg('s', "serial_number", "string", "", "Serial number of the device to update; only that device is updated, and the tool fails if it is not connected. Mandatory if more than one device is connected");
 
     cmd.default_log_level(RS2_LOG_SEVERITY_WARN);
     cmd.add(list_devices_arg);
@@ -477,13 +477,7 @@ try
         if (!d.is< rs2::updatable >() || !d.supports(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID))
             continue;
 
-        if (devs.size() > 1 && selected_serial_number.empty())
-        {
-            std::cout << "Please use the serial number argument to specify which device needs firmware update. " << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        if (devs.size() != 1)
+        if (!selected_serial_number.empty())
         {
             auto sn = d.get_info(d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? RS2_CAMERA_INFO_SERIAL_NUMBER
                 : RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
