@@ -146,8 +146,12 @@ def recording( test_device, tmp_path_factory, request ):
 
 @pytest.mark.device_exclude( "D401" )  # failure not yet checked
 @pytest.mark.device_exclude( "D555" )  # unstable
-@pytest.mark.device_type_exclude( "GMSL" )  # recording slows depth delivery on Jetson
-def test_fps_while_recording( recording ):
+def test_fps_while_recording( test_device, request ):
+    dev, _ = test_device
+    if (dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "GMSL"
+            and dev.get_info(rs.camera_info.product_id) not in {"0C04", "0C05", "0C06", "0C07", "0C08"}):
+        pytest.skip("Recording FPS on other GMSL devices is tracked separately")
+    recording = request.getfixturevalue("recording")
     for _, p in recording['picks']:
         fps = recording['frames'].fps( p.stream_name() )
         log.info( "%s recorded at %.2f fps", p, fps )
