@@ -17,6 +17,8 @@
 
 namespace librealsense
 {
+    class video_stream_profile_interface;
+
 
 
     // A synthetic source is simply a wrapper around a new frame_source and its exposure thru the rs2_source APIs
@@ -170,6 +172,8 @@ namespace librealsense
     class interleaved_functional_processing_block : public processing_block
     {
     public:
+        void reserve_output_frames( const video_stream_profile_interface & raw );
+
         interleaved_functional_processing_block(const char* name,
             rs2_format source_format,
             rs2_format left_target_format,

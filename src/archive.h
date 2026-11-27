@@ -19,6 +19,8 @@ namespace librealsense
 
         virtual frame_interface* alloc_and_track(const size_t size, frame_additional_data && additional_data, bool requires_memory) = 0;
 
+        virtual void reserve_frame( size_t size ) = 0;
+
         virtual std::shared_ptr<metadata_parser_map> get_md_parsers() const = 0;
 
         virtual std::shared_ptr< sensor_interface > get_sensor() const = 0;

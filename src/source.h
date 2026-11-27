@@ -30,6 +30,8 @@ namespace librealsense
 
         std::shared_ptr< option > get_published_size_option();
 
+        void reserve_frame( archive_id id, size_t size );
+
         frame_interface * alloc_frame( archive_id id,
                                        size_t size,
                                        frame_additional_data && additional_data,
@@ -71,6 +73,8 @@ namespace librealsense
         friend class syncer_process_unit;
 
         std::map< archive_id, std::shared_ptr< archive_interface > >::iterator create_archive( archive_id id );
+
+        archive_interface & get_or_create_archive( archive_id id );
 
         mutable std::recursive_mutex _mutex;
 

@@ -2,6 +2,7 @@
 // Copyright(c) 2019 RealSense, Inc. All Rights Reserved.
 
 #include "color-formats-converter.h"
+#include <src/core/video.h>
 
 #include "option.h"
 #include "image-avx.h"
@@ -26,6 +27,13 @@
 
 namespace librealsense 
 {
+
+    void color_converter::reserve_output_frame( const video_stream_profile_interface & profile )
+    {
+        _source.reserve_frame( { profile.get_stream_type(), profile.get_stream_index(), _extension_type },
+                               get_image_size( profile.get_width(), profile.get_height(), _target_format ) );
+    }
+
     /////////////////////////////
     // YUY2 unpacking routines //
     /////////////////////////////

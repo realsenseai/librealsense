@@ -102,17 +102,26 @@ namespace librealsense
     }
 
 
-    callback_invocation_holder frame_source::begin_callback( archive_id id )
+    // Callers hold _mutex while looking up and using the archive.
+    archive_interface & frame_source::get_or_create_archive( archive_id id )
     {
         normalize_extension_archive_id( id );
-
-        std::lock_guard< std::recursive_mutex > lock( _mutex );
-
         auto it = _archive.find( id );
         if( it == _archive.end() )
             it = create_archive( id );
+        return *it->second;
+    }
 
-        return it->second->begin_callback();
+    callback_invocation_holder frame_source::begin_callback( archive_id id )
+    {
+        std::lock_guard< std::recursive_mutex > lock( _mutex );
+        return get_or_create_archive( id ).begin_callback();
+    }
+
+    void frame_source::reserve_frame( archive_id id, size_t size )
+    {
+        std::lock_guard< std::recursive_mutex > lock( _mutex );
+        get_or_create_archive( id ).reserve_frame( size );
     }
 
     void frame_source::reset()
@@ -129,15 +138,8 @@ namespace librealsense
                                                  frame_additional_data && additional_data,
                                                  bool requires_memory )
     {
-        normalize_extension_archive_id( id );
-
         std::lock_guard< std::recursive_mutex > lock( _mutex );
-
-        auto it = _archive.find( id );
-        if( it == _archive.end() )
-            it = create_archive( id );
-
-        return it->second->alloc_and_track( size, std::move( additional_data ), requires_memory );
+        return get_or_create_archive( id ).alloc_and_track( size, std::move( additional_data ), requires_memory );
     }
 
     void frame_source::set_sensor( const std::weak_ptr< sensor_interface > & s )

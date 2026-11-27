@@ -2,6 +2,10 @@
 // Copyright(c) 2023-4 RealSense, Inc. All Rights Reserved.
 
 #include "proc/formats-converter.h"
+#ifdef RS2_USE_CUDA_ZEROCOPY
+#include "proc/color-formats-converter.h"
+#include "cuda/cuda-frame-memory.h"
+#endif
 #include "stream.h"
 #include <src/composite-frame.h>
 #include <src/core/frame-callback.h>
@@ -262,6 +266,10 @@ stream_profiles formats_converter::add_to_convert( stream_profiles from_profiles
 
     // Caching from_profiles to set as processed frames profile before calling user callback
     cache_from_profiles( from_profiles );
+#ifdef RS2_USE_CUDA_ZEROCOPY
+    // Reserve before the first pin starts. A live add must not block the other capture threads.
+    bool const reserve_outputs = _raw_profile_to_converters.empty() && rs_frame_zc_enabled();
+#endif
 
     // A profile that an active converter already outputs only keeps that converter's raw profile active
     for( auto it = from_profiles.begin(); it != from_profiles.end(); )
@@ -325,6 +333,16 @@ stream_profiles formats_converter::add_to_convert( stream_profiles from_profiles
                             own = pb_of_raw_profile.size() == 1 ? best_pb : factory_of_best_match->generate();
                         pb = own;
                     }
+
+#ifdef RS2_USE_CUDA_ZEROCOPY
+                    if( reserve_outputs )
+                    {
+                        if( auto color = dynamic_cast< color_converter * >( pb.get() ) )
+                            color->reserve_output_frame( dynamic_cast< const video_stream_profile_interface & >( *from_profile ) );
+                        else if( auto stereo = dynamic_cast< interleaved_functional_processing_block * >( pb.get() ) )
+                            stereo->reserve_output_frames( dynamic_cast< const video_stream_profile_interface & >( *raw_profile ) );
+                    }
+#endif
 
                     // Caching converters to invoke appropriate converters for received frames
                     auto & use = _raw_profile_to_converters[raw_profile];

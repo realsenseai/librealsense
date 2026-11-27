@@ -14,27 +14,24 @@ public:
     {
     }
 
-    frame_interface * get_frame( int i ) const
-    {
-        auto frames = get_frames();
-        return frames[i];
-    }
+    frame_interface * get_frame( int i ) const { return _frames[i]; }
 
-    frame_interface ** get_frames() const { return (frame_interface **)data.data(); }
+    frame_interface ** get_frames() { return _frames.data(); }
+    size_t storage_size() const { return _frames.size() * sizeof( frame_interface * ); }
+    void resize_storage( size_t bytes ) { _frames.resize( bytes / sizeof( frame_interface * ) ); }
 
     const frame_interface * first() const { return get_frame( 0 ); }
     frame_interface * first() { return get_frame( 0 ); }
 
     void keep() override
     {
-        auto frames = get_frames();
-        for( size_t i = 0; i < get_embedded_frames_count(); i++ )
-            if( frames[i] )
-                frames[i]->keep();
+        for( auto * child : _frames )
+            if( child )
+                child->keep();
         frame::keep();
     }
 
-    size_t get_embedded_frames_count() const { return data.size() / sizeof( rs2_frame * ); }
+    size_t get_embedded_frames_count() const { return _frames.size(); }
 
     // In the next section we make the composite frame "look and feel" like the first of its
     // children
@@ -62,6 +59,10 @@ public:
     {
         return first()->get_sensor();
     }
+
+private:
+    // Only the CPU accesses the child pointers. Pixel buffers belong to the children.
+    std::vector< frame_interface * > _frames;
 };
 
 MAP_EXTENSION( RS2_EXTENSION_COMPOSITE_FRAME, librealsense::composite_frame );

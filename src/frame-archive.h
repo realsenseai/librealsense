@@ -23,6 +23,7 @@ namespace librealsense
         callbacks_heap callback_inflight;
 
         std::vector<T> freelist; // return frames here
+        size_t reserved_pixel_size = 0;
         std::atomic<bool> recycle_frames;
         int pending_frames = 0;
         std::recursive_mutex mutex;
@@ -30,6 +31,31 @@ namespace librealsense
         std::weak_ptr<sensor_interface> _sensor;
         std::shared_ptr<sensor_interface> get_sensor() const override { return _sensor.lock(); }
         void set_sensor( const std::weak_ptr< sensor_interface > & s ) override { _sensor = s; }
+
+        // The consumer and synchronizer can each retain an output while capture fills the next one.
+        static constexpr uint32_t initial_pixel_buffers = 3;
+
+        uint32_t pixel_cache_limit() const
+        {
+            auto const limit = max_frame_queue_size->load();
+            return limit ? limit : initial_pixel_buffers;
+        }
+
+        void reserve_frame( size_t size ) override
+        {
+            std::lock_guard< std::recursive_mutex > lock( mutex );
+            if( reserved_pixel_size != size )
+            {
+                auto const count = std::min( uint32_t( initial_pixel_buffers ), pixel_cache_limit() );
+                for( uint32_t i = 0; i < count; ++i )
+                {
+                    T first;
+                    first.resize_storage( size );
+                    freelist.push_back( std::move( first ) );
+                }
+                reserved_pixel_size = size;
+            }
+        }
 
         T alloc_frame(const size_t size, frame_additional_data && additional_data, bool requires_memory)
         {
@@ -43,7 +69,7 @@ namespace librealsense
                     // Attempt to obtain a buffer of the appropriate size from the freelist
                     for (auto it = begin(freelist); it != end(freelist); ++it)
                     {
-                        if (it->data.size() == size)
+                        if (it->storage_size() == size)
                         {
                             backbuffer = std::move(*it);
                             freelist.erase(it);
@@ -52,17 +78,24 @@ namespace librealsense
                     }
                 }
 
-                // Discard buffers that have been in the freelist for longer than 1s
+                // Reuse mapped storage up to the stream's queue limit. Freeing a pinned
+                // buffer here can stall the same capture thread that must return a driver buffer.
+                auto keep_spares = reserved_pixel_size ? pixel_cache_limit() : 0u;
                 for (auto it = begin(freelist); it != end(freelist);)
                 {
-                    if (additional_data.timestamp > it->additional_data.timestamp + 1000) it = freelist.erase(it);
+                    if( keep_spares && it->storage_size() == reserved_pixel_size )
+                    {
+                        --keep_spares;
+                        ++it;
+                    }
+                    else if (additional_data.timestamp > it->additional_data.timestamp + 1000) it = freelist.erase(it);
                     else ++it;
                 }
             }
 
             if (requires_memory)
             {
-                backbuffer.data.resize(size, 0); // TODO: Allow users to provide a custom allocator for frame buffers
+                backbuffer.resize_storage( size );
             }
             // Record the logical size even when we don't allocate `data` (requires_memory==false,
             // e.g. zero-copy capture where the pixels live in an external continuation buffer), so
@@ -190,6 +223,7 @@ namespace librealsense
 
             {
                 std::lock_guard<std::recursive_mutex> guard(mutex);
+                reserved_pixel_size = 0;
                 freelist.clear();
             }
 
