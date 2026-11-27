@@ -5,6 +5,7 @@
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 from pytest_check import check
 import logging
 log = logging.getLogger(__name__)
@@ -22,6 +23,13 @@ pytestmark = [
 def dp_device(test_device):
     dev, _ = test_device
     return dev.as_debug_protocol()
+
+
+@pytest.fixture
+def fw_table_read_xfail(test_device, request):
+    # Temporary: remove once the FW config-table read regression is fixed
+    if rsutils.version(test_device[0].get_info(rs.camera_info.firmware_version)) >= rsutils.version(8, 62, 47520, 0):
+        request.applymarker(pytest.mark.xfail(reason="FW 8.62.47520+: config-table read fails (-41 / short chunk)", strict=False))
 
 
 def test_ds5_standard_buffer(dp_device):
@@ -54,6 +62,7 @@ def test_ds5_standard_buffer(dp_device):
     check.equal(rcv_gvd_payload_size_integer, gvd_expected_payload_size)
 
 
+@pytest.mark.usefixtures("fw_table_read_xfail")
 def test_get_buffer_less_than_1kb(dp_device):
     # getting depth_calibration_table - size is 512
     depth_calib_table_id = 0xb4
@@ -66,6 +75,7 @@ def test_get_buffer_less_than_1kb(dp_device):
     check.equal(len(ans), depth_calib_table_size + 4)
 
 
+@pytest.mark.usefixtures("fw_table_read_xfail")
 def test_get_buffer_more_than_1kb_whole(dp_device):
     # getting rgb_lens_shading table - size is 1088
     rgb_lens_shading_table_id = 0xb2
@@ -77,6 +87,7 @@ def test_get_buffer_more_than_1kb_whole(dp_device):
     check.equal(len(ans), rgb_lens_shading_table_size + 4)
 
 
+@pytest.mark.usefixtures("fw_table_read_xfail")
 def test_get_buffer_more_than_1kb_chunks(dp_device):
     # getting rgb_lens_shading table - size is 1088
     rgb_lens_shading_table_id = 0xb2
