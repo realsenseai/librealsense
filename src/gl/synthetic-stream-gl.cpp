@@ -305,8 +305,8 @@ namespace librealsense
                         auto& vis = get_texture_visualizer();
                         //rs2::visualizer_2d vis;
                         rs2::fbo fbo(width, height);
-                        uint32_t res;
-                        glGenTextures(1, &res);
+                        temp_texture target;
+                        uint32_t res = target.create();
                         glBindTexture(GL_TEXTURE_2D, res);
 
                         auto textype = gl_format_mapping(types[i]);
@@ -328,9 +328,7 @@ namespace librealsense
                             glReadPixels(0, 0, width, height, textype.gl_format, textype.data_type, ptr);
                             ptr += width * height * textype.size;
                         }
-                        
-                        glDeleteTextures(1, &res);
-                        
+
                         fbo.unbind();
 
                         preloaded = true;

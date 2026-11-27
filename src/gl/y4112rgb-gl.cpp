@@ -183,6 +183,7 @@ rs2::frame y411_2rgb::process_frame(const rs2::frame_source& src, const rs2::fra
             throw std::runtime_error("Frame interface is not gpu addon interface");
         
         uint32_t yuy_texture;
+        temp_texture uploaded;
         
         if (auto input_frame = f.as<rs2::gl::gpu_frame>())
         {
@@ -190,7 +191,7 @@ rs2::frame y411_2rgb::process_frame(const rs2::frame_source& src, const rs2::fra
         }
         else
         {
-            glGenTextures(1, &yuy_texture);
+            yuy_texture = uploaded.create();
             glBindTexture(GL_TEXTURE_2D, yuy_texture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _width, _height/2, 0, GL_RGB, GL_UNSIGNED_BYTE, f.get_data());
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -226,11 +227,6 @@ rs2::frame y411_2rgb::process_frame(const rs2::frame_source& src, const rs2::fra
         _fbo->unbind();
 
         glBindTexture(GL_TEXTURE_2D, 0);
-
-        if (!f.is<rs2::gl::gpu_frame>())
-        {
-            glDeleteTextures(1, &yuy_texture);
-        }
     }, 
     [this]{
         _enabled = false;

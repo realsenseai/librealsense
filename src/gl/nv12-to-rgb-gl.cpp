@@ -147,6 +147,7 @@ rs2::frame nv12_to_rgb::process_frame(const rs2::frame_source& src, const rs2::f
         // NV12 is 12bpp: upload as single-channel R8 texture, width x (height * 3/2)
         int tex_h = _height * 3 / 2;
         uint32_t input_texture;
+        temp_texture uploaded;
 
         if (auto input_frame = f.as<rs2::gl::gpu_frame>())
         {
@@ -154,7 +155,7 @@ rs2::frame nv12_to_rgb::process_frame(const rs2::frame_source& src, const rs2::f
         }
         else
         {
-            glGenTextures(1, &input_texture);
+            input_texture = uploaded.create();
             glBindTexture(GL_TEXTURE_2D, input_texture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, _width, tex_h, 0, GL_RED, GL_UNSIGNED_BYTE, f.get_data());
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -190,11 +191,6 @@ rs2::frame nv12_to_rgb::process_frame(const rs2::frame_source& src, const rs2::f
         _fbo->unbind();
 
         glBindTexture(GL_TEXTURE_2D, 0);
-
-        if (!f.is<rs2::gl::gpu_frame>())
-        {
-            glDeleteTextures(1, &input_texture);
-        }
     },
     [this]{
         _enabled = false;

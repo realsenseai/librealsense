@@ -456,6 +456,7 @@ void pointcloud_gl::get_texture_map(
             throw std::runtime_error("Frame interface is not gpu addon interface");
 
         uint32_t depth_texture;
+        temp_texture uploaded_depth, occlusion_xyz, occlusion_uv;
 
         if (auto input_frame = _depth_data.as<rs2::gl::gpu_frame>())
         {
@@ -463,7 +464,7 @@ void pointcloud_gl::get_texture_map(
         }
         else
         {
-            glGenTextures(1, &depth_texture);
+            depth_texture = uploaded_depth.create();
             glBindTexture(GL_TEXTURE_2D, depth_texture);
             auto depth_data = _depth_data.get_data();
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, width, height, 0, GL_RG, GL_UNSIGNED_BYTE, depth_data);
@@ -489,8 +490,8 @@ void pointcloud_gl::get_texture_map(
         // to final output output_xyz and output_uv, otherwise, fbo1 renders directly to final output
         if (run_glsl_occlusion_removal)
         {
-            glGenTextures(1, &fbo1_xyz);
-            glGenTextures(1, &fbo1_uv);
+            fbo1_xyz = occlusion_xyz.create();
+            fbo1_uv = occlusion_uv.create();
         }
         else
         {
@@ -606,16 +607,9 @@ void pointcloud_gl::get_texture_map(
             occu_shader.end();
 
             fbo2.unbind();
-
-            glDeleteTextures(1, &fbo1_xyz);
-            glDeleteTextures(1, &fbo1_uv);
         }
 
         glBindTexture(GL_TEXTURE_2D, 0);
-        if (!_depth_data.is<rs2::gl::gpu_frame>())
-        {
-            glDeleteTextures(1, &depth_texture);
-        }
     }, [&]{
         _enabled = false;
     });
