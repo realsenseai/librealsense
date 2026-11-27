@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# D401 GMSL raw dual-RGB across every output resolution. Each one is a different demosaic crop/scale of
+# D401 raw dual-RGB (GMSL, or USB as D405) across every output resolution. Each one is a different demosaic crop/scale of
 # the native 1288x808 image, so each gets its own Color 0 + Color 1 run. Nightly: too slow to gate PRs.
 
 import pytest
@@ -11,7 +11,8 @@ from d401_helper import COLOR0, COLOR1
 
 pytestmark = [
     pytest.mark.device_each( "D401" ),
-    pytest.mark.device_type( "GMSL" ),
+    # A D401 over USB enumerates as a D405 (PID 0x0B5B) and gets the same raw path when its FW advertises it
+    pytest.mark.device_each( "D405" ),
     pytest.mark.context( "nightly" ),
 ]
 
