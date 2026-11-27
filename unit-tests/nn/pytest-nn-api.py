@@ -11,3 +11,7 @@ def test_nn_api_is_exposed():
         assert hasattr( rs.nn_loader, name )
     for name in ( 'is_nn_loader', 'as_nn_loader' ):
         assert hasattr( rs.device, name )
+
+
+def test_nn_upload_documents_slot_2():
+    assert 'slot=2' in rs.nn_loader.nn_upload.__doc__

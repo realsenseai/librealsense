@@ -24,6 +24,7 @@ class fake_transport : public nn_transport
 public:
     struct chunk
     {
+        uint32_t param3;
         uint32_t param4;
         size_t size;
         uint8_t first;
@@ -32,9 +33,9 @@ public:
     // The total limit leaves the quick failures plenty of headroom on slow (e.g. instrumented) CI runners
     fake_transport() : nn_transport( { milliseconds( 1 ), milliseconds( 1000 ) } ) {}
 
-    int32_t send_chunk( uint16_t, uint32_t, uint32_t, uint32_t param4, const uint8_t * data, size_t size ) override
+    int32_t send_chunk( uint16_t, uint32_t, uint32_t param3, uint32_t param4, const uint8_t * data, size_t size ) override
     {
-        chunks.push_back( { param4, size, data[0] } );
+        chunks.push_back( { param3, param4, size, data[0] } );
         if( chunks.size() - 1 == lost_at_chunk )
             throw io_exception( "device disconnected" );
         auto it = chunk_errors.find( chunks.size() - 1 );
@@ -91,11 +92,12 @@ static std::vector< uint8_t > make_table( size_t size )
 
 
 // Uploads a table and returns the exception message, or empty on success
-static std::string upload( fake_transport & t, size_t size = 2501, std::vector< float > * progress = nullptr )
+static std::string upload( fake_transport & t, size_t size = 2501, std::vector< float > * progress = nullptr,
+                           uint32_t param3 = 0 )
 {
     try
     {
-        t.send_table( nn::PACKAGE_TABLE_ID, 1, 0, make_table( size ),
+        t.send_table( nn::PACKAGE_TABLE_ID, 1, param3, make_table( size ),
                       [&]( float p ) { if( progress ) progress->push_back( p ); } );
     }
     catch( librealsense_exception const & e )
@@ -125,11 +127,58 @@ TEST_CASE( "upload and commit" )
     CHECK( t.chunks[0].size == 1000 );
     CHECK( t.chunks[2].size == 501 );
 
-    // 90% for the chunks, the rest from the device's commit progress
-    std::vector< float > const expected = { 0.3f, 0.6f, 0.9f, 0.9f, 0.95f, 1.f };
+    // 90% for the chunks; past it only once the device writes flash, and 1.0 once done
+    std::vector< float > const expected = { 0.3f, 0.6f, 0.9f, 0.95f, 1.f };
     REQUIRE( progress.size() == expected.size() );
     for( size_t i = 0; i < expected.size(); ++i )
         CHECK( std::abs( progress[i] - expected[i] ) < 1e-5f );
+}
+
+
+TEST_CASE( "slot 2" )
+{
+    SECTION( "every chunk carries slot 2 with activate" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::done, 8, 100 ) };
+        CHECK( upload( t, 2501, nullptr, nn::slot_param( 2, true ) ) == "" );
+        REQUIRE( t.chunks.size() == 3 );
+        for( auto const & c : t.chunks )
+            CHECK( c.param3 == 0x10002 );
+    }
+    SECTION( "FW without slot 2 refuses the first chunk with -1" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ) };
+        t.chunk_errors[0] = -1;
+        CHECK_THROWS_AS( t.send_table( nn::PACKAGE_TABLE_ID, 1, nn::slot_param( 2, true ), make_table( 2501 ), {} ),
+                         not_implemented_exception );
+        CHECK( t.chunks.size() == 1 );
+        t.chunks.clear();
+        CHECK_THAT( upload( t, 2501, nullptr, nn::slot_param( 2, true ) ),
+                    ContainsSubstring( "Custom NN upload is not supported by this camera's firmware" ) );
+    }
+    SECTION( "package errors come in the commit, worded for slot 2" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::error, 8, 0, -65 ) };
+        CHECK_THAT( upload( t, 2501, nullptr, nn::slot_param( 2, true ) ),
+                    ContainsSubstring( "not signed" ) && ContainsSubstring( "(-65)" ) );
+
+        fake_transport weights_only;
+        weights_only.statuses = { make_status( nn::upload_state::idle, 7 ),
+                                  make_status( nn::upload_state::error, 8, 0, -5 ) };
+        CHECK_THAT( upload( weights_only, 2501, nullptr, nn::slot_param( 2, true ) ),
+                    ContainsSubstring( "network library" ) && ContainsSubstring( "dense strides" )
+                        && ContainsSubstring( "(-5)" ) && ContainsSubstring( "unchanged" ) );
+    }
+    SECTION( "-1 on slot 0 keeps its message" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ) };
+        t.chunk_errors[0] = -1;
+        CHECK_THAT( upload( t, 2501, nullptr, nn::slot_param( 0, true ) ), ContainsSubstring( "invalid command (-1)" ) );
+    }
 }
 
 
@@ -158,6 +207,19 @@ TEST_CASE( "device errors" )
         CHECK_THROWS_AS( t.send_table( nn::PACKAGE_TABLE_ID, 1, 0, make_table( 2501 ), {} ), invalid_value_exception );
         CHECK( t.chunks.size() == 2 );
         CHECK( t.status_reads == 1 );
+        t.chunks.clear();
+        CHECK_THAT( upload( t ), ContainsSubstring( "CRC mismatch (-6)" ) && ContainsSubstring( "model on the camera is unchanged" ) );
+    }
+    SECTION( "refused while validating: the model is kept, and progress stays at 0.9" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::validating, 8, 10 ),
+                       make_status( nn::upload_state::error, 8, 10, -6 ) };
+        std::vector< float > progress;
+        CHECK_THAT( upload( t, 2501, &progress ),
+                    ContainsSubstring( "CRC mismatch (-6)" ) && ContainsSubstring( "model on the camera is unchanged" ) );
+        REQUIRE( ! progress.empty() );
+        CHECK( progress.back() < 0.9005f );
     }
     SECTION( "device lost on a chunk: the model is unchanged" )
     {
@@ -180,7 +242,8 @@ TEST_CASE( "device errors" )
     {
         fake_transport t;
         t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::error, 8, 40, -15 ) };
-        CHECK_THAT( upload( t ), ContainsSubstring( "writing the model to the camera failed" ) && ContainsSubstring( "(-15)" ) );
+        CHECK_THAT( upload( t ), ContainsSubstring( "writing the model to the camera failed" ) && ContainsSubstring( "(-15)" )
+                                     && ! ContainsSubstring( "unchanged" ) );
     }
     SECTION( "after the commit progress reached 100: never reported as complete" )
     {
@@ -188,7 +251,8 @@ TEST_CASE( "device errors" )
         t.statuses = { make_status( nn::upload_state::idle, 7 ), make_status( nn::upload_state::activating, 8, 100 ),
                        make_status( nn::upload_state::error, 8, 100, -5 ) };
         std::vector< float > progress;
-        CHECK_THAT( upload( t, 2501, &progress ), ContainsSubstring( "(-5)" ) );
+        // Seen writing: the stored model may already be replaced
+        CHECK_THAT( upload( t, 2501, &progress ), ContainsSubstring( "(-5)" ) && ! ContainsSubstring( "unchanged" ) );
         REQUIRE( ! progress.empty() );
         CHECK( progress.back() < 1.f );
     }

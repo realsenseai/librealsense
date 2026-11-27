@@ -52,8 +52,32 @@ status parse_status( const std::vector< uint8_t > & reply )
 }
 
 
-std::string error_message( int32_t code )
+// Slot 2 (a custom network) has more causes behind -5, -10 and -15 than slot 0
+static const char * custom_slot_message( int32_t code )
 {
+    switch( code )
+    {
+    case -5:
+        return "the package is not a valid custom network for this camera. Check that it holds the network library as "
+               "well as the weights, unzipped, that it was converted for this camera's firmware, that its input is at "
+               "most 416 x 416, and that every output is s16, has dense strides (no gaps, no zero stride) and fits its "
+               "buffer";
+    case -10:
+        return "the custom network exceeds this camera's limits: an output frame over 3 MiB, scratch memory over its "
+               "budget, or a part larger than its flash slot";
+    case -15:
+        return "writing the custom network to the camera failed. The camera has no custom network until an upload "
+               "succeeds; upload again";
+    default: return nullptr;
+    }
+}
+
+
+std::string error_message( int32_t code, int slot )
+{
+    if( slot == CUSTOM_SLOT )
+        if( auto const msg = custom_slot_message( code ) )
+            return msg;
     switch( code )
     {
     case -1: return "invalid command";
@@ -77,15 +101,25 @@ std::string error_message( int32_t code )
                "type)";
     case -20: return "incomplete transfer";
     case -21: return "the camera could not allocate resources for the upload; reset the camera and try again";
-    case -41: return "the camera is busy: stop the Perception sensor and any other upload, then try again";
+    case -41:
+        return "the camera is busy: stop Object Detection streaming and wait for any firmware update or other upload "
+               "to finish, then try again";
+    case -65: return "this model package is not signed. Custom NN packages must be signed by RealSense";
+    case -66: return "the model package signature is not valid. Get the package again from the Perception Service";
+    case -67:
+        return "the model package is signed with a key this camera doesn't know. Update the camera firmware or get a "
+               "package for this firmware";
     default: return rsutils::string::from() << "device error " << code;
     }
 }
 
 
-void throw_error( int32_t code )
+void throw_error( int32_t code, int slot, bool model_unchanged )
 {
-    std::string msg = rsutils::string::from() << "NN upload failed: " << error_message( code ) << " (" << code << ")";
+    std::string msg = rsutils::string::from()
+                   << ( code == -1 && slot == CUSTOM_SLOT ? "Custom NN upload is not supported by this camera's firmware"
+                                                          : "NN upload failed: " + error_message( code, slot ) )
+                   << " (" << code << ")" << ( model_unchanged ? ". The model on the camera is unchanged" : "" );
     if( code == -1 || code == -4 || code == -12 || code == -19 || code == -34 )
         throw not_implemented_exception( msg );
     throw invalid_value_exception( msg );

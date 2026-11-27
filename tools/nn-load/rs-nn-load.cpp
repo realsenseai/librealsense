@@ -70,7 +70,7 @@ try
     cli::value< std::string > file_arg( 'f', "file", "path", "", "Path of the NN model package from the Perception Service" );
     cli::value< std::string > serial_number_arg( 's', "serial_number", "string", "", "The serial number of the device, mandatory if more than one NN loader device is connected" );
     cli::value< std::string > target_arg( "target", "flash|ddr", "flash", "Where to store the model (only flash is supported)" );
-    cli::value< int > slot_arg( "slot", "number", 0, "Model slot (only 0 is supported)" );
+    cli::value< int > slot_arg( "slot", "number", 0, "Model slot: 0 for Object Detection weights, 2 for a custom network" );
     cli::flag no_activate_arg( "no-activate", "Store the model without activating it (not supported)" );
 
     cmd.default_log_level( RS2_LOG_SEVERITY_WARN );
@@ -158,30 +158,41 @@ try
         }
     } );
 
-    std::cout << "Uploading " << file_arg.getValue() << " to " << info( loader, RS2_CAMERA_INFO_NAME ) << " s/n "
-              << serial << ". Please don't disconnect the device!" << std::endl;
+    std::string const uploading = "Uploading " + file_arg.getValue() + " to " + info( loader, RS2_CAMERA_INFO_NAME )
+                                + " s/n " + serial + ". Please don't disconnect the device!";
     bool activate = ! no_activate_arg.isSet();
     int last = -1;
+    bool started = false;
     bool writing = false;
-    // The camera reports little progress while it writes the model to flash (90-99%): say what it is doing
+    // Said on the first progress, after the first chunk: options the SDK refuses before any transfer print only the error
+    auto note_start = [&started, &uploading]
+    {
+        if( ! started )
+            std::cout << uploading << std::endl;
+        started = true;
+    };
+    // Progress passes 0.9 only once the camera has validated the package and writes it to flash, where it reports
+    // little progress: say what it is doing
     auto note_writing = [&writing]( float progress )
     {
-        if( progress >= 0.8999f && ! writing )
+        if( progress > 0.9005f && ! writing )
         {
             writing = true;
             std::cout << std::endl << "Writing the model to the camera, this can take about 15 seconds..." << std::endl;
         }
     };
     if( ISATTY( FILENO( stdout ) ) )
-        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&note_writing]( float progress )
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&note_start, &note_writing]( float progress )
         {
+            note_start();
             printf( "\rNN model upload progress: %d[%%]", int( progress * 100 + 0.001f ) );
             fflush( stdout );
             note_writing( progress );
         } );
     else  // a log gets a line every 10%
-        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last, &note_writing]( float progress )
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last, &note_start, &note_writing]( float progress )
         {
+            note_start();
             int pct = int( progress * 10 + 0.001f ) * 10;  // the last chunk's 0.9 may come as 0.8999999
             if( pct != last )
                 std::cout << "NN model upload progress: " << ( last = pct ) << "%" << std::endl;

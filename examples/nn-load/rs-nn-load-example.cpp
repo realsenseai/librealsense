@@ -77,14 +77,14 @@ int main( int argc, char * argv[] ) try
         }
     } );
 
-    // The upload blocks until the model is installed; the Perception sensor must not be streaming
+    // The upload blocks until the model is installed; no NN stream (Object Detection) may be streaming
     std::cout << "Uploading " << argv[1] << " to " << loader.get_info( RS2_CAMERA_INFO_NAME ) << " " << serial << std::endl;
     bool writing = false;
     loader.nn_upload( package, [&writing]( float progress )
     {
         std::cout << "\rProgress: " << int( progress * 100 + 0.001f ) << "%" << std::flush;
-        // The camera reports little progress while it writes the model to flash
-        if( progress >= 0.8999f && ! writing )
+        // Past 0.9 once the camera writes the model to flash, where it reports little progress
+        if( progress > 0.9005f && ! writing )
         {
             writing = true;
             std::cout << std::endl << "Writing the model to the camera, this can take about 15 seconds" << std::endl;

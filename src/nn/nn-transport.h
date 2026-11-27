@@ -37,7 +37,7 @@ public:
 
 private:
     nn::status get_status();
-    void wait_for_commit( uint32_t seq_before, const progress_callback & progress );
+    void wait_for_commit( uint32_t seq_before, int slot, const progress_callback & progress );
 
     nn_transport_timing _timing;
 };
