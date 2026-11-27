@@ -25,6 +25,7 @@ class single_consumer_queue
 
     unsigned int const _cap;
     bool _accepting;
+    bool _reserve_front = false;
 
     std::function<void(T const &)> const _on_drop_callback;
 
@@ -51,11 +52,22 @@ public:
 
         _queue.push_back(std::move(item));
 
-        if( _queue.size() > _cap )
+        if( _queue.size() > _cap + _reserve_front )
         {
-            if( _on_drop_callback )
-                _on_drop_callback( _queue.front() );
-            _queue.pop_front();
+            // An active read owns the first arrival. Replace only unread backlog.
+            if( _reserve_front )
+            {
+                auto superseded = _queue.begin() + 1;
+                if( _on_drop_callback )
+                    _on_drop_callback( *superseded );
+                _queue.erase( superseded );
+            }
+            else
+            {
+                if( _on_drop_callback )
+                    _on_drop_callback( _queue.front() );
+                _queue.pop_front();
+            }
         }
 
         lock.unlock();
@@ -94,13 +106,15 @@ public:
 
     // Remove one item; if unavailable, wait for it
     // Return true if an item was removed -- otherwise, false
-    bool dequeue( T * item, unsigned int timeout_ms )
+    bool dequeue( T * item, unsigned int timeout_ms, bool reserve_first = false )
     {
         std::unique_lock<std::mutex> lock(_mutex);
-        if( ! _deq_cv.wait_for( lock,
-                                std::chrono::milliseconds( timeout_ms ),
-                                [this]() { return ! _accepting || ! _queue.empty(); } )
-            || _queue.empty() )
+        _reserve_front = reserve_first && _queue.empty();
+        bool available = _deq_cv.wait_for( lock,
+                                           std::chrono::milliseconds( timeout_ms ),
+                                           [this]() { return ! _accepting || ! _queue.empty(); } );
+        _reserve_front = false;
+        if( ! available || _queue.empty() )
         {
             return false;
         }
@@ -217,9 +231,9 @@ public:
             return _queue.enqueue( std::move( item ) );
     }
 
-    bool dequeue(T* item, unsigned int timeout_ms)
+    bool dequeue(T* item, unsigned int timeout_ms, bool reserve_first = false)
     {
-        return _queue.dequeue(item, timeout_ms);
+        return _queue.dequeue(item, timeout_ms, reserve_first);
     }
 
     bool try_dequeue(T* item)
